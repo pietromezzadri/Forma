@@ -29,6 +29,7 @@ type Paint struct {
 	Dash       float32 // world units per dash period, 0 = solid
 	DepthBias  float32 // clip-space z pulled toward the camera
 	IDBase     uint32  // OR'ed into IDs in the pick pass
+	OnTop      bool    // faces: drawn over everything (no depth test)
 }
 
 type Renderer struct {
@@ -178,7 +179,13 @@ func (r *Renderer) faceSetup(v View, p Paint, pick bool) {
 // DrawFaces draws shaded triangles (or their IDs).
 func (r *Renderer) DrawFaces(v View, m *TriMesh, p Paint, pick bool) {
 	r.faceSetup(v, p, pick)
+	if p.OnTop {
+		gl.Disable(gl.DEPTH_TEST)
+	}
 	m.Draw()
+	if p.OnTop {
+		gl.Enable(gl.DEPTH_TEST)
+	}
 	gl.Disable(gl.POLYGON_OFFSET_FILL)
 }
 

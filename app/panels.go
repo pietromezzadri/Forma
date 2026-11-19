@@ -2,13 +2,9 @@ package app
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	imgui "github.com/AllenDang/cimgui-go/imgui"
 
-	"forma/brep"
-	fio "forma/io"
 	"forma/sketch"
 	"forma/ui"
 )
@@ -41,6 +37,7 @@ func (a *App) mainMenu() {
 		a.menuItem("file.saveas")
 		a.menuItem("file.recover")
 		imgui.Separator()
+		a.menuItem("file.import")
 		a.menuItem("file.export")
 		imgui.Separator()
 		a.menuItem("file.quit")
@@ -91,6 +88,8 @@ func (a *App) mainMenu() {
 		imgui.Separator()
 		a.menuItem("view.fit")
 		a.menuItem("view.ortho")
+		imgui.Separator()
+		a.menuItem("view.layout")
 		a.menuItem("view.grid")
 		a.menuItem("view.params")
 		imgui.EndMenu()
@@ -132,9 +131,9 @@ func (a *App) statusBar() {
 
 // defaultLayout docks the panels round the viewport (first run, or captures).
 func (a *App) defaultLayout(id imgui.ID) {
-	if n := imgui.InternalDockBuilderGetNode(id); n != nil && a.capture == nil {
-		ch := n.ChildNodes()
-		if ch[0] != nil || ch[1] != nil {
+	if n := imgui.InternalDockBuilderGetNode(id); n != nil && !a.layoutReset && (a.capture == nil || a.capture.script.Ini != "") {
+		// (ChildNodes wraps the child slots, never nil: ask ImGui)
+		if n.InternalIsSplitNode() {
 			return // a saved layout
 		}
 	}
@@ -151,6 +150,7 @@ func (a *App) defaultLayout(id imgui.ID) {
 	imgui.InternalDockBuilderDockWindow("Timeline", bottom)
 	imgui.InternalDockBuilderDockWindow("Viewport", mid)
 	imgui.InternalDockBuilderFinish(id)
+	a.layoutReset = false
 }
 
 func (a *App) sketchProperties(s *SketchItem) {
@@ -237,7 +237,8 @@ func (a *App) helpWindow() {
 			{"Num 0 / 1 / 3 / 7", "Iso / front / right / top (Ctrl: opposite)"},
 			{"Num 5", "Orthographic on / off"},
 			{"Ctrl+K", "Command palette"},
-			{"Ctrl+E", "Export STL"},
+			{"Ctrl+E", "Export (STEP, STL, OBJ)"},
+			{"Ctrl+I", "Import (STEP, STL)"},
 			{"Esc", "Cancel / clear selection"},
 			{"Del", "Delete the selection"},
 			{"", ""},
@@ -261,72 +262,4 @@ func (a *App) helpWindow() {
 		}
 	}
 	imgui.End()
-}
-
-// exportDialog asks where to write the STL.
-type exportDialog struct {
-	show bool
-	path string
-}
-
-func (d *exportDialog) open(path string) {
-	d.show = true
-	if path != "" {
-		d.path = path
-	}
-	if d.path == "" {
-		dir, _ := os.UserHomeDir()
-		d.path = filepath.Join(dir, "Documents", "Forma", "design.stl")
-	}
-}
-
-func (d *exportDialog) draw(a *App) {
-	if !d.show {
-		return
-	}
-	imgui.SetNextWindowSizeV(imgui.Vec2{X: 520, Y: 0}, imgui.CondAlways)
-	if imgui.BeginV("Export STL", &d.show, imgui.WindowFlagsNoResize|imgui.WindowFlagsNoSavedSettings) {
-		n := 0
-		for _, b := range a.doc.Bodies {
-			if b.Visible && b.Body != nil {
-				n++
-			}
-		}
-		imgui.Text(fmt.Sprintf("%d visible bodies, as binary STL in millimetres.", n))
-		imgui.SetNextItemWidth(-1)
-		imgui.InputTextWithHint("##path", "file path", &d.path, 0, nil)
-		if imgui.Button(ui.Icon(ui.FaDownload, "Export")) {
-			if err := a.exportSTL(d.path); err != nil {
-				a.notify("Export failed: %v", err)
-			} else {
-				a.notify("Exported %s", d.path)
-				d.show = false
-			}
-		}
-		imgui.SameLine()
-		if imgui.Button("Cancel") {
-			d.show = false
-		}
-	}
-	imgui.End()
-}
-
-// exportSTL writes the visible bodies at a fine tolerance.
-func (a *App) exportSTL(path string) error {
-	var meshes []*brep.Mesh
-	for _, b := range a.doc.Bodies {
-		if !b.Visible || b.Body == nil {
-			continue
-		}
-		opt := brep.DefaultMeshOptions(b.Body)
-		opt.ChordTol = min(opt.ChordTol, 0.01)
-		meshes = append(meshes, brep.Tessellate(b.Body, opt))
-	}
-	if len(meshes) == 0 {
-		return fmt.Errorf("nothing to export")
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return fio.SaveSTL(path, "design", meshes...)
 }

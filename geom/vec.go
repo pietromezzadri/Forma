@@ -134,6 +134,14 @@ func (b *Box) Add(p Vec3) {
 func (b *Box) Empty() bool      { return !b.set }
 func (b Box) Center() Vec3      { return b.Min.Add(b.Max).Scale(0.5) }
 func (b Box) Diagonal() float64 { return b.Max.Dist(b.Min) }
+
+// Contains reports whether p lies in the box (with tol to spare).
+func (b Box) Contains(p Vec3) bool {
+	const t = 1e-6
+	return b.set && p.X >= b.Min.X-t && p.Y >= b.Min.Y-t && p.Z >= b.Min.Z-t &&
+		p.X <= b.Max.X+t && p.Y <= b.Max.Y+t && p.Z <= b.Max.Z+t
+}
+
 func (b *Box) Union(o Box) {
 	if o.set {
 		b.Add(o.Min)

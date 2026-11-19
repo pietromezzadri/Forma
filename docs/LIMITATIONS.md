@@ -13,9 +13,10 @@ new ones as features land.
   with two edges go.
 - **K2 Intersection curves are polylines.** Where a plane meets a cylinder
   square on (a boss's root, a hole's rim) the edge is a polyline, not a
-  circle. Fine for display and booleans, but STEP export (M6) wants exact
-  curves: recognise plane–cylinder, plane–cone, plane–sphere and coaxial
-  cases and make lines, circles and ellipses.
+  circle. Fine for display and booleans; STEP export fits circles and lines
+  to them (E4), but the kernel should make them exact itself: recognise
+  plane–cylinder, plane–cone, plane–sphere and coaxial cases and make
+  lines, circles and ellipses (also sharpens mass properties, I2).
 - **K3 Speed.** A boolean takes up to about a quarter of a second, so
   dragging an extrude's arrow or the move gizmo on a joined body stutters,
   and a long history regenerates slowly. Ideas: bounding-box culling per
@@ -78,7 +79,8 @@ new ones as features land.
   and a flat face, and parallel flat faces. Angles only between flat faces
   and straight edges. No edge–edge minimum distance.
 - **I2 Mass properties** come from a fine tessellation (a part in 10⁴–10⁵ on
-  curved bodies) and one density for the whole design.
+  curved bodies: a sphere's volume is 1.5 parts in 10⁴ low, where OpenCASCADE
+  gets it exactly) and one density for the whole design.
 - **I3 Section view:** X, Y or Z planes only (not a face or any angle); the cut
   is shown by hatching the inside faces seen through it, not real cap faces,
   so it looks wrong for open (non-solid) geometry.
@@ -100,7 +102,7 @@ new ones as features land.
 
 ## App and UI (`app/`)
 
-- **U1 No native file dialogs** (paths are typed).
+- ~~U1 No native file dialogs~~ (Windows' own Open / Save As windows now, `app/native_dialog.go`; captures still type paths). Untested on macOS / Linux, where zenity needs zenity or kdialog installed.
 - **U2 Not tried with a real mouse yet:** everything was checked by scripted
   captures; the feel of orbiting, picking, sketching and the gizmo needs a
   real session.
@@ -111,6 +113,51 @@ new ones as features land.
   open the menu first or call the command.
 - **U5 Section panel's radio buttons** look odd (empty circles beside X / Z).
 
+## Assemblies (`doc/assembly.go`, `app/assembly_ui.go`)
+
+- **A1 Components are copies:** a component keeps the design as it was when
+  inserted (inside this design); changes to its file come in only with
+  Update from file, and its own history can't be edited in place (open its
+  file, change it, save, Update).
+- **A2 Joints** are rigid, revolute, slider and cylindrical only (no ball,
+  planar or pin-in-slot); no motion limits, no contact, no motion study.
+  Each joint moves its second component once, in timeline order: there is
+  no solver, so loops (a four-bar linkage) can't be closed, and a component
+  moved by two joints ends up where the later one puts it.
+- **A3 Joint snap points:** a flat face's area centre, a round face's axis at
+  the middle of the face, a circle's centre, a line's middle or a vertex;
+  no picking other snap points (a face's edge midpoints, an end of an axis)
+  and no offsets but the joint's own angle and distance.
+- **A4 Features act on components' bodies** like any others: a cut through
+  two components cuts both, and they stop being components (STEP then
+  writes them as plain bodies).
+- **A5 Interference** intersects the bodies pairwise: slow with many
+  components, and a pin exactly the size of its hole (round faces lying on
+  each other) may come back as "couldn't be checked" (K4).
+- **A6 Not there yet:** a bill of materials, exploded views, grounding a
+  component, rigid groups, nested-component editing.
+
 ## Exchange (`io/`)
 
-- **E1 STL only** (in and out). STEP, OBJ and assemblies are milestone M6.
+- ~~E1 STL only~~ (M6: STEP in and out, OBJ out, STL in as a reference mesh).
+- **E2 STEP import reads analytic solids only:** faces on planes, cylinders,
+  cones, spheres and tori. B-spline surfaces, surfaces of revolution or
+  extrusion and offset surfaces are refused (the solid is left out, with the
+  reason); so are open shells and surface models. Ellipse and B-spline edges
+  become polylines pulled onto both faces (fine for booleans; not exact).
+- **E3 STEP import flattens assemblies:** placements (`NEXT_ASSEMBLY_USAGE_OCCURRENCE`
+  transforms, at any depth, a part used many times) are applied, but the
+  solids come in as bodies of one Import feature, not as components;
+  `MAPPED_ITEM` instancing, colours, layers and names of faces aren't read.
+- **E4 STEP export** writes components as an assembly (a part per distinct
+  design, an occurrence per component) but no colours or names of faces.
+  Intersection edges are written as circles or lines when their points lie
+  on one (within 1e-5 mm), else as degree-1 B-splines through the points;
+  ellipses (a plane cutting a cylinder at a slant) aren't recognised.
+- **E5 STL import is a reference mesh only:** shown flat-shaded with its size,
+  area and volume, but not pickable in the view, not measurable against other
+  things, and never turned into a solid for booleans.
+- **E6 OBJ:** export only, no materials.
+- **E7 Imports keep the whole file in the design** (`.forma` files grow with
+  big imports), and there's no "replace with a newer version of the file":
+  import again and delete the old feature.

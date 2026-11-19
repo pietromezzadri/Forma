@@ -28,21 +28,25 @@ type Param struct {
 
 // Feature kinds.
 const (
-	KBox      = "box"
-	KCylinder = "cylinder"
-	KCone     = "cone"
-	KSphere   = "sphere"
-	KTorus    = "torus"
-	KSketch   = "sketch"
-	KExtrude  = "extrude"
-	KRevolve  = "revolve"
-	KMove     = "move"
-	KMirror   = "mirror"
-	KPattern  = "pattern"
-	KFillet   = "fillet"
-	KChamfer  = "chamfer"
-	KHole     = "hole"
-	KShell    = "shell"
+	KBox       = "box"
+	KCylinder  = "cylinder"
+	KCone      = "cone"
+	KSphere    = "sphere"
+	KTorus     = "torus"
+	KSketch    = "sketch"
+	KExtrude   = "extrude"
+	KRevolve   = "revolve"
+	KMove      = "move"
+	KMirror    = "mirror"
+	KPattern   = "pattern"
+	KFillet    = "fillet"
+	KChamfer   = "chamfer"
+	KHole      = "hole"
+	KShell     = "shell"
+	KImport    = "import"    // solids read from a STEP file
+	KMesh      = "mesh"      // a reference mesh read from an STL file
+	KComponent = "component" // another design inserted and placed
+	KJoint     = "joint"     // moves a component onto another
 )
 
 // KeysPerFeature: a body's key is its feature's ID × KeysPerFeature + its
@@ -108,6 +112,8 @@ type Feature struct {
 	AxisFace *FaceRef          `json:"axisFace,omitempty"`
 	Ref      int               `json:"ref,omitempty"`    // a hole's sketch
 	Points   []int             `json:"points,omitempty"` // its points
+	Data     string            `json:"data,omitempty"`   // an import's file (STEP text, STL as base64)
+	Joint    []JointRef        `json:"joint,omitempty"`  // a joint's fixed and moving ends
 	Hidden   bool              `json:"hidden,omitempty"`
 	Off      bool              `json:"suppressed,omitempty"`
 
@@ -115,6 +121,10 @@ type Feature struct {
 	Bodies  []*brep.Body    `json:"-"`
 	Regions []sketch.Region `json:"-"`
 	Err     string          `json:"-"`
+	Warn    string          `json:"-"` // what an import left out
+	RefMesh *brep.Mesh      `json:"-"` // a mesh feature's triangles
+	Local   []*brep.Body    `json:"-"` // a component's bodies in its own frame
+	Place   geom.Xform      `json:"-"` // and where it put them
 	Active  bool            `json:"-"` // before the rollback marker and not suppressed
 	After   []*BodyRef      `json:"-"` // the design's bodies after it
 	Gen     int             `json:"-"` // bumped whenever the results change
@@ -138,6 +148,8 @@ type Document struct {
 	state []*BodyRef // the bodies so far, while regenerating
 	regen bool
 	gen   int
+
+	subCache map[uint64]subDesign // components' designs, regenerated
 }
 
 func New() *Document {
@@ -190,7 +202,8 @@ func (d *Document) uniqueName(base string) string {
 
 var kindLabel = map[string]string{KBox: "Box", KCylinder: "Cylinder", KCone: "Cone", KSphere: "Sphere",
 	KTorus: "Torus", KSketch: "Sketch", KExtrude: "Extrude", KRevolve: "Revolve", KMove: "Move",
-	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell"}
+	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell",
+	KImport: "Import", KMesh: "Mesh", KComponent: "Component", KJoint: "Joint"}
 
 // KindLabel names a kind for the UI.
 func KindLabel(k string) string { return kindLabel[k] }
@@ -267,6 +280,12 @@ func (f *Feature) deps() []int {
 	}
 	if f.Ref != 0 {
 		out = append(out, f.Ref)
+	}
+	for _, j := range f.Joint {
+		out = append(out, j.Feature)
+		if j.Edge != nil {
+			out = append(out, nameFeature(j.Edge.A), nameFeature(j.Edge.B))
+		}
 	}
 	return out
 }

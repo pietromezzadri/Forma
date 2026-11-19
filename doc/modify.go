@@ -114,7 +114,7 @@ func fmtNum(x float64) string {
 // adding tool bodies of their own.
 func (f *Feature) modifies() bool {
 	switch f.Kind {
-	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell:
+	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint:
 		return true
 	}
 	return false
@@ -344,11 +344,9 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 			if err != nil {
 				return nil, err
 			}
-			b, err := brep.Transform(out[i].Body, x, nil)
-			if err != nil {
+			if err := d.moveRefs(out, []int{i}, x); err != nil {
 				return nil, err
 			}
-			changed(i, b)
 		}
 		return out, nil
 
@@ -548,6 +546,9 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 		s.Name = b.Name
 		changed(i, s)
 		return out, nil
+
+	case KJoint:
+		return d.joint(f, out)
 	}
 	return nil, fmt.Errorf("unknown feature kind %q", f.Kind)
 }

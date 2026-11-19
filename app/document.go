@@ -19,9 +19,11 @@ type Document struct {
 	D        *doc.Document
 	Bodies   []*BodyItem
 	Sketches []*SketchItem
+	Meshes   []*MeshItem // reference meshes
 	hist     *doc.History
 	bodies   map[int]*BodyItem
 	sketches map[int]*SketchItem
+	meshes   map[int]*MeshItem
 	changed  bool // regenerate before the next frame
 	Path     string
 	saved    []byte // the design as last saved (for the title's ●)
@@ -61,7 +63,7 @@ func bodyKey(fid, k int) int { return doc.BodyKey(fid, k) }
 func featureOf(id int) int { return id / doc.KeysPerFeature }
 
 func NewDocument() *Document {
-	d := &Document{D: doc.New(), bodies: map[int]*BodyItem{}, sketches: map[int]*SketchItem{}}
+	d := &Document{D: doc.New(), bodies: map[int]*BodyItem{}, sketches: map[int]*SketchItem{}, meshes: map[int]*MeshItem{}}
 	d.hist = doc.NewHistory(d.D)
 	d.saved = d.D.Marshal()
 	d.sync()
@@ -72,11 +74,14 @@ func NewDocument() *Document {
 func (d *Document) replace(nd *doc.Document) {
 	d.freeAll()
 	d.D = nd
-	d.bodies, d.sketches = map[int]*BodyItem{}, map[int]*SketchItem{}
+	d.bodies, d.sketches, d.meshes = map[int]*BodyItem{}, map[int]*SketchItem{}, map[int]*MeshItem{}
 	d.sync()
 }
 
 func (d *Document) freeAll() {
+	for _, m := range d.meshes {
+		m.free()
+	}
 	for _, b := range d.bodies {
 		if b.gpu != nil {
 			b.gpu.free()
@@ -172,6 +177,7 @@ func (d *Document) sync() {
 		}
 	}
 	d.Bodies, d.Sketches = bodies, sketches
+	d.syncMeshes()
 }
 
 func (d *Document) Body(id int) *BodyItem {
@@ -225,6 +231,11 @@ func (d *Document) Bounds() geom.Box {
 	for _, it := range d.Bodies {
 		if it.Visible && it.Body != nil {
 			b.Union(it.Body.Bounds())
+		}
+	}
+	for _, m := range d.Meshes {
+		if m.Visible {
+			b.Union(doc.MeshBounds(m.Mesh))
 		}
 	}
 	for _, s := range d.Sketches {

@@ -36,7 +36,10 @@ type captureScript struct {
 	Out    string `json:"out"`
 	// Record writes every frame to <out>/frames/ for a video.
 	Record bool `json:"record"`
-	Shots  []struct {
+	// Ini reads (and saves) the layout in that file, as a normal run does,
+	// instead of always laying the panels out afresh.
+	Ini   string `json:"ini"`
+	Shots []struct {
 		Name   string   `json:"name"`
 		Do     []string `json:"do"`
 		Frames int      `json:"frames"`
@@ -158,7 +161,7 @@ func (c *captureRun) do(act string) {
 		if !filepath.IsAbs(arg) {
 			arg = filepath.Join(c.dir, arg)
 		}
-		if err := a.exportSTL(arg); err != nil {
+		if err := a.writeExport(arg); err != nil {
 			log.Printf("capture: export: %v", err)
 		} else {
 			log.Printf("capture: exported %s", arg)

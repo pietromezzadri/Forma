@@ -39,12 +39,17 @@ type App struct {
 	sk         *sketchMode // the sketch being edited, nil outside sketch mode
 	browserSel int         // body or sketch picked in the browser
 
-	showGrid  bool
-	layoutSet bool
-	export    exportDialog
-	showHelp  bool
+	showGrid    bool
+	layoutSet   bool
+	layoutReset bool // lay the panels out afresh, saved layout or not
+	exportPath  string
+	importPath  string
+	showHelp    bool
 
 	files      fileDialog
+	dialogOpen bool // a native file dialog is up
+	asm        assemblyState
+	postQueue
 	showParams bool
 
 	section     sectionView
@@ -108,6 +113,8 @@ func Run() error {
 	ini := ""
 	if cap == nil {
 		ini = iniPath()
+	} else if cap.script.Ini != "" {
+		ini = cap.script.Ini
 	}
 	a := &App{win: win, doc: NewDocument(), cam: NewCamera(), showGrid: true, capture: cap, last: time.Now(), btnRects: map[string]imgui.Vec2{}, density: "7.85"}
 	a.backend = ui.Init(win, ini)
@@ -133,6 +140,7 @@ func Run() error {
 			glfw.PollEvents()
 			cap.tick()
 		}
+		a.runPosted()
 		a.frame()
 		if cap != nil && cap.done {
 			break
@@ -199,6 +207,7 @@ func (a *App) frame() {
 
 // buildUI lays out every window of the frame.
 func (a *App) buildUI() {
+	a.animateJoint()
 	a.mainMenu()
 	a.toolbar()
 	a.statusBar()
@@ -212,7 +221,7 @@ func (a *App) buildUI() {
 	a.timelinePanel()
 	a.viewportWindow()
 	a.palette.draw(a)
-	a.export.draw(a)
+	a.clashWindow()
 	a.files.draw()
 	a.paramsWindow()
 	a.helpWindow()

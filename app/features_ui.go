@@ -12,6 +12,7 @@ import (
 
 var (
 	colErr    = imgui.Vec4{X: 1, Y: 0.42, Z: 0.35, W: 1}
+	colWarn   = imgui.Vec4{X: 1, Y: 0.78, Z: 0.35, W: 1}
 	colOK     = imgui.Vec4{X: 0.5, Y: 0.85, Z: 0.5, W: 1}
 	colAccent = imgui.Vec4{X: 0.88, Y: 0.62, Z: 0.28, W: 0.55}
 )
@@ -38,6 +39,14 @@ func kindIcon(k string) rune {
 		return icHole
 	case doc.KShell:
 		return icShell
+	case doc.KImport:
+		return icImport
+	case doc.KMesh:
+		return icMesh
+	case doc.KComponent:
+		return icComponent
+	case doc.KJoint:
+		return icJoint
 	}
 	return ui.FaCube
 }
@@ -96,6 +105,7 @@ func (a *App) browserPanel() {
 		}
 		imgui.TreePop()
 	}
+	a.meshBrowser(eye)
 	if imgui.TreeNodeExStrV(ui.Icon(ui.FaPen, "Sketches")+"###sketches", imgui.TreeNodeFlagsDefaultOpen|imgui.TreeNodeFlagsSpanAvailWidth) {
 		for _, s := range a.doc.Sketches {
 			eye(s.F)
@@ -321,6 +331,12 @@ func (a *App) featureProperties(f *doc.Feature) {
 		a.exprField(f, "Angle", "°")
 		a.opCombo(f)
 	default:
+		if a.assemblyProperties(f) {
+			return
+		}
+		if a.importProperties(f) {
+			return
+		}
 		if a.modifyProperties(f) {
 			return
 		}

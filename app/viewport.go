@@ -376,6 +376,9 @@ func (a *App) renderScene() {
 		}
 	}
 
+	a.drawMeshes(v, inSketch)
+	a.drawClashes(v)
+
 	if a.showGrid {
 		r.DrawGrid(v, a.gridSpec(wpp))
 	}

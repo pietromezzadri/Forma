@@ -29,8 +29,8 @@ func (d *Document) Regenerate() {
 	for i, f := range d.Features {
 		f.Active = i < active && !f.Off
 		if !f.Active {
-			if f.Bodies != nil || f.Regions != nil || f.After != nil {
-				f.Bodies, f.Regions, f.After = nil, nil, nil
+			if f.Bodies != nil || f.Regions != nil || f.After != nil || f.RefMesh != nil {
+				f.Bodies, f.Regions, f.After, f.RefMesh = nil, nil, nil, nil
 				f.Gen++
 			}
 			f.sig = 0
@@ -47,7 +47,8 @@ func (d *Document) Regenerate() {
 		}
 		f.Gen++
 		f.Err = ""
-		f.Bodies, f.Regions = nil, nil
+		f.Bodies, f.Regions, f.RefMesh, f.Warn = nil, nil, nil, ""
+		f.Local = nil
 		d.state = state
 		if err := d.build(f); err != nil {
 			f.Err = err.Error()
@@ -74,11 +75,17 @@ type BodyRef struct {
 	Body  *brep.Body
 	Owner int
 	Gen   int
+	// a component's body: which, its body in the component's frame, and
+	// where the component is (Body = Place(Local)); cleared once a join or
+	// cut changes it
+	Comp  int
+	Local *brep.Body
+	Place geom.Xform
 }
 
 func (f *Feature) makesBodies() bool {
 	switch f.Kind {
-	case KSketch:
+	case KSketch, KMesh:
 		return false
 	}
 	return true
@@ -105,6 +112,9 @@ func (d *Document) apply(f *Feature, state []*BodyRef) []*BodyRef {
 	out := append([]*BodyRef(nil), state...)
 	if f.Err != "" {
 		return out
+	}
+	if f.Kind == KComponent {
+		return d.addComponent(f, state)
 	}
 	if f.modifies() {
 		r, err := d.modify(f, state)
@@ -279,7 +289,15 @@ func (d *Document) build(f *Feature) error {
 		err := d.buildHole(f)
 		qualify(f)
 		return err
-	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell:
+	case KImport:
+		err := d.buildImport(f)
+		qualify(f)
+		return err
+	case KMesh:
+		return d.buildMesh(f)
+	case KComponent:
+		return d.buildComponent(f)
+	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint:
 		return nil // they work on the bodies there are (modify)
 	default:
 		return fmt.Errorf("unknown feature kind %q", f.Kind)

@@ -73,7 +73,7 @@ func (a *App) registerCommands() *Commands {
 				a.openFile(arg)
 				return
 			}
-			a.files.ask("Open design", "Open", a.doc.Path, a.openFile)
+			a.pickFile(false, "Open design", "Open", startIn(a.doc.Path, ""), designFilter, a.openFile)
 		}})
 	c.add(&Command{ID: "file.save", Label: "Save", Group: "File", Icon: ui.FaFloppy, Shortcut: "Ctrl+S",
 		Run: func(arg string) {
@@ -81,16 +81,14 @@ func (a *App) registerCommands() *Commands {
 				a.saveFile(pickStr(arg, a.doc.Path))
 				return
 			}
-			a.files.ask("Save design", "Save", defaultPath("design.forma"), a.saveFile)
+			a.pickFile(true, "Save design", "Save", defaultPath("design.forma"), designFilter, a.saveFile)
 		}})
 	c.add(&Command{ID: "file.saveas", Label: "Save as…", Group: "File", Shortcut: "Ctrl+Shift+S",
 		Run: func(string) {
-			a.files.ask("Save design as", "Save", pickStr(a.doc.Path, defaultPath("design.forma")), a.saveFile)
+			a.pickFile(true, "Save design as", "Save", startIn(a.doc.Path, "design.forma"), designFilter, a.saveFile)
 		}})
 	c.add(&Command{ID: "file.recover", Label: "Recover autosave", Group: "File",
 		Enabled: func() bool { return autosaveExists() }, Run: func(string) { a.openFile(autosavePath()) }})
-	c.add(&Command{ID: "file.export", Label: "Export STL…", Group: "File", Icon: ui.FaDownload, Shortcut: "Ctrl+E",
-		Run: func(arg string) { a.export.open(arg) }})
 	c.add(&Command{ID: "file.quit", Label: "Quit", Group: "File", Run: func(string) { a.quit = true }})
 
 	c.add(&Command{ID: "edit.undo", Label: "Undo", Group: "Edit", Shortcut: "Ctrl+Z", Icon: 0xf0e2,
@@ -262,6 +260,8 @@ func (a *App) registerCommands() *Commands {
 	c.add(&Command{ID: "view.fit", Label: "Zoom to fit", Group: "View", Shortcut: "F", Icon: ui.FaExpand, Run: func(string) {
 		a.cam.Fit(a.doc.Bounds(), a.aspect(), a.animate())
 	}})
+	c.add(&Command{ID: "view.layout", Label: "Reset panel layout", Group: "View",
+		Run: func(string) { a.layoutSet, a.layoutReset = false, true }})
 	c.add(&Command{ID: "view.ortho", Label: "Toggle orthographic", Group: "View", Shortcut: "Num 5", Run: func(string) {
 		a.cam.Ortho = !a.cam.Ortho
 	}})
@@ -273,6 +273,8 @@ func (a *App) registerCommands() *Commands {
 	c.add(&Command{ID: "palette", Label: "Command palette", Group: "Help", Shortcut: "Ctrl+K", Icon: ui.FaSearch,
 		Run: func(string) { a.palette.open = true; a.palette.filter = ""; a.palette.cursor = 0 }})
 	a.registerModifyCommands(c)
+	a.registerExchangeCommands(c)
+	a.registerAssemblyCommands(c)
 	a.registerInspectCommands(c)
 	return c
 }
@@ -330,6 +332,8 @@ func (a *App) shortcuts() {
 		run("palette")
 	case ctrl && press(imgui.KeyE):
 		run("file.export")
+	case ctrl && press(imgui.KeyI):
+		run("file.import")
 	case ctrl && (press(imgui.KeyEnter) || press(imgui.KeyKeypadEnter)):
 		run("sketch.finish")
 	case press(imgui.KeyEscape):

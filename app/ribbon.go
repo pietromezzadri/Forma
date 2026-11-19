@@ -189,6 +189,8 @@ func (a *App) partRibbon(r *ribbon) {
 	r.cmd("edit.undo", 0xf0e2, "Undo", false)
 	r.cmd("edit.redo", 0xf01e, "Redo", false)
 	r.cmd("file.save", ui.FaFloppy, "Save", false)
+	r.cmd("file.import", icImport, "Import", false)
+	r.cmd("file.export", ui.FaDownload, "Export", false)
 	r.end("File")
 
 	r.group()
@@ -227,6 +229,13 @@ func (a *App) partRibbon(r *ribbon) {
 	r.end("Pattern")
 
 	r.group()
+	r.cmd("assemble.component", icComponent, "Component", false)
+	r.cmd("assemble.copy", icCopy, "Copy", false)
+	r.cmd("assemble.joint", icJoint, "Joint", false)
+	r.cmd("assemble.interference", icInterference, "Clash", a.asm.showClashes)
+	r.end("Assemble")
+
+	r.group()
 	r.cmd("view.section", icSection, "Section", a.section.on)
 	r.cmd("inspect.mass", 0xf5cd, "Mass", false)
 	r.cmd("view.params", 0xf1de, "Params", a.showParams)
@@ -239,7 +248,6 @@ func (a *App) partRibbon(r *ribbon) {
 	r.end("View")
 
 	r.group()
-	r.cmd("file.export", ui.FaDownload, "STL", false)
 	r.cmd("palette", ui.FaSearch, "Search", false)
 	r.end("More")
 }

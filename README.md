@@ -13,13 +13,17 @@ go run ./tools/stlcheck f.stl   # facets, volume, closed / oriented
 Run from PowerShell on Windows (Git Bash loads the wrong DLLs). Needs a C
 compiler for cgo (MSYS2 gcc works).
 
-## What's here (milestones M0–M2)
+## What's here
+
+Milestones M0–M2 (the shell, kernel and sketcher):
 
 - **App shell** (`app/`, `ui/`, `render/`): docked layout (Browser, Viewport,
   Properties, Timeline), a ribbon toolbar (`app/ribbon.go`: icon-over-name
   tools in captioned groups — File, Sketch, Create, Modify, Pattern, Inspect,
   View; primitives and sketch planes in drop-downs; its own set in a sketch), status bar, Ctrl+K command palette, F1
-  shortcuts. Every action is an `app.Command`, shared by menus, toolbar,
+  shortcuts. Open, Save as, Import and Export use Windows' own file
+  dialogs (`github.com/ncruces/zenity`, modal to the window, run off the main
+  loop; captures keep an in-app path box). Every action is an `app.Command`, shared by menus, toolbar,
   palette, shortcuts and capture scripts.
 - **Viewport**: MSAA render target shown as an ImGui image; orbit round the
   point under the cursor (right drag or Shift+middle), pan (middle), zoom to the
@@ -46,7 +50,7 @@ compiler for cgo (MSYS2 gcc works).
   points, midpoints, curves, centres and the grid; inferred horizontal /
   vertical; badges and dimensions drawn over the view; double-click a
   dimension to type a value or expression (`expr/`: `20mm + 5`, `1in`, `45deg`).
-- **Exchange** (`io/`): binary / ASCII STL in, binary STL out.
+- **Exchange** (`io/`): binary / ASCII STL in, binary STL out (STEP and OBJ: M6).
 
 ## M3: features and history
 
@@ -148,6 +152,54 @@ compiler for cgo (MSYS2 gcc works).
 - Everything known not to work yet is listed, with IDs, in
   [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
 
+## M6: exchange
+
+- **STEP export** (`io/step_write.go`, File → Export, Ctrl+E, by the file's
+  extension): AP214 (`AUTOMOTIVE_DESIGN`) advanced B-rep solids in mm — planes,
+  cylinders, cones, spheres and tori with their exact parameters, lines and
+  circles; intersection edges are fitted to circles or lines where their
+  points lie on one, else written as degree-1 B-splines; cavities as
+  `BREP_WITH_VOIDS`. Also STL and OBJ (`io/obj.go`, a group per face).
+- **STEP import** (`io/step_parse.go`: an ISO 10303-21 reader; `io/step_read.go`;
+  File → Import, Ctrl+I): the solids of AP203 / AP214 / AP242 files on those
+  surfaces become bodies of the design (an Import feature with an Operation,
+  its faces named `imp:<n>`, the file kept inside the `.forma`), units read
+  from the file (inches, metres …); ellipse and B-spline edges become
+  polylines pulled onto both faces. They take part in booleans, fillets and
+  the rest like any body.
+- **STL import** makes a reference mesh: shown, with its size, area and
+  volume, not part of the solids.
+- Tests (`go test ./io/`): every surface and edge kind written and read
+  back (counts and volume); files written by OpenCASCADE read in
+  (`io/testdata/`, made by `tools/stepcheck/make.py`: fillets with spherical
+  corners, an oblique hole, crossing cylinders, a torus cut, a chamfered
+  cone); with `FORMA_FREECAD` set to FreeCAD's `bin/python.exe` our files are
+  read by OpenCASCADE and checked valid with the same volumes
+  (`tools/stepcheck/check.py`).
+
+## M7: assemblies
+
+- **Components** (Assemble → Component): another `.forma` design inserted and
+  placed (Move / Rotate inputs or the gizmo), kept inside this one; its
+  bodies stay apart (`BodyRef.Comp`, with the body in the component's frame
+  and its placement). Copy places another instance sharing the design;
+  Update from file re-reads it.
+- **Joints** (pick a face, edge or vertex on the part that stays, then one on
+  the part that moves): rigid, revolute, slider, cylindrical. The moving
+  part's frame (a flat face's centre and normal, a round face's axis, a
+  circle's centre and axis — a boolean's polyline rims are fitted —, a
+  line's middle) is brought onto the fixed one face to face (Flip: the same
+  way), then turned by the angle and slid by the distance; the motion has a
+  slider and Play.
+- **Interference** (Clash): the overlap of every pair of bodies from
+  different components, listed with its volume and drawn in red.
+- **STEP**: components export as an assembly (a product per design, a
+  `NEXT_ASSEMBLY_USAGE_OCCURRENCE` and transform per instance, as
+  OpenCASCADE writes them), and assembly placements are applied on import.
+  Tests: `doc/assembly_test.go` (a pin jointed into a plate's hole, flip,
+  motion, instances, a reload, a face joint, interference) and `io`
+  (OpenCASCADE's assembly read, ours written and read back by both).
+
 ## Screenshots without touching the mouse
 
 `FORMA_CAPTURE=captures/basic.json` opens a hidden window that never takes
@@ -168,8 +220,12 @@ focus, runs each shot's actions (command IDs with `:args`, or `hover:fx,fy`,
 - **M5 modelling tools** (done): fillet, chamfer, patterns, mirror, shell,
   holes, move / rotate with the ImGuizmo gizmo; measure, mass properties,
   section view.
-- **M6 exchange and assemblies**: STEP AP214 export, OBJ, STL as reference
-  meshes, components and joints.
+- **M6 exchange** (done): STEP AP214 export and import, OBJ, STL as reference
+  meshes.
+- **M7 assemblies** (done): components, joints, interference, STEP assembly
+  structure in and out.
+- Next: kernel exactness (K2), coplanar face merging (K1), corner patches
+  for fillets (F2), speed (K3); drawings; scripting.
 - Ideas: Starlark scripting for code-driven parts, 2D drawings to SVG / PDF.
 
 ## Stack

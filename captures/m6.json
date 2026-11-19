@@ -1,0 +1,19 @@
+{
+  "width": 1600, "height": 900, "out": "out/m6",
+  "shots": [
+    {"name": "a_import", "frames": 8, "do": [
+      "file.import:io/testdata/occ_fillet_box.step", "view.iso:now", "view.fit", "wait:10"
+    ]},
+    {"name": "b_cut", "frames": 8, "do": [
+      "create.cylinder:X=15,Y=10,Z=-1,Radius=4,Height=12,Operation=Cut", "wait:10",
+      "move:w:22,4,10@4", "wait:3", "click", "wait:6"
+    ]},
+    {"name": "c_mesh", "frames": 8, "do": [
+      "edit.clear", "file.import:captures/data/scan.stl", "view.iso:now", "view.fit", "wait:10",
+      "move:item:scan@4", "click", "wait:6"
+    ]},
+    {"name": "d_export", "frames": 6, "do": [
+      "edit.clear", "export:out/m6/part.step", "export:out/m6/part.obj", "export:out/m6/part.stl", "file.export", "wait:6"
+    ]}
+  ]
+}

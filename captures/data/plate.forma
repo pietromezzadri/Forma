@@ -1,0 +1,1 @@
+{"version":1,"params":null,"features":[{"id":1,"name":"Box 1","kind":"box","inputs":{"Depth":"30","Height":"10","Width":"40","X":"0","Y":"0","Z":"0"}},{"id":2,"name":"Cylinder 1","kind":"cylinder","inputs":{"Height":"14","Operation":"Cut","Radius":"5","X":"20","Y":"15","Z":"-2"}}],"rollback":-1,"next":2}

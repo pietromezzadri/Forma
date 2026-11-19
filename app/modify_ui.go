@@ -835,7 +835,7 @@ func (a *App) moveGizmo(dl *imgui.DrawList) {
 	vp := &a.vp
 	vp.gizmoHot = false
 	f := a.selFeature()
-	if f == nil || f.Kind != doc.KMove || a.sk != nil || !f.Active {
+	if f == nil || (f.Kind != doc.KMove && (f.Kind != doc.KComponent || a.jointedBy(f.ID) != 0)) || a.sk != nil || !f.Active {
 		vp.gizmoDrag = false
 		return
 	}
