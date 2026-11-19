@@ -1,0 +1,65 @@
+{
+  "width": 1600, "height": 900, "out": "out/demo", "record": true,
+  "shots": [
+    {"name": "v1_primitives", "frames": 10, "do": [
+      "move:vp:0.5,0.5@1", "say:Forma: parametric CAD in Go. Primitives from the toolbar", "wait:20",
+      "move:btn:create.box@20", "click", "wait:15",
+      "move:btn:create.cylinder@18", "click", "wait:8",
+      "say:Every primitive keeps its parameters: edit them in Properties",
+      "move:prop:X@22", "click", "wait:3", "key:ctrl+a", "type:75", "key:enter", "wait:14",
+      "move:btn:create.sphere@20", "click", "wait:6",
+      "move:prop:X@18", "click", "wait:3", "key:ctrl+a", "type:-35", "key:enter", "wait:10",
+      "move:btn:create.torus@20", "click", "wait:6",
+      "move:prop:Y@18", "click", "wait:3", "key:ctrl+a", "type:75", "key:enter", "wait:10",
+      "move:btn:create.cone@20", "click", "wait:6",
+      "move:prop:X@18", "click", "wait:3", "key:ctrl+a", "type:75", "key:enter", "wait:4",
+      "move:prop:Y@12", "click", "wait:3", "key:ctrl+a", "type:75", "key:enter", "wait:10",
+      "move:btn:view.fit@20", "click", "wait:25"
+    ]},
+    {"name": "v2_orbit", "frames": 10, "do": [
+      "say:Right drag orbits round the point under the cursor; the wheel zooms toward it",
+      "move:w:20,15,20@20", "rdrag:320,50@55", "wait:10", "rdrag:-460,-70@65", "wait:10",
+      "move:w:75,75,15@20", "wheel:5@25", "wait:12", "wheel:-5@25", "wait:8",
+      "say:Middle drag pans; F fits the view",
+      "move:vp:0.5,0.5@15", "mdrag:-160,60@30", "wait:8", "key:f", "wait:25"
+    ]},
+    {"name": "v3_pick", "frames": 10, "do": [
+      "say:Exact picking from an ID buffer: faces, edges, vertices",
+      "move:w:20,15,20@25", "wait:12", "click", "wait:10",
+      "move:w:40,15,20@20", "wait:12", "click", "wait:10",
+      "move:w:40,30,20@18", "wait:12", "click", "wait:10",
+      "move:w:100,75,6@25", "wait:12", "click", "wait:15",
+      "key:escape", "wait:10"
+    ]},
+    {"name": "v4_sketch", "frames": 10, "do": [
+      "file.new", "say:A sketch on the XY plane: a rectangle and a circle",
+      "move:btn:sketch.xy@20", "click", "wait:25",
+      "move:btn:tool.rect@18", "click",
+      "move:sk:-40,-25@25", "click", "move:sk:40,25@40", "wait:4", "click", "wait:10",
+      "move:btn:tool.circle@20", "click",
+      "move:sk:15,0@25", "click", "move:sk:25,0@22", "wait:3", "click", "wait:12",
+      "say:Dimensions drive the geometry: type a value or an expression",
+      "move:btn:tool.dim@20", "click",
+      "move:sk:0,25@25", "click", "move:sk:0,38@16", "click", "wait:10", "type:100", "wait:6", "key:enter", "wait:20",
+      "move:sk:-50,0@25", "click", "move:sk:-66,0@16", "click", "wait:10", "type:30 + 30", "wait:6", "key:enter", "wait:20",
+      "move:sk:25,0@22", "wait:4", "click", "wait:10", "type:24", "wait:6", "key:enter", "wait:15",
+      "move:sk:15,0@22", "wait:3", "click", "move:sk:-50,12@20", "wait:3", "click", "wait:10", "type:70", "wait:6", "key:enter", "wait:15",
+      "move:sk:20,0@20", "wait:3", "click", "move:sk:0,-30@20", "wait:3", "click", "wait:10", "type:30", "wait:6", "key:enter", "wait:20"
+    ]},
+    {"name": "v5_drag_fix", "frames": 10, "do": [
+      "say:Drag it: the dimensions hold, only the free position changes",
+      "move:btn:tool.select@20", "click",
+      "move:sk:50,30@25", "wait:6", "drag:sk:64,42@45", "wait:15",
+      "say:Fix a corner and the sketch is fully constrained: it turns green",
+      "move:sk:-36,-18@25", "wait:6", "click", "wait:6",
+      "move:btn:constrain.fix@22", "click", "wait:35"
+    ]},
+    {"name": "v6_finish", "frames": 10, "do": [
+      "say:Ctrl+K opens the command palette",
+      "move:vp:0.5,0.5@15", "key:ctrl+k", "wait:12", "type:finish", "wait:16", "key:enter", "wait:15",
+      "say:The closed region is a profile, ready for extrude in the next milestone",
+      "move:btn:view.iso@22", "click", "wait:20", "move:w:20,10,0@25", "wait:30",
+      "say:", "wait:20"
+    ]}
+  ]
+}

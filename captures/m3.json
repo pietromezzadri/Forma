@@ -1,0 +1,72 @@
+{
+  "width": 1600, "height": 900, "out": "out/m3", "record": true,
+  "shots": [
+    {"name": "m1_params", "frames": 8, "do": [
+      "move:vp:0.5,0.5@1", "say:M3: parameters, features and the timeline", "wait:15",
+      "move:btn:view.params@20", "click", "wait:8",
+      "move:btn:param.add@20", "click", "wait:6",
+      "move:param:0:name@16", "click", "wait:3", "key:ctrl+a", "type:w", "key:enter", "wait:4",
+      "move:param:0:expr@14", "click", "wait:3", "key:ctrl+a", "type:60", "key:enter", "wait:6",
+      "move:btn:param.add@16", "click", "wait:6",
+      "move:param:1:name@16", "click", "wait:3", "key:ctrl+a", "type:h", "key:enter", "wait:4",
+      "move:param:1:expr@14", "click", "wait:3", "key:ctrl+a", "type:w / 3", "key:enter", "wait:12",
+      "move:btn:view.params@20", "click", "wait:6"
+    ]},
+    {"name": "m2_sketch", "frames": 8, "do": [
+      "say:A sketch whose dimensions use the parameters",
+      "move:btn:sketch.xy@20", "click", "wait:25",
+      "move:btn:tool.rect@16", "click",
+      "move:sk:-30,-20@22", "click", "move:sk:30,20@30", "wait:3", "click", "wait:8",
+      "move:btn:tool.circle@18", "click", "move:sk:0,0@20", "click", "move:sk:8,0@16", "wait:3", "click", "wait:8",
+      "move:btn:tool.dim@18", "click",
+      "move:sk:0,20@20", "click", "move:sk:0,32@14", "click", "wait:8", "type:w", "wait:4", "key:enter", "wait:12",
+      "move:sk:-30,0@20", "click", "move:sk:-44,0@14", "click", "wait:8", "type:w / 2", "wait:4", "key:enter", "wait:12",
+      "move:sk:8,0@18", "wait:3", "click", "wait:8", "type:h", "wait:4", "key:enter", "wait:14",
+      "move:btn:sketch.finish@20", "click", "wait:10", "key:num0", "wait:20"
+    ]},
+    {"name": "m3_extrude", "frames": 8, "do": [
+      "say:Pick the profile and Extrude; drag the arrow to set the distance",
+      "move:w:-20,-10,0@25", "wait:8", "click", "wait:6",
+      "move:btn:feature.extrude@22", "click", "wait:15",
+      "move:w:0,0,20@25", "wait:8", "drag:w:0,0,36@40", "wait:15"
+    ]},
+    {"name": "m4_param_change", "frames": 8, "do": [
+      "say:Change a parameter: the sketch, its profile and the extrude follow",
+      "move:btn:view.params@20", "click", "wait:8",
+      "move:param:0:expr@18", "click", "wait:3", "key:ctrl+a", "type:90", "key:enter", "wait:25",
+      "move:btn:view.params@20", "click", "wait:4", "key:f", "wait:20"
+    ]},
+    {"name": "m5_sketch_on_face", "frames": 8, "do": [
+      "say:A sketch on the extrude's top face: it moves with the face",
+      "move:w:28,12,36@25", "wait:8", "click", "wait:6",
+      "move:btn:sketch.face@22", "click", "wait:25",
+      "move:btn:tool.circle@18", "click", "move:sk:28,0@20", "click", "move:sk:36,0@16", "wait:3", "click", "wait:8",
+      "move:btn:sketch.finish@20", "click", "wait:8", "key:num0", "wait:18",
+      "move:w:27,4,36@25", "wait:8", "click", "wait:4",
+      "move:btn:feature.extrude@22", "click", "wait:20"
+    ]},
+    {"name": "m6_revolve", "frames": 8, "do": [
+      "say:Revolve: a profile turned about an axis",
+      "move:btn:sketch.xz@22", "click", "wait:25",
+      "move:btn:tool.rect@16", "click", "move:sk:58,0@22", "click", "move:sk:66,24@28", "wait:3", "click", "wait:8",
+      "move:btn:sketch.finish@20", "click", "wait:8", "key:num0", "wait:18", "key:f", "wait:18",
+      "move:w:62,0,12@25", "wait:8", "click", "wait:4",
+      "move:btn:feature.revolve@22", "click", "wait:22",
+      "move:prop:Angle@22", "click", "wait:3", "key:ctrl+a", "type:270", "key:enter", "wait:25"
+    ]},
+    {"name": "m7_timeline", "frames": 8, "do": [
+      "say:The timeline: roll the design back and forward",
+      "move:tl:Roll back one step@22", "click", "wait:14", "click", "wait:14", "click", "wait:14", "click", "wait:14",
+      "move:tl:Roll forward one step@14", "click", "wait:14", "click", "wait:14",
+      "move:tl:Roll to the end@14", "click", "wait:20"
+    ]},
+    {"name": "m8_undo_save", "frames": 8, "do": [
+      "say:Undo and redo every step (Ctrl+Z / Ctrl+Y)",
+      "move:vp:0.5,0.5@15", "key:ctrl+z", "wait:16", "key:ctrl+z", "wait:16", "key:ctrl+y", "wait:16", "key:ctrl+y", "wait:20",
+      "say:Save the history as a .forma file, start again, open it",
+      "key:ctrl+s", "wait:10", "key:ctrl+a", "type:C:/Users/pietr/Documents/Programming/Forma/captures/out/m3/demo.forma", "wait:4", "key:enter", "wait:20",
+      "file.new", "wait:20", "file.open:C:/Users/pietr/Documents/Programming/Forma/captures/out/m3/demo.forma", "wait:25",
+      "say:", "rdrag:260,30@60", "wait:30"
+    ]}
+  ]
+}

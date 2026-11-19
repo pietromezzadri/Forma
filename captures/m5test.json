@@ -1,0 +1,48 @@
+{
+  "width": 1600, "height": 900, "out": "out/m5test",
+  "shots": [
+    {"name": "a_plate", "frames": 6, "do": [
+      "create.box:X=-40,Y=-25,Width=80,Depth=50,Height=12", "view.iso:now", "view.fit", "wait:20"
+    ]},
+    {"name": "b_fillet", "frames": 6, "do": [
+      "move:w:40,25,6@6", "wait:3", "click", "hold:shift",
+      "move:w:-40,25,6@6", "wait:3", "click",
+      "move:w:-40,-25,6@6", "wait:3", "click",
+      "move:w:40,-25,6@6", "wait:3", "click", "release:shift", "wait:4",
+      "feature.fillet:Radius=8", "wait:20"
+    ]},
+    {"name": "c_chamfer", "frames": 6, "do": [
+      "move:w:0,-25,12@6", "wait:3", "click", "wait:3", "feature.chamfer:Distance=1.5", "wait:20"
+    ]},
+    {"name": "d_holes", "frames": 6, "do": [
+      "move:w:20,10,12@6", "wait:3", "click", "wait:3", "sketch.face", "wait:15",
+      "sk.tool:Point", "move:sk:-28,-15@6", "sk.click", "move:sk:28,-15@6", "sk.click",
+      "move:sk:28,15@6", "sk.click", "move:sk:-28,15@6", "sk.click", "wait:3",
+      "sketch.finish", "wait:6", "view.iso", "wait:10",
+      "feature.hole:Diameter=5,Extent=Through all,Type=Counterbore,Bore diameter=9,Bore depth=3", "wait:25"
+    ]},
+    {"name": "e_boss", "frames": 6, "do": [
+      "create.cylinder:X=0,Y=0,Z=12,Radius=10,Height=14,Operation=Join", "wait:20"
+    ]},
+    {"name": "f_lug_pattern", "frames": 6, "do": [
+      "create.box:X=8,Y=-2,Z=12,Width=6,Depth=4,Height=10,Operation=Join", "wait:10",
+      "feature.circular:Count=6", "wait:25"
+    ]},
+    {"name": "g_measure", "frames": 6, "do": [
+      "move:w:0,0,26@6", "wait:3", "click", "hold:shift", "move:w:-20,-5,12@6", "wait:3", "click", "release:shift", "wait:10"
+    ]},
+    {"name": "h_section", "frames": 6, "do": [
+      "edit.clear", "view.section:y:0", "wait:20"
+    ]},
+    {"name": "i_move", "frames": 6, "do": [
+      "view.section:off", "move:w:0,0,26@6", "wait:3", "click", "feature.move", "wait:15"
+    ]},
+    {"name": "j_mirror", "frames": 6, "do": [
+      "feature.set:Move X=0", "edit.clear", "move:w:39,0,6@6", "wait:3", "click", "feature.mirror", "wait:5",
+      "move:w:39,0,6@6", "wait:3", "click", "feature.plane", "wait:25", "view.fit", "wait:15"
+    ]},
+    {"name": "k_mass", "frames": 6, "do": [
+      "edit.clear", "move:item:Box 1@6", "wait:3", "click", "wait:5", "move:btn:mass@6", "wait:3", "click", "wait:30"
+    ]}
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "width": 1600, "height": 900, "out": "out",
+  "shots": [
+    {"name": "01_empty", "do": ["view.iso"], "frames": 6},
+    {"name": "02_primitives", "do": [
+      "create.box", "create.cylinder:X=70", "create.sphere:X=-40,Y=10",
+      "create.torus:X=20,Y=75", "create.cone:X=80,Y=70", "view.iso", "view.fit"], "frames": 8},
+    {"name": "03_hover_face", "do": ["hover:0.50,0.52"], "frames": 6},
+    {"name": "04_select_edge", "do": ["click", "hover:0.62,0.40"], "frames": 6},
+    {"name": "05_sketch_constrained", "do": ["file.new", "sketch.xy", "sk.demo", "view.fit"], "frames": 14},
+    {"name": "06_sketch_free", "do": ["file.new", "sketch.xy", "sk.free", "view.fit"], "frames": 14},
+    {"name": "07_sketch_3d", "do": ["sketch.finish", "create.box:Z=-20,Width=80,Depth=50,Height=20", "view.iso", "view.fit"], "frames": 8}
+  ]
+}

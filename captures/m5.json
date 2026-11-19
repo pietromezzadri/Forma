@@ -1,0 +1,95 @@
+{
+  "width": 1600, "height": 900, "out": "out/m5", "record": true,
+  "shots": [
+    {"name": "s01_plate", "frames": 6, "do": [
+      "move:vp:0.5,0.5@1", "say:M5: modelling tools. A plate 80 × 50 × 12",
+      "create.box:X=-40,Y=-25,Width=80,Depth=50,Height=12", "view.iso:now", "view.fit", "wait:30"
+    ]},
+    {"name": "s02_corners", "frames": 6, "do": [
+      "say:Fillet: pick the four corner edges (Shift adds to the selection)",
+      "move:w:40,25,6@22", "wait:4", "click", "wait:4", "hold:shift",
+      "move:w:-40,-25,6@22", "wait:4", "click", "wait:4",
+      "move:w:40,-25,6@22", "wait:4", "click", "wait:6",
+      "camto:315,-30", "wait:32", "move:w:-40,25,6@22", "wait:4", "click", "wait:6", "release:shift",
+      "camto:135,-35.26", "wait:30",
+      "move:btn:feature.fillet@22", "wait:4", "click", "wait:15",
+      "move:prop:Radius@22", "click", "wait:3", "key:ctrl+a", "type:8", "key:enter", "wait:30"
+    ]},
+    {"name": "s03_topchain", "frames": 6, "do": [
+      "say:Pick the top face: its edges all round, one smooth chain, radius 2",
+      "move:w:0,0,12@22", "wait:4", "click", "wait:6",
+      "move:btn:feature.fillet@22", "wait:4", "click", "wait:15",
+      "move:prop:Radius@22", "click", "wait:3", "key:ctrl+a", "type:2", "key:enter", "wait:30",
+      "camto:120,-18", "wait:40", "camto:135,-35.26", "wait:30"
+    ]},
+    {"name": "s04_holes", "frames": 6, "do": [
+      "say:Holes at sketch points: a sketch on the top face, four points",
+      "move:w:10,10,12@22", "wait:4", "click", "wait:4",
+      "move:btn:sketch.face@22", "click", "wait:30",
+      "move:btn:tool.point@20", "click", "wait:4",
+      "move:sk:-30,-15@16", "sk.click", "wait:4", "move:sk:30,-15@16", "sk.click", "wait:4",
+      "move:sk:30,15@16", "sk.click", "wait:4", "move:sk:-30,15@16", "sk.click", "wait:8",
+      "move:btn:sketch.finish@20", "click", "wait:8", "camto:135,-35.26", "wait:30",
+      "say:Hole: counterbored, through all",
+      "move:btn:feature.hole@22", "click", "wait:15",
+      "feature.set:Type=Counterbore,Diameter=5,Bore diameter=9,Bore depth=3,Extent=Through all", "wait:35"
+    ]},
+    {"name": "s05_boss", "frames": 6, "do": [
+      "say:A boss joined on top, and a lug on its side",
+      "create.cylinder:X=0,Y=0,Z=12,Radius=10,Height=14,Operation=Join", "wait:25",
+      "create.box:X=8,Y=-2,Z=12,Width=6,Depth=4,Height=10,Operation=Join", "wait:25"
+    ]},
+    {"name": "s06_pattern", "frames": 6, "do": [
+      "say:Circular pattern: the lug, six times round the boss",
+      "move:step:Box 2@22", "click", "wait:6",
+      "move:btn:feature.circular@22", "click", "wait:15",
+      "move:prop:Count@22", "click", "wait:3", "key:ctrl+a", "type:6", "key:enter", "wait:35"
+    ]},
+    {"name": "s07_chamfer", "frames": 6, "do": [
+      "say:Chamfer the boss's top rim",
+      "edit.clear", "move:w:0,10,26@22", "wait:4", "click", "wait:6",
+      "move:btn:feature.chamfer@22", "click", "wait:15",
+      "move:prop:Distance@22", "click", "wait:3", "key:ctrl+a", "type:1.5", "key:enter", "wait:35"
+    ]},
+    {"name": "s08_mirror", "frames": 6, "do": [
+      "say:Mirror the part about its end face: a body twice as long",
+      "edit.clear", "move:w:40,0,6@22", "wait:4", "click", "wait:4",
+      "move:btn:feature.mirror@22", "click", "wait:10",
+      "move:w:40,0,6@16", "wait:4", "click", "wait:4", "feature.plane", "wait:20", "view.fit", "wait:45",
+      "say:… and undo it (Ctrl+Z)", "key:ctrl+z", "wait:10", "view.fit", "wait:30"
+    ]},
+    {"name": "s09_move", "frames": 6, "do": [
+      "say:Move / rotate: drag the gizmo's arrows",
+      "edit.clear", "move:w:-20,-10,12@22", "wait:4", "click", "wait:4",
+      "move:btn:feature.move@22", "click", "wait:20",
+      "move:gz:z,0.8@22", "wait:6", "drag:gz:z,2.0@40", "wait:15",
+      "move:gz:x,0.8@22", "wait:6", "drag:gz:x,1.8@40", "wait:25",
+      "say:… values you can type too (here back to where it was)",
+      "feature.set:Move X=0,Move Y=0,Move Z=0", "wait:30"
+    ]},
+    {"name": "s10_shell", "frames": 6, "do": [
+      "say:Shell: open the bottom face, walls 1.5 mm",
+      "edit.clear", "camto:135,40", "wait:40",
+      "move:w:-20,-10,0@22", "wait:4", "click", "wait:6",
+      "move:btn:feature.shell@22", "click", "wait:15",
+      "move:prop:Thickness@22", "click", "wait:3", "key:ctrl+a", "type:1.5", "key:enter", "wait:40",
+      "camto:135,-35.26", "wait:30"
+    ]},
+    {"name": "s11_section", "frames": 6, "do": [
+      "say:Section view: the cut through the walls, holes and boss",
+      "edit.clear", "move:btn:view.section@22", "click", "wait:10", "view.section:y:0", "wait:40",
+      "view.section:y:-15", "wait:30", "view.section:x:30", "wait:40", "view.section:y:0", "wait:20",
+      "camto:100,-15", "wait:45", "camto:135,-35.26", "wait:25", "view.section:off", "wait:10"
+    ]},
+    {"name": "s12_measure", "frames": 6, "do": [
+      "say:Measure: pick two faces …",
+      "move:w:0,5,26@22", "wait:4", "click", "hold:shift", "move:w:-20,-12,12@22", "wait:4", "click", "release:shift", "wait:50",
+      "say:… or an edge",
+      "edit.clear", "move:w:10,0,26@22", "wait:4", "click", "wait:50"
+    ]},
+    {"name": "s13_mass", "frames": 6, "do": [
+      "say:Mass properties: volume, mass, centroid, inertia",
+      "edit.clear", "move:item:Box 1@22", "click", "wait:8", "move:btn:mass@22", "click", "wait:60", "say:", "wait:10"
+    ]}
+  ]
+}

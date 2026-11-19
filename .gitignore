@@ -1,0 +1,5 @@
+captures/out/
+*.exe
+cap_*.txt
+run_*.txt
+*.forma.autosave

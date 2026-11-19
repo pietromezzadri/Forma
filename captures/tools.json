@@ -1,0 +1,20 @@
+{
+  "width": 1600, "height": 900, "out": "out",
+  "shots": [
+    {"name": "10_tools_loop", "do": [
+      "sketch.xy", "wait:15",
+      "sk.tool:Line",
+      "hover:0.30,0.65", "wait:1", "sk.click",
+      "hover:0.62,0.655", "wait:1", "sk.click",
+      "hover:0.45,0.30", "wait:1", "sk.click",
+      "hover:0.30,0.65", "wait:2", "sk.click",
+      "sk.tool:Circle",
+      "hover:0.75,0.40", "wait:1", "sk.click",
+      "hover:0.82,0.40", "wait:1", "sk.click",
+      "sk.tool:Dimension",
+      "hover:0.46,0.652", "wait:2", "sk.click",
+      "hover:0.46,0.85", "wait:2", "sk.click",
+      "log", "hover:0.55,0.55"], "frames": 6},
+    {"name": "11_export", "do": ["sketch.finish", "create.cylinder", "create.torus:X=50", "export:test.stl", "view.fit"], "frames": 6}
+  ]
+}

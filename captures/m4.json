@@ -1,0 +1,50 @@
+{
+  "width": 1600, "height": 900, "out": "out/m4", "record": true,
+  "shots": [
+    {"name": "b1_plate", "frames": 8, "do": [
+      "move:vp:0.5,0.5@1", "say:M4: booleans. A plate 80 × 50, its thickness the parameter H = 12",
+      "param.add:H=12", "view.params", "create.box:X=-40,Y=-25,Width=80,Depth=50,Height=H", "view.iso", "view.fit", "wait:30"
+    ]},
+    {"name": "b2_join", "frames": 8, "do": [
+      "say:A sketch on the top face, extruded: it joins the plate into one body",
+      "move:w:20,12,12@25", "wait:6", "click", "wait:6",
+      "move:btn:sketch.face@22", "click", "wait:25",
+      "move:btn:tool.circle@18", "click", "move:sk:-20,0@20", "click", "move:sk:-8,0@16", "wait:3", "click", "wait:8",
+      "move:btn:sketch.finish@20", "click", "wait:6", "key:num0", "wait:20",
+      "move:w:-20,5,12@25", "wait:6", "click", "wait:4",
+      "move:btn:feature.extrude@22", "click", "wait:15",
+      "move:w:-20,0,32@25", "wait:6", "drag:w:-20,0,40@40", "wait:20"
+    ]},
+    {"name": "b3_cut", "frames": 8, "do": [
+      "say:Cut: a hole through the plate, as deep as H",
+      "move:w:20,12,12@25", "wait:6", "click", "wait:6",
+      "move:btn:sketch.face@22", "click", "wait:25",
+      "move:btn:tool.circle@18", "click", "move:sk:20,0@20", "click", "move:sk:28,0@16", "wait:3", "click", "wait:8",
+      "move:btn:sketch.finish@20", "click", "wait:6", "key:num0", "wait:20",
+      "move:w:20,5,12@25", "wait:6", "click", "wait:4",
+      "move:btn:feature.extrude@22", "click", "wait:10", "feature.op:Cut", "wait:10",
+      "move:prop:Distance@22", "click", "wait:3", "key:ctrl+a", "type:H", "key:enter", "wait:25"
+    ]},
+    {"name": "b4_prim_cut", "frames": 8, "do": [
+      "say:Primitives can cut too: a cylinder through the boss",
+      "create.cylinder:X=-20,Y=0,Z=-5,Radius=5,Height=60,Operation=Cut", "wait:30"
+    ]},
+    {"name": "b5_intersect", "frames": 8, "do": [
+      "say:Intersect: keep what lies inside both, here a cylinder that rounds the corners",
+      "create.cylinder:X=0,Y=0,Z=-10,Radius=44,Height=80,Operation=Intersect", "wait:35"
+    ]},
+    {"name": "b6_param", "frames": 8, "do": [
+      "say:H = 20: the plate thickens, the boss stays on its face, the hole still goes through",
+      "param.set:H=20", "wait:30", "move:vp:0.5,0.5@10", "rdrag:-220,30@50", "wait:20"
+    ]},
+    {"name": "b7_timeline", "frames": 8, "do": [
+      "say:Every step stays editable in the timeline",
+      "move:tl:Roll back one step@22", "click", "wait:14", "click", "wait:14", "click", "wait:14", "click", "wait:14",
+      "move:tl:Roll to the end@16", "click", "wait:20"
+    ]},
+    {"name": "b8_under", "frames": 8, "do": [
+      "say:From below: the holes go right through",
+      "move:vp:0.5,0.5@12", "rdrag:0,-260@50", "wait:25", "say:", "rdrag:300,40@60", "wait:25"
+    ]}
+  ]
+}

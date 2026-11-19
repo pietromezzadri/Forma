@@ -1,0 +1,2 @@
+Inter-Medium.ttf: Inter by Rasmus Andersson (rsms.me/inter), latin subset via Fontsource (cdn.jsdelivr.net/fontsource/fonts/inter), SIL Open Font License 1.1
+fa-solid-900.ttf: Font Awesome Free 6.5.2 Solid by Fonticons, Inc. (fontawesome.com), font under SIL Open Font License 1.1, icons CC BY 4.0
