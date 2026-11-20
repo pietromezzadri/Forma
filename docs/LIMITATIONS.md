@@ -27,6 +27,14 @@ new ones as features land.
 - **K4 Tangent contact.** Surfaces touching along a line or curve (a cylinder
   lying on a plane, a sphere in a cylinder of its radius) only work where the
   touching curve is also an edge. A general case is likely to fail.
+- **K4b Nearly coincident faces fail.** Two cylinders of one radius whose
+  axes are a hair apart (0.0002 mm: a ring's outside and a flange revolved
+  onto it about an axis the ring's centre had drifted off) or a few mm
+  apart (they cross along two lines at a grazing angle) make the join
+  fail; exactly coaxial ones work. Sketches now keep a pinned origin and
+  move the loosest geometry when a dimension changes, so this no longer
+  happens by itself, but a centre placed off the axis by hand still
+  hits it.
 - **K5 Non-manifold results are refused.** Bodies meeting only along an edge
   or at a point make no solid; the boolean reports an error.
 - **K6 Equal crossing cylinders are a special case.** Two cylinders of one

@@ -156,6 +156,41 @@ func TestTangentArcs(t *testing.T) {
 	}
 }
 
+// Changing a dimension moves the loosest geometry: a point riding on the
+// inner of two concentric circles follows it, the shared centre stays.
+func TestSetValueMovesTheLoosest(t *testing.T) {
+	s := New("s", geom.World)
+	c := s.AddPoint(geom.V2(0, 0))
+	in := s.AddCircle(c.ID, 30)
+	out := s.AddCircle(c.ID, 40)
+	p := s.AddPoint(geom.V2(30, 0))
+	for _, k := range []struct {
+		k   ConKind
+		ids []int
+		v   float64
+	}{
+		{Diameter, []int{in.ID}, 60},
+		{Diameter, []int{out.ID}, 80},
+		{PointOnCircle, []int{p.ID, in.ID}, 0},
+	} {
+		if _, err := s.AddConstraint(k.k, k.ids, k.v); err != nil {
+			t.Fatalf("%s: %v", k.k, err)
+		}
+	}
+	id := s.Cons[0].ID
+	for _, v := range []float64{50, 70, 20} {
+		if err := s.SetValue(id, v, ""); err != nil {
+			t.Fatal(err)
+		}
+		if s.P(c.ID).Len() > 1e-12 || !near(s.Radius(out), 40) || !near(s.Radius(in), v/2) {
+			t.Fatalf("Ø%g: centre %v, radii %g %g", v, s.P(c.ID), s.Radius(in), s.Radius(out))
+		}
+		if !near(s.P(p.ID).Len(), v/2) {
+			t.Fatalf("Ø%g: the point is %g from the centre", v, s.P(p.ID).Len())
+		}
+	}
+}
+
 func rect(s *Sketch, x0, y0, x1, y1 float64) {
 	a, b := s.AddPoint(geom.V2(x0, y0)), s.AddPoint(geom.V2(x1, y0))
 	c, d := s.AddPoint(geom.V2(x1, y1)), s.AddPoint(geom.V2(x0, y1))

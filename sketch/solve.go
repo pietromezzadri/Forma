@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 
 	"forma/geom"
 )
@@ -177,6 +178,67 @@ func (s *Sketch) lm(locked map[int]bool, softs []soft, maxIter int) (bool, int, 
 		}
 	}
 	return maxAbs(hard(r)) < solveTol*10, it, maxAbs(hard(r))
+}
+
+// solveLoosest solves after a dimension changed, moving the least connected
+// geometry it can: first only the parameters of the loosest tier (see
+// stiffness), then each stiffer tier as well, and last everything. So a
+// diameter changed on a circle with a point riding on it moves the point,
+// not the centre the circle shares with another one.
+func (s *Sketch) solveLoosest() bool {
+	w := s.stiffness()
+	var tiers []float64
+	for _, x := range w {
+		found := false
+		for _, t := range tiers {
+			found = found || t == x
+		}
+		if !found {
+			tiers = append(tiers, x)
+		}
+	}
+	sort.Float64s(tiers)
+	saved := append([]float64(nil), s.Params...)
+	for _, t := range tiers[:max(len(tiers)-1, 0)] {
+		locked := map[int]bool{}
+		for i, x := range w {
+			if x > t {
+				locked[i] = true
+			}
+		}
+		if ok, it, res := s.lm(locked, nil, 100); ok {
+			s.analyze()
+			s.Status.Converged, s.Status.Iter, s.Status.Residual = ok, it, res
+			return true
+		}
+		copy(s.Params, saved)
+	}
+	return s.Solve()
+}
+
+// stiffness weighs how reluctant each parameter is to move. A point is
+// stiffer the more curves it holds together (×10 for each), so a lone point
+// riding on a circle gives way before the centre two circles share, and a
+// loose end before a corner; radii and lone points weigh 1.
+func (s *Sketch) stiffness() []float64 {
+	w := make([]float64, len(s.Params))
+	for i := range w {
+		w[i] = 1
+	}
+	uses := map[int]int{}
+	for _, e := range s.Ents {
+		for _, p := range e.Pts {
+			uses[p]++
+		}
+	}
+	for _, e := range s.Ents {
+		if e.Kind != Point || uses[e.ID] == 0 {
+			continue
+		}
+		k := math.Pow(10, math.Min(float64(uses[e.ID]), 4))
+		w[e.Par], w[e.Par+1] = k, k
+	}
+	return w
 }
 
 func neg(v []float64) []float64 {
@@ -407,7 +469,7 @@ func (s *Sketch) SetValue(id int, v float64, expr string) error {
 	old, oldExpr := c.Value, c.Expr
 	saved := append([]float64(nil), s.Params...)
 	c.Value, c.Expr = v, expr
-	if !s.Solve() {
+	if !s.solveLoosest() {
 		c.Value, c.Expr = old, oldExpr
 		copy(s.Params, saved)
 		s.Solve()

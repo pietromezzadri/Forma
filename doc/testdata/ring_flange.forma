@@ -1,0 +1,309 @@
+{
+ "version": 1,
+ "params": null,
+ "features": [
+  {
+   "id": 1,
+   "name": "Sketch 1",
+   "kind": "sketch",
+   "sketch": {
+    "name": "Sketch 1",
+    "plane": {
+     "O": {
+      "X": 0,
+      "Y": 0,
+      "Z": 0
+     },
+     "X": {
+      "X": 1,
+      "Y": 0,
+      "Z": 0
+     },
+     "Y": {
+      "X": 0,
+      "Y": 1,
+      "Z": 0
+     },
+     "Z": {
+      "X": 0,
+      "Y": 0,
+      "Z": 1
+     }
+    },
+    "params": [
+     0,
+     0,
+     59.99999999958026,
+     67.5,
+     42.56643335353112,
+     42.2859167130001
+    ],
+    "ents": [
+     {
+      "ID": 1,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 2,
+      "Kind": 2,
+      "Pts": [
+       1
+      ],
+      "Par": 2,
+      "Construction": false
+     },
+     {
+      "ID": 4,
+      "Kind": 2,
+      "Pts": [
+       1
+      ],
+      "Par": 3,
+      "Construction": false
+     },
+     {
+      "ID": 6,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 4,
+      "Construction": false
+     }
+    ],
+    "cons": [
+     {
+      "ID": 3,
+      "Kind": 17,
+      "E": [
+       2
+      ],
+      "Value": 120,
+      "Value2": 0,
+      "Expr": "120",
+      "Internal": false,
+      "Flip": false,
+      "Offset": {
+       "X": 0,
+       "Y": 0
+      }
+     },
+     {
+      "ID": 5,
+      "Kind": 17,
+      "E": [
+       4
+      ],
+      "Value": 135,
+      "Value2": 0,
+      "Expr": "135",
+      "Internal": false,
+      "Flip": false,
+      "Offset": {
+       "X": 0,
+       "Y": 0
+      }
+     },
+     {
+      "ID": 7,
+      "Kind": 2,
+      "E": [
+       6,
+       2
+      ],
+      "Value": 0,
+      "Value2": 0,
+      "Expr": "",
+      "Internal": false,
+      "Flip": false,
+      "Offset": {
+       "X": 0,
+       "Y": 0
+      }
+     }
+    ],
+    "next": 8
+   },
+   "plane": {
+    "std": "xy"
+   },
+   "hidden": true
+  },
+  {
+   "id": 2,
+   "name": "Extrude 1",
+   "kind": "extrude",
+   "inputs": {
+    "Direction": "One side",
+    "Distance": "50",
+    "Distance 2": "10"
+   },
+   "profiles": [
+    {
+     "sketch": 1,
+     "outer": [
+      4
+     ],
+     "holes": [
+      [
+       2
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Sketch 2",
+   "kind": "sketch",
+   "sketch": {
+    "name": "Sketch 2",
+    "plane": {
+     "O": {
+      "X": 0,
+      "Y": 0,
+      "Z": 0
+     },
+     "X": {
+      "X": 1,
+      "Y": 0,
+      "Z": 0
+     },
+     "Y": {
+      "X": 0,
+      "Y": 0,
+      "Z": 1
+     },
+     "Z": {
+      "X": -0,
+      "Y": -1,
+      "Z": -0
+     }
+    },
+    "params": [
+     70,
+     -0,
+     70,
+     50,
+     67.5,
+     15,
+     67.5,
+     -0,
+     81.73024947075771,
+     10.256583509747433,
+     67.5,
+     50
+    ],
+    "ents": [
+     {
+      "ID": 5,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 4,
+      "Construction": false
+     },
+     {
+      "ID": 6,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 6,
+      "Construction": false
+     },
+     {
+      "ID": 7,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 8,
+      "Construction": false
+     },
+     {
+      "ID": 8,
+      "Kind": 3,
+      "Pts": [
+       5,
+       6,
+       7
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 10,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 10,
+      "Construction": false
+     },
+     {
+      "ID": 11,
+      "Kind": 1,
+      "Pts": [
+       7,
+       10
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 12,
+      "Kind": 1,
+      "Pts": [
+       10,
+       6
+      ],
+      "Par": 0,
+      "Construction": false
+     }
+    ],
+    "cons": [
+     {
+      "ID": 9,
+      "Kind": 18,
+      "E": [
+       8
+      ],
+      "Value": 0,
+      "Value2": 0,
+      "Expr": "",
+      "Internal": true,
+      "Flip": false,
+      "Offset": {
+       "X": 0,
+       "Y": 0
+      }
+     }
+    ],
+    "next": 12
+   },
+   "plane": {
+    "std": "xz"
+   },
+   "hidden": true
+  },
+  {
+   "id": 4,
+   "name": "Revolve 1",
+   "kind": "revolve",
+   "inputs": {
+    "Angle": "360",
+    "Operation": "Join"
+   },
+   "profiles": [
+    {
+     "sketch": 3,
+     "outer": [
+      8,
+      11,
+      12
+     ]
+    }
+   ],
+   "axis": {
+    "kind": "y"
+   }
+  }
+ ],
+ "rollback": -1,
+ "next": 4
+}

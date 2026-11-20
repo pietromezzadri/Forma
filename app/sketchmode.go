@@ -44,6 +44,9 @@ type snapPt struct {
 	mid   int    // a line whose midpoint it is
 	hv    int    // 1 horizontal, 2 vertical (from the previous click)
 	label string // what it snapped to, for the cursor
+	// on the sketch's origin: a new point there is pinned to it, so what
+	// is drawn round the origin stays centred on it whatever changes
+	origin bool
 }
 
 type sketchMode struct {
@@ -170,6 +173,15 @@ func (sm *sketchMode) snap(a *App) (snapPt, bool) {
 			}
 		}
 	}
+	// the origin: an existing point there, else a new one pinned to it
+	if a.skScreenDist(s, geom.Vec2{}, c) < 9 {
+		for _, e := range s.Ents {
+			if e.Kind == sketch.Point && s.P(e.ID).Len() < 1e-9 {
+				return snapPt{point: e.ID, label: "origin"}, true
+			}
+		}
+		return snapPt{origin: true, label: "origin"}, true
+	}
 	// horizontal / vertical from the previous click
 	if n := len(sm.clicks); n > 0 && (sm.tool == toolLine) {
 		prev := sm.clicks[n-1].p
@@ -209,6 +221,9 @@ func (sm *sketchMode) snapConstraints(id int, sp snapPt) {
 	s := sm.item.S
 	if sp.point != 0 {
 		return
+	}
+	if sp.origin {
+		s.AddConstraint(sketch.Fix, []int{id}, 0)
 	}
 	if sp.on != 0 {
 		if e := s.Ent(sp.on); e != nil {
