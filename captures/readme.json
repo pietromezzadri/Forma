@@ -1,0 +1,84 @@
+{
+  "width": 1920, "height": 1080, "out": "out/readme",
+  "shots": [
+    {"name": "part_base", "frames": 6, "do": [
+      "move:vp:0.5,0.5@1",
+      "create.box:X=-40,Y=-25,Width=80,Depth=50,Height=12", "view.iso:now", "view.fit", "wait:10",
+      "move:w:40,25,6@6", "wait:4", "click", "wait:4", "hold:shift",
+      "move:w:-40,-25,6@6", "wait:4", "click", "wait:4",
+      "move:w:40,-25,6@6", "wait:4", "click", "wait:6",
+      "camto:315,-30", "wait:32", "move:w:-40,25,6@6", "wait:4", "click", "wait:6", "release:shift",
+      "camto:135,-35.26", "wait:30",
+      "move:btn:feature.fillet@6", "wait:4", "click", "wait:15",
+      "move:prop:Radius@6", "click", "wait:3", "key:ctrl+a", "type:8", "key:enter", "wait:20",
+      "move:w:0,0,12@6", "wait:4", "click", "wait:6",
+      "move:btn:feature.fillet@6", "wait:4", "click", "wait:15",
+      "move:prop:Radius@6", "click", "wait:3", "key:ctrl+a", "type:2", "key:enter", "wait:20"
+    ]},
+    {"name": "part_holes", "frames": 6, "do": [
+      "move:w:10,10,12@6", "wait:4", "click", "wait:4",
+      "move:btn:sketch.face@6", "click", "wait:30",
+      "move:btn:tool.point@6", "click", "wait:4",
+      "move:sk:-30,-15@6", "sk.click", "wait:4", "move:sk:30,-15@6", "sk.click", "wait:4",
+      "move:sk:30,15@6", "sk.click", "wait:4", "move:sk:-30,15@6", "sk.click", "wait:8",
+      "move:btn:sketch.finish@6", "click", "wait:8", "camto:135,-35.26", "wait:30",
+      "move:btn:feature.hole@6", "click", "wait:15",
+      "feature.set:Type=Counterbore,Diameter=5,Bore diameter=9,Bore depth=3,Extent=Through all", "wait:20",
+      "create.cylinder:X=0,Y=0,Z=12,Radius=10,Height=14,Operation=Join", "wait:20",
+      "create.box:X=8,Y=-2,Z=12,Width=6,Depth=4,Height=10,Operation=Join", "wait:20",
+      "move:step:Box 2@6", "click", "wait:6",
+      "move:btn:feature.circular@6", "click", "wait:15",
+      "move:prop:Count@6", "click", "wait:3", "key:ctrl+a", "type:6", "key:enter", "wait:20",
+      "edit.clear", "move:w:0,10,26@6", "wait:4", "click", "wait:6",
+      "move:btn:feature.chamfer@6", "click", "wait:15",
+      "move:prop:Distance@6", "click", "wait:3", "key:ctrl+a", "type:1.5", "key:enter", "wait:20"
+    ]},
+    {"name": "part_hero", "frames": 8, "do": [
+      "edit.clear", "camto:135,-30", "wait:30", "view.fit", "wait:10", "move:vp:0.5,0.5@2", "wheel:1.6@10", "wait:6", "move:vp:0.98,0.98@2", "wait:10"
+    ]},
+    {"name": "part_section", "frames": 8, "do": [
+      "camto:135,40", "wait:40",
+      "move:w:-20,-10,0@6", "wait:4", "click", "wait:6",
+      "move:btn:feature.shell@6", "click", "wait:15",
+      "move:prop:Thickness@6", "click", "wait:3", "key:ctrl+a", "type:1.5", "key:enter", "wait:30",
+      "edit.clear", "move:btn:view.section@6", "click", "wait:10", "view.section:y:0", "wait:20",
+      "camto:115,-28", "wait:45", "move:vp:0.5,0.5@2", "wheel:1.2@10", "wait:6", "move:vp:0.98,0.98@2", "wait:10"
+    ]},
+    {"name": "part_mass", "frames": 8, "do": [
+      "view.section:off", "camto:135,-35.26", "wait:30",
+      "move:item:Box 1@6", "click", "wait:8", "move:btn:mass@6", "click", "wait:30"
+    ]},
+    {"name": "sketch", "frames": 8, "do": [
+      "key:escape", "file.new", "wait:6",
+      "sketch.xy", "wait:25",
+      "move:btn:tool.rect@6", "click",
+      "move:sk:-40,-25@6", "click", "move:sk:40,25@10", "wait:4", "click", "wait:10",
+      "move:btn:tool.circle@6", "click",
+      "move:sk:15,0@6", "click", "move:sk:25,0@6", "wait:3", "click", "wait:12",
+      "move:btn:tool.dim@6", "click",
+      "move:sk:0,25@6", "click", "move:sk:0,38@6", "click", "wait:10", "type:100", "wait:6", "key:enter", "wait:20",
+      "move:sk:-50,0@6", "click", "move:sk:-66,0@6", "click", "wait:10", "type:30 + 30", "wait:6", "key:enter", "wait:20",
+      "move:sk:25,0@6", "wait:4", "click", "wait:10", "type:24", "wait:6", "key:enter", "wait:15",
+      "move:sk:15,0@6", "wait:3", "click", "move:sk:-50,12@6", "wait:3", "click", "wait:10", "type:70", "wait:6", "key:enter", "wait:15",
+      "move:sk:20,0@6", "wait:3", "click", "move:sk:0,-30@6", "wait:3", "click", "wait:10", "type:30", "wait:6", "key:enter", "wait:20",
+      "move:btn:tool.select@6", "click",
+      "move:sk:-50,-30@6", "wait:6", "click", "wait:6",
+      "move:btn:constrain.fix@6", "click", "wait:10", "key:escape", "move:vp:0.98,0.98@2", "wait:20"
+    ]},
+    {"name": "step_import", "frames": 8, "do": [
+      "key:escape", "file.new", "wait:6",
+      "file.import:io/testdata/occ_fillet_box.step", "view.iso:now", "view.fit", "wait:10",
+      "create.cylinder:X=15,Y=10,Z=-1,Radius=4,Height=12,Operation=Cut", "wait:10",
+      "edit.clear", "move:w:22,4,10@4", "wait:3", "click", "wait:10", "move:vp:0.98,0.98@2", "wait:10"
+    ]},
+    {"name": "assembly", "frames": 8, "do": [
+      "key:escape", "file.new", "wait:6",
+      "assemble.component:captures/data/plate.forma", "assemble.component:captures/data/pin.forma",
+      "view.iso:now", "view.fit", "wait:10",
+      "edit.clear", "move:w:20,20,10@4", "wait:3", "click", "wait:3", "hold:shift",
+      "move:w:50.6,5.5,30@4", "wait:3", "click", "release:shift", "wait:6",
+      "assemble.joint:Revolute", "view.fit", "wait:10",
+      "assemble.interference", "wait:10"
+    ]}
+  ]
+}
