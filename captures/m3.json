@@ -64,8 +64,8 @@
       "say:Undo and redo every step (Ctrl+Z / Ctrl+Y)",
       "move:vp:0.5,0.5@15", "key:ctrl+z", "wait:16", "key:ctrl+z", "wait:16", "key:ctrl+y", "wait:16", "key:ctrl+y", "wait:20",
       "say:Save the history as a .forma file, start again, open it",
-      "key:ctrl+s", "wait:10", "key:ctrl+a", "type:C:/Users/pietr/Documents/Programming/Forma/captures/out/m3/demo.forma", "wait:4", "key:enter", "wait:20",
-      "file.new", "wait:20", "file.open:C:/Users/pietr/Documents/Programming/Forma/captures/out/m3/demo.forma", "wait:25",
+      "key:ctrl+s", "wait:10", "key:ctrl+a", "type:captures/out/m3/demo.forma", "wait:4", "key:enter", "wait:20",
+      "file.new", "wait:20", "file.open:captures/out/m3/demo.forma", "wait:25",
       "say:", "rdrag:260,30@60", "wait:30"
     ]}
   ]
