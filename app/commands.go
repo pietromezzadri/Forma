@@ -202,7 +202,7 @@ func (a *App) registerCommands() *Commands {
 		icon rune
 	}{
 		{"select", toolSelect, "S", 0xf245}, {"line", toolLine, "L", ui.FaSlash}, {"rect", toolRect, "R", ui.FaSquare},
-		{"circle", toolCircle, "C", ui.FaCircle}, {"arc", toolArc, "A", ui.FaBezier}, {"point", toolPoint, "P", ui.FaDotCircle},
+		{"circle", toolCircle, "C", ui.FaCircle}, {"arc", toolArc, "A", ui.FaBezier}, {"point", toolPoint, "P", ui.FaDotCircle}, {"spline", toolSpline, "B", ui.FaBezier},
 		{"dim", toolDim, "D", ui.FaRuler},
 	}
 	for _, t := range tools {
@@ -210,8 +210,8 @@ func (a *App) registerCommands() *Commands {
 		c.add(&Command{ID: "tool." + t.id, Label: toolNames[t.t], Group: "Sketch tool", Shortcut: t.key, Icon: t.icon, Enabled: inSketch,
 			Run: func(string) { a.sk.setTool(t.t) }})
 	}
-	c.add(&Command{ID: "sketch.gridsnap", Label: "Snap to grid", Group: "Sketch", Shortcut: "G", Enabled: inSketch,
-		Run: func(string) { a.sk.gridSnap = !a.sk.gridSnap }})
+	c.add(&Command{ID: "sketch.gridsnap", Label: "Snap to grid", Group: "View", Shortcut: "G",
+		Run: func(string) { a.snap.off = !a.snap.off }})
 	c.add(&Command{ID: "sketch.construction", Label: "Toggle construction", Group: "Sketch", Shortcut: "X", Enabled: inSketch,
 		Run: func(string) {
 			s := a.sk.item.S
@@ -276,6 +276,7 @@ func (a *App) registerCommands() *Commands {
 	a.registerExchangeCommands(c)
 	a.registerAssemblyCommands(c)
 	a.registerInspectCommands(c)
+	a.registerSnapCommands(c)
 	return c
 }
 
@@ -352,6 +353,8 @@ func (a *App) shortcuts() {
 		run(pick(ctrl, "view.bottom", "view.top"))
 	case press(imgui.KeyKeypad5):
 		run("view.ortho")
+	case !ctrl && !shift && a.sk == nil && press(imgui.KeyG):
+		run("sketch.gridsnap")
 	case !ctrl && press(imgui.KeyF):
 		run("view.fit")
 	}
@@ -360,7 +363,7 @@ func (a *App) shortcuts() {
 	}
 	for key, id := range map[imgui.Key]string{
 		imgui.KeyS: "tool.select", imgui.KeyL: "tool.line", imgui.KeyR: "tool.rect", imgui.KeyC: "tool.circle",
-		imgui.KeyA: "tool.arc", imgui.KeyP: "tool.point", imgui.KeyD: "tool.dim", imgui.KeyH: "constrain.horizontal",
+		imgui.KeyA: "tool.arc", imgui.KeyP: "tool.point", imgui.KeyB: "tool.spline", imgui.KeyD: "tool.dim", imgui.KeyH: "constrain.horizontal",
 		imgui.KeyV: "constrain.vertical", imgui.KeyT: "constrain.tangent", imgui.KeyE: "constrain.equal",
 		imgui.KeyG: "sketch.gridsnap", imgui.KeyX: "sketch.construction",
 	} {

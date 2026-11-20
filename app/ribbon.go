@@ -254,7 +254,7 @@ func (a *App) partRibbon(r *ribbon) {
 
 func (a *App) sketchRibbon(r *ribbon) {
 	// read the sketch state first: a button below may end the sketch
-	tool, grid := a.sk.tool, a.sk.gridSnap
+	tool, grid := a.sk.tool, !a.snap.off
 	r.group()
 	r.cmd("sketch.finish", ui.FaCheck, "Finish", false)
 	r.cmd("edit.undo", 0xf0e2, "Undo", false)
@@ -268,7 +268,7 @@ func (a *App) sketchRibbon(r *ribbon) {
 		icon rune
 		name string
 	}{{"select", toolSelect, 0xf245, "Select"}, {"line", toolLine, ui.FaSlash, "Line"}, {"rect", toolRect, ui.FaSquare, "Rectangle"},
-		{"circle", toolCircle, ui.FaCircle, "Circle"}, {"arc", toolArc, ui.FaBezier, "Arc"}, {"point", toolPoint, ui.FaDotCircle, "Point"},
+		{"circle", toolCircle, ui.FaCircle, "Circle"}, {"arc", toolArc, ui.FaBezier, "Arc"}, {"point", toolPoint, ui.FaDotCircle, "Point"}, {"spline", toolSpline, ui.FaBezier, "Spline"},
 		{"dim", toolDim, ui.FaRuler, "Dimension"}} {
 		r.cmd("tool."+t.id, t.icon, t.name, tool == t.t)
 	}

@@ -89,6 +89,8 @@ func (x Xform) Curve(c Curve) Curve {
 		f := Frame{O: x.Pt(k.F.O), X: x.Dir(k.F.X), Y: x.Dir(k.F.Y)}
 		f.Z = f.X.Cross(f.Y)
 		return Ellipse{F: f, A: k.A, B: k.B, P: k.P}
+	case *BSpline:
+		return k.Map(x.Pt)
 	case *Polyline:
 		pts := make([]Vec3, len(k.Pts))
 		for i, p := range k.Pts {
@@ -115,6 +117,16 @@ func (x Xform) Surface(s Surface) Surface {
 		return Sphere{F: x.Frame(k.F), R: k.R}
 	case Torus:
 		return Torus{F: x.Frame(k.F), R: k.R, Rm: k.Rm}
+	case Revolved:
+		// the profile stays in the frame's own coordinates
+		return Revolved{F: x.Frame(k.F), C: k.C}
+	case Extruded:
+		c, d := k.C.Map(x.Pt), x.Dir(k.D)
+		if x.Det() < 0 {
+			// C′ × D would turn over: run the curve the other way
+			c = c.Reversed()
+		}
+		return Extruded{C: c, D: d}
 	}
 	return s
 }

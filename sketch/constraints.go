@@ -92,7 +92,7 @@ func (s *Sketch) conParams(c *Constraint) []int {
 		switch e.Kind {
 		case Point:
 			addPoint(id)
-		case Line, Arc:
+		case Line, Arc, Spline:
 			for _, p := range e.Pts {
 				addPoint(p)
 			}
@@ -116,6 +116,8 @@ func ends(e *Entity) []int {
 		return e.Pts
 	case Arc:
 		return e.Pts[1:]
+	case Spline:
+		return []int{e.Pts[0], e.Pts[len(e.Pts)-1]}
 	}
 	return nil
 }
@@ -143,6 +145,33 @@ func (s *Sketch) sharedEnd(a, b *Entity) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+// endTangent is a curve's direction (either way) at its end point p.
+func (s *Sketch) endTangent(e *Entity, p int) geom.Vec2 {
+	q := s.P(p)
+	switch e.Kind {
+	case Line:
+		a, b := s.lineEnds(e.ID)
+		return b.Sub(a)
+	case Arc:
+		return q.Sub(s.center(e.ID)).Perp()
+	case Spline:
+		// a leg of zero length leaves the tangent to the next point
+		pts := e.Pts
+		if p == pts[len(pts)-1] {
+			pts = append([]int(nil), pts...)
+			for i, j := 0, len(pts)-1; i < j; i, j = i+1, j-1 {
+				pts[i], pts[j] = pts[j], pts[i]
+			}
+		}
+		for _, c := range pts[1:] {
+			if d := s.P(c).Sub(q); d.Len() > 1e-9 {
+				return d
+			}
+		}
+	}
+	return geom.Vec2{}
 }
 
 // residuals appends a constraint's equations (zero when satisfied).
@@ -198,6 +227,16 @@ func (s *Sketch) residuals(c *Constraint, out []float64) []float64 {
 		// sharing an end (the usual case: a line running into an arc), the
 		// distance form has no gradient at tangency; ask for the line (or the
 		// other arc's radius) to be square to the radius at that end instead
+		if ents[0].Kind == Spline || ents[1].Kind == Spline {
+			// a spline meets the other curve at a shared end with its
+			// control leg along the other's direction there
+			p, ok := s.sharedEnd(ents[0], ents[1])
+			if !ok {
+				return append(out, 0)
+			}
+			t0, t1 := s.endTangent(ents[0], p), s.endTangent(ents[1], p)
+			return append(out, t0.Cross(t1)/(math.Max(t0.Len(), 1e-9)*math.Max(t1.Len(), 1e-9)))
+		}
 		if p, ok := s.sharedEnd(ents[0], ents[1]); ok {
 			pp := s.P(p)
 			r1 := pp.Sub(s.center(c.E[1]))
@@ -319,6 +358,15 @@ func (s *Sketch) checkArgs(k ConKind, ids []int) error {
 		ok = is(Line, Line)
 	case Tangent:
 		ok = len(kinds) == 2 && ((kinds[0] == Line && round(kinds[1])) || (round(kinds[0]) && round(kinds[1])))
+		if len(kinds) == 2 && (kinds[0] == Spline || kinds[1] == Spline) {
+			// at an end they share
+			other := kinds[0]
+			if other == Spline {
+				other = kinds[1]
+			}
+			_, shared := s.sharedEnd(s.Ent(ids[0]), s.Ent(ids[1]))
+			ok = other != Circle && other != Point && shared
+		}
 	case Equal:
 		ok = is(Line, Line) || (len(kinds) == 2 && round(kinds[0]) && round(kinds[1]))
 	case Concentric:

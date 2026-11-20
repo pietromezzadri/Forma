@@ -63,6 +63,8 @@ func revAxis(s Surface) (axis, bool) {
 		return axis{k.F.O, k.F.Z}, true
 	case Torus:
 		return axis{k.F.O, k.F.Z}, true
+	case Revolved:
+		return axis{k.F.O, k.F.Z}, true
 	}
 	return axis{}, false
 }

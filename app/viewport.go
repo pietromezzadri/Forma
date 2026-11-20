@@ -52,7 +52,7 @@ type viewport struct {
 	cubeHot   bool
 	gizmoHot  bool // the cursor is on the move gizmo
 	gizmoDrag bool
-	handle    extrudeHandle
+	handle    handleSet
 
 	// a capture places the cursor here (UI units in the image), nil = the mouse
 	virtual *imgui.Vec2
@@ -171,6 +171,7 @@ func (a *App) viewportWindow() {
 	a.drawOverlays(dl)
 	imgui.End()
 	a.section.panel(a)
+	a.modeBar()
 }
 
 // viewCube draws ImGuizmo's view cube in the top right corner and takes the
@@ -548,4 +549,11 @@ func accentU32(alpha float32) uint32 {
 	c := ui.Accent
 	c.W = alpha
 	return imgui.ColorConvertFloat4ToU32(c)
+}
+
+// accentVec4 is the UI accent as a colour.
+func accentVec4(alpha float32) imgui.Vec4 {
+	c := ui.Accent
+	c.W = alpha
+	return c
 }

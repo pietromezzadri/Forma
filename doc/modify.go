@@ -51,7 +51,7 @@ func withInputs(f *Feature, in ...[][2]string) *Feature {
 
 // NewMove moves and turns bodies (pivot: where it turns about).
 func NewMove(targets []int, pivot geom.Vec3) *Feature {
-	f := withInputs(&Feature{Kind: KMove, Targets: targets}, MoveInputs)
+	f := withInputs(&Feature{Kind: KMove, Targets: targets}, append(append([][2]string(nil), MoveInputs...), [2]string{"Scale", "1"}))
 	f.Inputs["Pivot X"] = fmtNum(pivot.X)
 	f.Inputs["Pivot Y"] = fmtNum(pivot.Y)
 	f.Inputs["Pivot Z"] = fmtNum(pivot.Z)
@@ -342,6 +342,9 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 		for _, key := range f.Targets {
 			i, err := target(key)
 			if err != nil {
+				return nil, err
+			}
+			if err := d.scaleRef(out, i, f); err != nil {
 				return nil, err
 			}
 			if err := d.moveRefs(out, []int{i}, x); err != nil {
@@ -690,4 +693,43 @@ func awayFrom(e *brep.Edge, v *brep.Vertex) geom.Vec3 {
 		return e.Curve.Deriv(e.T0).Norm().Scale(sgn)
 	}
 	return e.Curve.Deriv(e.T1).Norm().Scale(-sgn)
+}
+
+// MoveScale is a move feature's scale (1 when it has none: older files).
+func (d *Document) MoveScale(f *Feature) (float64, error) {
+	if s, ok := f.Inputs["Scale"]; !ok || s == "" {
+		return 1, nil
+	}
+	s, err := d.input(f, "Scale")
+	if err != nil {
+		return 1, err
+	}
+	if s <= 0 {
+		return 1, fmt.Errorf("Scale must be more than 0")
+	}
+	return s, nil
+}
+
+// scaleRef scales body i by a move feature's Scale about its pivot (before
+// the feature turns and moves it).
+func (d *Document) scaleRef(out []*BodyRef, i int, f *Feature) error {
+	s, err := d.MoveScale(f)
+	if err != nil || s == 1 {
+		return err
+	}
+	var p [3]float64
+	for k, name := range []string{"Pivot X", "Pivot Y", "Pivot Z"} {
+		if p[k], err = d.input(f, name); err != nil {
+			return err
+		}
+	}
+	r := out[i]
+	b, err := brep.Scale(r.Body, geom.V3(p[0], p[1], p[2]), s)
+	if err != nil {
+		return err
+	}
+	b.Name = r.Body.Name
+	// a scaled component's body is no longer its design's: plain from here
+	out[i] = &BodyRef{Key: r.Key, Name: r.Name, Body: b, Owner: r.Owner, Gen: d.nextGen()}
+	return nil
 }

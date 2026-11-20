@@ -137,7 +137,21 @@ func Revolve(name string, reg sketch.Region, plane geom.Frame, axisP, axisD geom
 				r1 = 0
 			}
 			var surf geom.Surface
-			if s.Arc {
+			if s.Ctrl != nil {
+				// the profile in the axis frame: X its distance out, Z its height
+				loc := make([]geom.Vec3, len(s.Ctrl))
+				for k, c := range s.Ctrl {
+					r, h := rh(plane.At2(c))
+					loc[k] = geom.Vec3{X: r, Z: h}
+				}
+				if va.axis {
+					loc[0].X = 0
+				}
+				if vb.axis {
+					loc[len(loc)-1].X = 0
+				}
+				surf = geom.Revolved{F: F, C: geom.Bezier(loc...)}
+			} else if s.Arc {
 				rc, hc := rh(plane.At2(s.C))
 				if rc < tol {
 					surf = geom.Sphere{F: ring(hc), R: s.R}
@@ -221,6 +235,10 @@ func reverseLoop(l []brep.Use) []brep.Use {
 
 // segMid is a segment's middle point and its direction of travel there.
 func segMid(s sketch.Seg) (geom.Vec2, geom.Vec2) {
+	if s.Ctrl != nil {
+		p, d := bezMid(s.Ctrl)
+		return p, d
+	}
 	if !s.Arc {
 		return s.A.Lerp(s.B, 0.5), s.B.Sub(s.A).Norm()
 	}
@@ -250,6 +268,16 @@ func segMid(s sketch.Seg) (geom.Vec2, geom.Vec2) {
 
 // revSegEdge makes a profile segment's edge, turned by rotDir when given.
 func revSegEdge(b *brep.Builder, plane geom.Frame, s sketch.Seg, va, vb *brep.Vertex, rotDir func(geom.Vec3) geom.Vec3) *brep.Edge {
+	if s.Ctrl != nil {
+		c := bezier3(plane, s.Ctrl, 0)
+		if rotDir != nil {
+			// turned round the axis like the vertices: through va's offset
+			a0 := plane.At2(s.A)
+			c = c.Map(func(p geom.Vec3) geom.Vec3 { return va.P.Add(rotDir(p.Sub(a0))) })
+		}
+		c.Ctrl[0], c.Ctrl[len(c.Ctrl)-1] = va.P, vb.P
+		return b.Edge(va, vb, c, 0, 1)
+	}
 	if !s.Arc {
 		return b.LineEdge(va, vb)
 	}
@@ -279,4 +307,15 @@ func revSegEdge(b *brep.Builder, plane geom.Frame, s sketch.Seg, va, vb *brep.Ve
 		t1 = a0 - sw
 	}
 	return b.Edge(va, vb, geom.Circle{F: f, R: s.R}, a0, t1)
+}
+
+// bezMid is a Bézier's middle point and its direction of travel there.
+func bezMid(c []geom.Vec2) (geom.Vec2, geom.Vec2) {
+	pts := make([]geom.Vec3, len(c))
+	for i, p := range c {
+		pts[i] = geom.Vec3{X: p.X, Y: p.Y}
+	}
+	b := geom.Bezier(pts...)
+	m, d := b.Eval(0.5), b.Deriv(0.5)
+	return geom.Vec2{X: m.X, Y: m.Y}, geom.Vec2{X: d.X, Y: d.Y}.Norm()
 }

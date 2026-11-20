@@ -16,7 +16,10 @@ new ones as features land.
   ellipses where the surfaces meet in one, `geom.ExactCurve`). Still:
   **K2b other curves stay polylines** — a plane cutting a cone at a slant
   (an ellipse, parabola or hyperbola), a plane along a cone's apex, a
-  sphere off a cylinder's axis, two crossing cylinders. The faces are
+  sphere off a cylinder's axis, two crossing cylinders, a revolved or
+  extruded spline face against a face not on its axis (a plane through a
+  revolved spline's axis meets it in the profile itself; it is still
+  contoured). The faces are
   split along the contoured polyline even where the edge is exact, so
   regions match the exact edge only to the contour tolerance.
 - **K3 Speed.** A boolean takes up to about a quarter of a second, so
@@ -27,6 +30,9 @@ new ones as features land.
 - **K4 Tangent contact.** Surfaces touching along a line or curve (a cylinder
   lying on a plane, a sphere in a cylinder of its radius) only work where the
   touching curve is also an edge. A general case is likely to fail.
+  (M9: a revolved face against faces on its own axis is intersected
+  exactly, profile against profile, so a foot leaving a ring's floor
+  tangentially joins.)
 - **K4b Nearly coincident faces fail.** Two cylinders of one radius whose
   axes are a hair apart (0.0002 mm: a ring's outside and a flange revolved
   onto it about an axis the ring's centre had drifted off) or a few mm
@@ -47,7 +53,8 @@ new ones as features land.
 - **F1 Only some edges.** Straight edges between flat faces, and circles where
   a flat face meets a cylinder or cone square on. Not edges between two
   curved faces (two cylinders, a cylinder and a sphere), torus or sphere
-  edges, or a plane meeting a cylinder at a slant.
+  edges, a plane meeting a cylinder at a slant, spline edges or the edges
+  of revolved or extruded spline faces (M9).
 - **F2 No corner patches.** Three rounded edges at one corner meet in mitres
   (the rounds cross), not the ball-shaped corner Fusion makes. Needs a
   spherical (or setback) patch at vertices where three rounds meet.
@@ -69,6 +76,8 @@ new ones as features land.
 - **S2 Busy vertices.** A vertex where four or more faces meet that don't
   agree once moved (the tip of a pyramid) has no place and fails.
 - **S3 One thickness.** No per-face thickness, no shelling outward.
+- **S4 Spline faces aren't offset:** a body with revolved or extruded spline
+  faces can't be shelled (an offset spline isn't a spline; it needs fitting).
 
 ## Holes, patterns, mirror, move
 
@@ -80,7 +89,8 @@ new ones as features land.
   (extrude, revolve, hole, primitive), not fillets, chamfers or shells.
 - **M1 Move:** rotations are three angles (X, then Y, then Z), so the gizmo can
   jump near a 90° turn about Y (gimbal lock); the gizmo works in world axes
-  only and doesn't snap.
+  only. Scale is uniform (a body scaled unevenly would turn circles into
+  ellipses), and components can't be scaled.
 
 ## Measure, mass properties, section
 
@@ -97,8 +107,14 @@ new ones as features land.
 
 ## Sketcher (`sketch/`)
 
-- **SK1 Few tools:** no splines, ellipses, slots, polygons, offset, trim,
-  extend or sketch fillets; no projecting body edges into a sketch.
+- **SK1 Few tools:** no ellipses, slots, polygons, offset, trim, extend or
+  sketch fillets; no projecting body edges into a sketch (M10). Splines (M9)
+  are single Bézier curves (quadratic or cubic) chained with tangency: no
+  fit-point splines, no point-on-spline constraint, no dimensions on a
+  spline's length or curvature.
+- **SK3 No transform box:** a sketch selection can't yet be moved, stretched
+  or scaled as a whole by handles (bodies can: Resize · Move · Turn · Scale).
+
 - **SK2 Solver:** numerical Jacobian, one cluster; big sketches will slow down.
 
 ## Design history and references (`doc/`)
@@ -150,12 +166,14 @@ new ones as features land.
 ## Exchange (`io/`)
 
 - ~~E1 STL only~~ (M6: STEP in and out, OBJ out, STL in as a reference mesh).
-- **E2 STEP import reads analytic solids only:** faces on planes, cylinders,
-  cones, spheres and tori. B-spline surfaces, surfaces of revolution or
-  extrusion and offset surfaces are refused (the solid is left out, with the
-  reason); so are open shells and surface models. Lines, circles and
-  ellipses come in exact; B-spline edges become polylines pulled onto both
-  faces (fine for booleans; not exact).
+- **E2 STEP import reads analytic solids:** faces on planes, cylinders,
+  cones, spheres and tori, and (M9) surfaces of revolution and of linear
+  extrusion of non-rational B-spline curves. B-spline surfaces, rational
+  swept curves and offset surfaces are refused (the solid is left out, with
+  the reason); so are open shells and surface models. Lines, circles,
+  ellipses and non-rational B-spline edges lying on their faces come in
+  exact; other B-spline edges become polylines pulled onto both faces.
+
 - **E3 STEP import flattens assemblies:** placements (`NEXT_ASSEMBLY_USAGE_OCCURRENCE`
   transforms, at any depth, a part used many times) are applied, but the
   solids come in as bodies of one Import feature, not as components;

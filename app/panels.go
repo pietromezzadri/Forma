@@ -122,6 +122,19 @@ func (a *App) statusBar() {
 			right = fmt.Sprintf("(%.2f, %.2f, %.2f)   ·   %s", p.X, p.Y, p.Z, right)
 		}
 		w := imgui.CalcTextSize(right).X
+		snap := a.snapLabel()
+		sw := imgui.CalcTextSize(snap).X + 16
+		imgui.SetCursorPosX(imgui.WindowWidth() - w - sw - 24)
+		imgui.PushStyleVarVec2(imgui.StyleVarFramePadding, imgui.Vec2{X: 8, Y: 0})
+		if imgui.SmallButton(snap + "##snapbtn") {
+			imgui.OpenPopupStr("##snap")
+		}
+		imgui.PopStyleVar()
+		if imgui.IsItemHovered() {
+			imgui.SetTooltip("Snapping: click to set the increments.\nWhile dragging: Ctrl moves freely, Shift for fine control.")
+		}
+		a.snapPopup()
+		imgui.SameLine()
 		imgui.SetCursorPosX(imgui.WindowWidth() - w - 12)
 		imgui.TextDisabled(right)
 	}

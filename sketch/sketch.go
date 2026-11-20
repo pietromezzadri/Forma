@@ -19,10 +19,11 @@ const (
 	Line
 	Circle
 	Arc
+	Spline // a Bézier curve through its control points
 )
 
 func (k Kind) String() string {
-	return [...]string{"Point", "Line", "Circle", "Arc"}[k]
+	return [...]string{"Point", "Line", "Circle", "Arc", "Spline"}[k]
 }
 
 // Entity is a sketch element. Points own two parameters (x, y); a line
@@ -32,7 +33,7 @@ func (k Kind) String() string {
 type Entity struct {
 	ID           int
 	Kind         Kind
-	Pts          []int // point entity IDs: line [a b], circle [c], arc [c start end]
+	Pts          []int // point entity IDs: line [a b], circle [c], arc [c start end], spline [p0 c1 … pn]
 	Par          int   // point: index of x (y is Par+1); circle: radius index
 	Construction bool
 }
@@ -135,6 +136,42 @@ func (s *Sketch) AddArc(center, start, end int) *Entity {
 	s.Ents = append(s.Ents, e)
 	s.Cons = append(s.Cons, &Constraint{ID: s.id(), Kind: ArcRadius, E: []int{e.ID}, Internal: true})
 	return e
+}
+
+// AddSpline adds a Bézier curve on existing points: its two ends and the
+// control points between them (one for a quadratic, two for a cubic).
+func (s *Sketch) AddSpline(pts ...int) *Entity {
+	e := &Entity{ID: s.id(), Kind: Spline, Pts: append([]int(nil), pts...)}
+	s.Ents = append(s.Ents, e)
+	return e
+}
+
+// Ctrl is a spline's control points (its ends included).
+func (s *Sketch) Ctrl(e *Entity) []geom.Vec2 {
+	out := make([]geom.Vec2, len(e.Pts))
+	for i, p := range e.Pts {
+		out[i] = s.P(p)
+	}
+	return out
+}
+
+// IsHandle reports whether point id is only a spline's inner control point
+// (drawn as a handle, not a point the curve passes through).
+func (s *Sketch) IsHandle(id int) bool {
+	inner := false
+	for _, e := range s.Ents {
+		for i, p := range e.Pts {
+			if p != id {
+				continue
+			}
+			if e.Kind == Spline && i > 0 && i < len(e.Pts)-1 {
+				inner = true
+			} else {
+				return false
+			}
+		}
+	}
+	return inner
 }
 
 // Radius of a circle or arc.
@@ -286,6 +323,8 @@ func (s *Sketch) Polyline(e *Entity, chordTol float64) []geom.Vec2 {
 			out[0], out[n] = s.P(e.Pts[1]), s.P(e.Pts[2])
 		}
 		return out
+	case Spline:
+		return bezPoints(s.Ctrl(e), chordTol)
 	}
 	return nil
 }
@@ -314,6 +353,8 @@ func (s *Sketch) Describe(id int) string {
 		return fmt.Sprintf("Circle %d (Ø %.3f mm)", e.ID, 2*s.Radius(e))
 	case Arc:
 		return fmt.Sprintf("Arc %d (R %.3f mm)", e.ID, s.Radius(e))
+	case Spline:
+		return fmt.Sprintf("Spline %d (degree %d)", e.ID, len(e.Pts)-1)
 	}
 	p := s.P(e.ID)
 	return fmt.Sprintf("Point %d (%.3f, %.3f)", e.ID, p.X, p.Y)
@@ -339,4 +380,10 @@ func sortedIDs(m map[int]bool) []int {
 	}
 	sort.Ints(out)
 	return out
+}
+
+// SplineAt is a spline's point and unit tangent at t in [0, 1].
+func (s *Sketch) SplineAt(e *Entity, t float64) (geom.Vec2, geom.Vec2) {
+	c := s.Ctrl(e)
+	return bezAt(c, t), bezDeriv(c, t).Norm()
 }

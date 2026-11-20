@@ -293,7 +293,11 @@ func (c *bctx) splitFace(F *bface) ([]*region, error) {
 				mid = pc.pts[0].Lerp(pc.pts[1], 0.5)
 			}
 			q, ok := F.place(F.uvRaw(mid))
-			if !ok || F.nearBoundary(q, c) {
+			// (lying along the boundary: already one of its edges; the
+			// (u, v) here are in mm along the surface, so no stretch for the
+			// aspect: a rim 0.5 mm below a long cylinder face's edge is
+			// well inside it)
+			if !ok || F.nearBoundaryTol(q, c.weldLoose*2) {
 				continue
 			}
 			add(pc, mapUV(pc.pts))
@@ -594,7 +598,11 @@ func subUV(hu heUV, ta, tb float64) []geom.Vec2 {
 
 // nearBoundary: q is on the face's boundary (an imprint along an edge).
 func (f *bface) nearBoundary(q geom.Vec2, c *bctx) bool {
-	tol := c.weldLoose * math.Max(f.su, f.sv) / math.Max(math.Min(f.su, f.sv), 1e-9)
+	return f.nearBoundaryTol(q, c.weldLoose*math.Max(f.su, f.sv)/math.Max(math.Min(f.su, f.sv), 1e-9))
+}
+
+// nearBoundaryTol: q is within tol of the face's boundary.
+func (f *bface) nearBoundaryTol(q geom.Vec2, tol float64) bool {
 	for _, s := range f.segs {
 		ab := s.b.Sub(s.a)
 		t := 0.0
@@ -608,12 +616,33 @@ func (f *bface) nearBoundary(q geom.Vec2, c *bctx) bool {
 	return false
 }
 
+// probeStep is how far either side of a region its classification looks:
+// the usual step, but less than half the way to a face of the other body
+// lying close (not on it) — a sliver almost flat on another face would
+// otherwise be looked at from beyond that face.
+func (c *bctx) probeStep(r *region) float64 {
+	eps := c.eps
+	var at geom.Box
+	at.Add(r.p)
+	for _, f := range c.faces {
+		if f.body == r.f.body || !boxesOverlap(f.box, at, c.eps) {
+			continue
+		}
+		d := math.Abs(geom.SignedDist(f.s, r.p))
+		if d > c.tolOn*100 && d/2 < eps {
+			eps = d / 2
+		}
+	}
+	return math.Max(eps, 1e-7*math.Max(1, c.scale))
+}
+
 // classify says where each region is relative to the other body.
 func (c *bctx) classify(rs []*region) {
 	for _, r := range rs {
 		m := c.meshes[1-r.f.body]
-		in1 := windingNumber(m, r.p.Add(r.n.Scale(c.eps))) > 0.5
-		in0 := windingNumber(m, r.p.Sub(r.n.Scale(c.eps))) > 0.5
+		eps := c.probeStep(r)
+		in1 := windingNumber(m, r.p.Add(r.n.Scale(eps))) > 0.5
+		in0 := windingNumber(m, r.p.Sub(r.n.Scale(eps))) > 0.5
 		switch {
 		case in0 && in1:
 			r.cls = classIn

@@ -100,6 +100,7 @@ type stepReader struct {
 type stepEdge struct {
 	e        *brep.Edge
 	sampled  bool // a polyline made here, to pull onto its faces
+	exact    bool // a B-spline kept as it is (if it lies on its faces)
 	surfaces []geom.Surface
 }
 
@@ -481,6 +482,66 @@ func (r *stepReader) surface(v p21Val) (geom.Surface, error) {
 			}
 			s = geom.Torus{F: f, R: x1, Rm: minor * r.scale}
 		}
+	case "SURFACE_OF_REVOLUTION":
+		bc, err := r.sweptCurve(arg(a, 1))
+		if err != nil {
+			return nil, err
+		}
+		ax, err := r.ent(arg(a, 2))
+		if err != nil {
+			return nil, err
+		}
+		o, err := r.point(arg(ax.Parts[0].Args, 1))
+		if err != nil {
+			return nil, err
+		}
+		z, err := r.direction(arg(ax.Parts[0].Args, 2))
+		if err != nil {
+			return nil, err
+		}
+		// X toward the profile's start, so it lies at u = 0 in F's XZ plane
+		d := bc.Ctrl[0].Sub(o)
+		x := d.Sub(z.Scale(d.Dot(z)))
+		if x.Len() < 1e-9 {
+			for _, c := range bc.Ctrl {
+				if d := c.Sub(o); d.Sub(z.Scale(d.Dot(z))).Len() > 1e-9 {
+					x = d.Sub(z.Scale(d.Dot(z)))
+					break
+				}
+			}
+		}
+		x = x.Norm()
+		F := geom.Frame{O: o, X: x, Y: z.Cross(x), Z: z}
+		size := 1.0
+		loc := bc.Map(func(p geom.Vec3) geom.Vec3 {
+			l := F.ToLocal(p)
+			size = math.Max(size, l.Len())
+			return l
+		})
+		for _, c := range loc.Ctrl {
+			if math.Abs(c.Y) > 1e-9*size {
+				return nil, fmt.Errorf("its surface of revolution has a profile off a plane through the axis, which Forma can't represent yet")
+			}
+		}
+		s = geom.Revolved{F: F, C: loc.Map(func(p geom.Vec3) geom.Vec3 { return geom.Vec3{X: p.X, Z: p.Z} })}
+	case "SURFACE_OF_LINEAR_EXTRUSION":
+		bc, err := r.sweptCurve(arg(a, 1))
+		if err != nil {
+			return nil, err
+		}
+		vec, err := r.ent(arg(a, 2))
+		if err != nil {
+			return nil, err
+		}
+		dir, err := r.direction(arg(vec.Parts[0].Args, 1))
+		if err != nil {
+			return nil, err
+		}
+		dir = dir.Norm()
+		// the curve flattened along the direction (the same surface)
+		o := bc.Ctrl[0]
+		bc = bc.Map(func(p geom.Vec3) geom.Vec3 { return p.Sub(dir.Scale(p.Sub(o).Dot(dir))) })
+		s = geom.Extruded{C: bc, D: dir}
 	default:
 		return nil, fmt.Errorf("its surface is a %s, which Forma can't represent yet", stepTypeName(t))
 	}
@@ -614,6 +675,10 @@ func (r *stepReader) curve(c *p21Ent, v0, v1 *brep.Vertex, sense bool) (*stepEdg
 		}
 		lo, hi := sp.knots[sp.deg], sp.knots[len(sp.knots)-sp.deg-1]
 		per := sp.eval(lo).Dist(sp.eval(hi)) < 1e-9*(1+sp.eval(lo).Len())
+		if bc := sp.curve(); bc != nil && !per {
+			// exact: kept if it lies on both its faces (fixEdges checks)
+			return &stepEdge{e: r.b.Edge(v0, v1, bc, bc.Project(v0.P), bc.Project(v1.P)), exact: true}, nil
+		}
 		return r.sampled(sp.eval, lo, hi, per, sp.project(v0.P), sp.project(v1.P), v0, v1, sense)
 	}
 	return nil, fmt.Errorf("its curve is a %s, which Forma can't read yet", c.Type())
@@ -688,6 +753,28 @@ func (r *stepReader) fixEdges() {
 	sort.Ints(ids)
 	for _, id := range ids {
 		se := r.edges[id]
+		if bc, ok := se.e.Curve.(*geom.BSpline); ok && se.exact && len(se.surfaces) == 2 {
+			// an exact B-spline stays if it lies on both faces; else it
+			// becomes a polyline pulled onto them like the others
+			off := 0.0
+			for k := 0; k <= 16; k++ {
+				p := bc.Eval(se.e.T0 + (se.e.T1-se.e.T0)*float64(k)/16)
+				for _, s := range se.surfaces {
+					off = math.Max(off, geom.SurfaceDist(s, p))
+				}
+			}
+			if off < 1e-6 {
+				continue
+			}
+			ts := geom.SampleParams(bc, se.e.T0, se.e.T1, 2e-4, math.Inf(1))
+			pts := make([]geom.Vec3, len(ts))
+			for i, t := range ts {
+				pts[i] = bc.Eval(t)
+			}
+			pts[0], pts[len(pts)-1] = se.e.Verts[0].P, se.e.Verts[1].P
+			pl := geom.NewPolyline(pts, 1e-6)
+			se.e.Curve, se.e.T0, se.e.T1 = pl, 0, pl.Length()
+		}
 		pl, ok := se.e.Curve.(*geom.Polyline)
 		if !ok || len(se.surfaces) != 2 {
 			continue
@@ -766,6 +853,40 @@ func (r *stepReader) bspline(c *p21Ent) (*stepSpline, error) {
 		return nil, fmt.Errorf("B-spline #%d: %d knots for %d points of degree %d", c.ID, len(sp.knots), len(sp.cps), sp.deg)
 	}
 	return sp, nil
+}
+
+// curve is the kernel's B-spline for a non-rational one (nil if rational).
+func (s *stepSpline) curve() *geom.BSpline {
+	if s.w != nil {
+		same := true
+		for _, w := range s.w {
+			same = same && math.Abs(w-s.w[0]) < 1e-12
+		}
+		if !same {
+			return nil
+		}
+	}
+	return &geom.BSpline{Deg: s.deg, Knots: append([]float64(nil), s.knots...), Ctrl: append([]geom.Vec3(nil), s.cps...)}
+}
+
+// sweptCurve reads a surface's basis curve as a B-spline.
+func (r *stepReader) sweptCurve(v p21Val) (*geom.BSpline, error) {
+	c, err := r.ent(v)
+	if err != nil {
+		return nil, err
+	}
+	if c.Part("B_SPLINE_CURVE_WITH_KNOTS") == nil {
+		return nil, fmt.Errorf("its swept curve is a %s, which Forma can't read yet", c.Type())
+	}
+	sp, err := r.bspline(c)
+	if err != nil {
+		return nil, err
+	}
+	bc := sp.curve()
+	if bc == nil {
+		return nil, fmt.Errorf("its swept curve is a rational B-spline, which Forma can't represent yet")
+	}
+	return bc, nil
 }
 
 // eval by de Boor's algorithm, in homogeneous coordinates.

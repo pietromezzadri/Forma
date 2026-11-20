@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	imgui "github.com/AllenDang/cimgui-go/imgui"
-	"github.com/AllenDang/cimgui-go/imguizmo"
-	"github.com/go-gl/mathgl/mgl32"
 
 	"forma/brep"
 	"forma/doc"
@@ -300,7 +298,18 @@ func (a *App) registerModifyCommands(c *Commands) {
 	c.add(&Command{ID: "view.section", Label: "Section view", Group: "View", Icon: icSection,
 		Run: func(arg string) { a.section.toggle(a, arg) }})
 	c.add(&Command{ID: "view.gizmo", Label: "Gizmo: move / turn", Group: "View",
-		Run: func(arg string) { a.gizmoRotate = arg == "rotate" || (arg == "" && !a.gizmoRotate) }})
+		Run: func(arg string) {
+			switch arg {
+			case "rotate":
+				a.gizmoMode = modeRotate
+			case "move":
+				a.gizmoMode = modeMove
+			case "scale":
+				a.gizmoMode = modeScale
+			default:
+				a.gizmoMode = (a.gizmoMode + 1) % 4
+			}
+		}})
 }
 
 // --- properties ---
@@ -365,15 +374,13 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 		for _, k := range []string{"Pivot X", "Pivot Y", "Pivot Z"} {
 			a.exprField(f, k, " mm")
 		}
+		imgui.SeparatorText("Scale (about the pivot)")
+		if _, ok := f.Inputs["Scale"]; !ok {
+			f.Inputs["Scale"] = "1"
+		}
+		a.exprField(f, "Scale", "×")
 		imgui.Spacing()
-		if imgui.RadioButtonBool("Drag to move", !a.gizmoRotate) {
-			a.gizmoRotate = false
-		}
-		imgui.SameLine()
-		if imgui.RadioButtonBool("Drag to turn", a.gizmoRotate) {
-			a.gizmoRotate = true
-		}
-		imgui.TextDisabled("The arrows in the view move it.")
+		imgui.TextDisabled("Pick Move, Turn or Scale in the bar over the view and drag.")
 	case doc.KMirror:
 		targets()
 		cur := "Selected face"
@@ -828,83 +835,16 @@ func (s *sectionView) panel(a *App) {
 }
 
 // --- the move gizmo ---
-
-// moveGizmo shows ImGuizmo's arrows (or rings) on the selected move
-// feature's bodies; dragging them sets its inputs.
-func (a *App) moveGizmo(dl *imgui.DrawList) {
-	vp := &a.vp
-	vp.gizmoHot = false
-	f := a.selFeature()
-	if f == nil || (f.Kind != doc.KMove && (f.Kind != doc.KComponent || a.jointedBy(f.ID) != 0)) || a.sk != nil || !f.Active {
-		vp.gizmoDrag = false
-		return
-	}
-	x, err := a.doc.D.MoveXform(f)
-	if err != nil {
-		return
-	}
-	var pivot [3]float64
-	for i, k := range []string{"Pivot X", "Pivot Y", "Pivot Z"} {
-		pivot[i], _ = a.doc.D.Eval(f.Inputs[k])
-	}
-	pv := geom.V3(pivot[0], pivot[1], pivot[2])
-	at := x.Pt(pv)
-	c0, c1, c2 := x.R[0], x.R[1], x.R[2]
-	m := mgl32.Mat4{
-		float32(c0.X), float32(c0.Y), float32(c0.Z), 0,
-		float32(c1.X), float32(c1.Y), float32(c1.Z), 0,
-		float32(c2.X), float32(c2.Y), float32(c2.Z), 0,
-		float32(at.X), float32(at.Y), float32(at.Z), 1,
-	}
-	before := m
-	view, proj := vp.view.View, vp.view.Proj
-	imguizmo.SetOrthographic(a.cam.Ortho)
-	imguizmo.SetGizmoSizeClipSpace(0.17)
-	imguizmo.SetDrawlistV(dl)
-	imguizmo.SetRect(vp.pos.X, vp.pos.Y, vp.size.X, vp.size.Y)
-	op := imguizmo.TRANSLATE
-	if a.gizmoRotate {
-		op = imguizmo.ROTATE
-	}
-	imguizmo.ManipulateV(&view[0], &proj[0], op, imguizmo.WORLD, &m[0], nil, nil, nil, nil)
-	using := imguizmo.IsUsing()
-	vp.gizmoHot = using || imguizmo.IsOver()
-	if m != before {
-		g := func(i int) float64 { return float64(m[i]) }
-		r0 := geom.V3(g(0), g(1), g(2)).Norm()
-		r1 := geom.V3(g(4), g(5), g(6)).Norm()
-		r2 := geom.V3(g(8), g(9), g(10)).Norm()
-		deg := 180 / math.Pi
-		rx := math.Atan2(r1.Z, r2.Z) * deg
-		ry := math.Asin(math.Max(-1, math.Min(1, -r0.Z))) * deg
-		rz := math.Atan2(r0.Y, r0.X) * deg
-		mv := geom.V3(g(12), g(13), g(14)).Sub(pv)
-		put := func(k string, v float64) {
-			v = math.Round(v*100) / 100
-			if v == 0 {
-				v = 0 // no "-0"
-			}
-			f.Inputs[k] = fmtLen(v)
-		}
-		put("Move X", mv.X)
-		put("Move Y", mv.Y)
-		put("Move Z", mv.Z)
-		put("Rotate X", rx)
-		put("Rotate Y", ry)
-		put("Rotate Z", rz)
-		a.doc.Regenerate()
-	}
-	if using {
-		vp.gizmoDrag = true
-	} else if vp.gizmoDrag {
-		vp.gizmoDrag = false
-		a.doc.Commit()
-	}
-}
-
 // gizmoAt is where the move gizmo stands (the moved pivot), if it shows.
 func (a *App) gizmoAt() (geom.Vec3, bool) {
 	f := a.selFeature()
+	if f != nil && isPrimitive(f) && a.gizmoMode != modeResize {
+		var p [3]float64
+		for i, k := range []string{"X", "Y", "Z"} {
+			p[i], _ = a.doc.D.Eval(f.Inputs[k])
+		}
+		return geom.V3(p[0], p[1], p[2]), true
+	}
 	if f == nil || f.Kind != doc.KMove {
 		return geom.Vec3{}, false
 	}

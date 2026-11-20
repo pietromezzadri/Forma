@@ -492,7 +492,7 @@ func (s *Sketch) Drag(id int, grab, target geom.Vec2) {
 	case Point:
 		s.Params[e.Par], s.Params[e.Par+1] = target.X, target.Y
 		locked[e.Par], locked[e.Par+1] = true, true
-	case Line, Arc:
+	case Line, Arc, Spline:
 		d := target.Sub(grab)
 		pts := e.Pts
 		if e.Kind == Arc {

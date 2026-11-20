@@ -69,6 +69,37 @@ func SampleParams(c Curve, t0, t1, chordTol, maxLen float64) []float64 {
 		if full := math.Abs(t1-t0) > math.Pi*1.999; full && n < 8 {
 			n = 8
 		}
+	case *BSpline:
+		// even steps within each knot span the range crosses
+		lo, hi := math.Min(t0, t1), math.Max(t0, t1)
+		per := k.steps(chordTol)
+		cuts := []float64{lo}
+		for _, kn := range k.Knots {
+			if kn > lo+1e-12 && kn < hi-1e-12 && kn != cuts[len(cuts)-1] {
+				cuts = append(cuts, kn)
+			}
+		}
+		cuts = append(cuts, hi)
+		ts := []float64{lo}
+		for i := 0; i+1 < len(cuts); i++ {
+			a, b := cuts[i], cuts[i+1]
+			m := per
+			if l := k.LengthBetween(a, b); maxLen > 0 && !math.IsInf(maxLen, 1) {
+				if q := int(math.Ceil(l / maxLen)); q > m {
+					m = q
+				}
+			}
+			for j := 1; j <= m; j++ {
+				ts = append(ts, a+(b-a)*float64(j)/float64(m))
+			}
+		}
+		ts[len(ts)-1] = hi
+		if t1 < t0 {
+			for i, j := 0, len(ts)-1; i < j; i, j = i+1, j-1 {
+				ts[i], ts[j] = ts[j], ts[i]
+			}
+		}
+		return ts
 	case *Polyline:
 		lo, hi := math.Min(t0, t1), math.Max(t0, t1)
 		ts := []float64{lo}

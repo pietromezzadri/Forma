@@ -367,6 +367,14 @@ func (s *SketchItem) upload(chordTol float64) *sketchGPU {
 			p3 = append(p3, sk.Plane.At2(p))
 		}
 		pl := render.Polyline{ID: uint32(e.ID), Pts: p3}
+		if e.Kind == sketch.Spline {
+			// its control legs, drawn like construction lines
+			var legs []geom.Vec3
+			for _, p := range e.Pts {
+				legs = append(legs, sk.Plane.At2(sk.P(p)))
+			}
+			constr = append(constr, render.Polyline{ID: uint32(e.ID), Pts: legs})
+		}
 		if e.Construction {
 			constr = append(constr, pl)
 		} else {

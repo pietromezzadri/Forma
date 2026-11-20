@@ -212,3 +212,55 @@ What each milestone added, in the order they were built. The current gaps are in
   `brep/merge_test.go` (side by side, an L, a frame round a hole, drilling
   across a merged join), `io` (a slanted cut through OpenCASCADE, the oblique
   hole's ellipses read back).
+
+## M9: splines (and dragging)
+
+- **Curves and surfaces** (`geom/bspline.go`, `geom/sweepsurf.go`): clamped
+  non-rational B-splines (`geom.BSpline`; `geom.Bezier` is the one-span
+  case) with evaluation, derivatives, projection, length, de Casteljau
+  splitting and chord-bounded sampling; `geom.Revolved` (a profile curve
+  turned about an axis) and `geom.Extruded` (a curve swept along a
+  direction), with the parameters and normals of STEP's surfaces of
+  revolution and linear extrusion. Their signed distance stops at the
+  profile's ends (a profile ending flat on a plane doesn't put the plane
+  at distance 0). Transforms, uniform scaling (`brep.Scale`) and meshing
+  handle them.
+- **Sketcher**: a Spline entity (a Bézier on ordinary sketch points: its
+  ends and handles drag, snap and take constraints like any point); the
+  Spline tool (B: start, two handles, end; it chains on, the next first
+  handle mirrored and held tangent); tangency between a spline and a line,
+  arc or spline at a shared end; profiles cut splines exactly where curves
+  cross (numeric intersection, de Casteljau pieces) with exact areas.
+- **Features**: extruding a spline makes an extruded face, revolving one a
+  revolved face (`ops/extrude.go`, `ops/revolve.go`); booleans on them. A
+  revolved face against faces on its own axis (planes square to it,
+  coaxial cylinders, cones, spheres, tori, other revolved faces) is
+  intersected exactly by walking its profile (`brep/bool_coaxial.go`):
+  crossings and tangent touches give circles.
+- **Kernel fixes found on the way** (they failed before M9 too): a cut
+  ending exactly where two edges cross (the ring's split line and a
+  revolved foot's seam) now splits both; an imprinted edge half a
+  millimetre inside a long cylindrical face is no longer dropped as "on
+  its boundary" (a boss flush with a plate's side and a little taller); a
+  sliver lying almost on a face of the other body is classified with a
+  probe step shorter than the gap.
+- **STEP**: B-spline edges, surfaces of revolution and of linear extrusion
+  written and read exactly (OpenCASCADE reads them valid with the same
+  volumes).
+- **Dragging** (`app/snapping.go`, `app/handle.go`, `app/transform_ui.go`):
+  drags snap to an increment (half the grid's spacing, or a fixed length
+  from the status bar's Snap menu or `snap.step`), Ctrl moves freely,
+  Shift is fine control (a tenth of the step and of the motion), with a
+  readout by the cursor; sketch drags (which ignored the grid) included.
+  Arrows on the selected feature resize it: an extrude's distance, a box's
+  sides, a cylinder's radius and height and so on. A Resize · Move · Turn
+  · Scale bar over the view: a primitive moves and scales by its own
+  inputs, anything else gets a move feature (which now has a Scale), and
+  Resize goes back from a move feature to the feature that made the body.
+  The sketch snaps to its origin and pins what is drawn there; changing a
+  dimension moves the loosest geometry first.
+- Tests: `geom/bspline_test.go`, `sketch` (spline regions, tangency),
+  `ops/spline_test.go` (extruded and revolved splines against exact
+  volumes, booleans through them), `ops/bowl_test.go` and
+  `ops/bowlprobe_test.go` (a dog bowl's foot joined eight ways),
+  `brep/scale_test.go`, `io` (spline parts through OpenCASCADE).

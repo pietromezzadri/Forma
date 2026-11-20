@@ -103,6 +103,15 @@ func (a *App) drawSketchOverlay(dl *imgui.DrawList) {
 	}
 	sm.dimRects = rects
 
+	// what a drag is setting, by the cursor
+	if sm.dragging && sm.dragLabel != "" {
+		p := vadd(a.vp.pos, a.vp.mouse)
+		ts := imgui.CalcTextSize(sm.dragLabel)
+		mn := vadd(p, imgui.Vec2{X: 16, Y: 12})
+		dl.AddRectFilledV(mn, vadd(mn, imgui.Vec2{X: ts.X + 10, Y: ts.Y + 4}), u32(1, 1, 1, 0.92), 4, 0)
+		dl.AddTextVec2(vadd(mn, imgui.Vec2{X: 5, Y: 2}), u32(0.1, 0.12, 0.16, 1), sm.dragLabel)
+	}
+
 	// the snap cursor
 	if sm.valid && sm.tool != toolSelect && !sm.editOpen {
 		p := a.skScreen(s, sm.cur.p)
@@ -270,6 +279,9 @@ func (a *App) curveSpot(s *sketch.Sketch, id int, t float64) (geom.Vec2, geom.Ve
 		ang := a0 + sw*t
 		u := geom.Vec2{X: math.Cos(ang), Y: math.Sin(ang)}
 		return s.P(e.Pts[0]).Add(u.Scale(s.Radius(e))), u, true
+	case sketch.Spline:
+		p, d := s.SplineAt(e, t)
+		return p, d.Perp(), true
 	case sketch.Point:
 		return s.P(id), geom.Vec2{X: 0.7, Y: 0.7}, true
 	}

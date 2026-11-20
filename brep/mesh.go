@@ -93,6 +93,12 @@ func minRadius(s geom.Surface) float64 {
 		return k.R
 	case geom.Torus:
 		return k.Rm
+	case geom.Revolved:
+		return k.BendRadius()
+	case geom.Extruded:
+		if r := k.BendRadius(); !math.IsInf(r, 1) {
+			return r
+		}
 	}
 	return 0
 }

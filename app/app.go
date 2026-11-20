@@ -52,13 +52,16 @@ type App struct {
 	postQueue
 	showParams bool
 
-	section     sectionView
-	gizmoRotate bool
-	density     string // g/cm³, for mass properties
-	title       string
-	autoT       float64
-	lastAuto    []byte
-	titleT      float64
+	section   sectionView
+	gizmoMode gizmoMode // what dragging a selected feature does (resize, move, turn, scale)
+	modeFor   int       // the feature gizmoMode was set for
+	scale     scaleDrag
+	density   string // g/cm³, for mass properties
+	snap      snapSettings
+	title     string
+	autoT     float64
+	lastAuto  []byte
+	titleT    float64
 
 	capture  *captureRun
 	btnRects map[string]imgui.Vec2 // centres of named widgets (for capture scripts)

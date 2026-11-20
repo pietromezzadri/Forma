@@ -22,10 +22,43 @@ func SignedDist(s Surface, p Vec3) float64 {
 	case Torus:
 		l := k.F.ToLocal(p)
 		return math.Hypot(math.Hypot(l.X, l.Y)-k.R, l.Z) - k.Rm
+	case Revolved:
+		// in the half-plane through p: the profile's side, and past its
+		// ends the true distance to them (a profile ending flat on a plane
+		// would otherwise put the whole plane at distance 0)
+		l := k.F.ToLocal(p)
+		return curveSide(k.C, Vec3{X: math.Hypot(l.X, l.Y), Z: l.Z}, func(d Vec3) Vec3 { return Vec3{X: d.Z, Z: -d.X} })
+	case Extruded:
+		o := k.C.Ctrl[0]
+		q := p.Sub(k.D.Scale(p.Sub(o).Dot(k.D)))
+		return curveSide(k.C, q, func(d Vec3) Vec3 { return d.Cross(k.D) })
 	}
 	u, v := s.Project(p)
 	q := s.Eval(u, v)
 	return p.Sub(q).Dot(s.Normal(u, v))
+}
+
+// curveSide is the signed distance from q to a curve in its plane, positive
+// on the side normal(tangent) points to; past an end of the curve, the
+// distance to that end.
+func curveSide(c *BSpline, q Vec3, normal func(Vec3) Vec3) float64 {
+	t := c.Project(q)
+	p := c.Eval(t)
+	d := q.Sub(p)
+	n := normal(c.Deriv(t))
+	if n.Len() < 1e-300 {
+		return d.Len()
+	}
+	s := d.Dot(n.Norm())
+	t0, t1 := c.Range()
+	if t <= t0 || t >= t1 {
+		// beyond the end: the whole distance, with the side's sign
+		if s < 0 {
+			return -d.Len()
+		}
+		return d.Len()
+	}
+	return s
 }
 
 // DistGrad is the gradient of SignedDist (numerical, central differences).

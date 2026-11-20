@@ -191,6 +191,68 @@ func TestSetValueMovesTheLoosest(t *testing.T) {
 	}
 }
 
+// A region closed by a Bézier: its area is exact, a line across it splits
+// it in two whose areas add up, and tangency at a shared end holds.
+func TestSplineRegions(t *testing.T) {
+	s := New("s", geom.World)
+	a := s.AddPoint(geom.V2(0, 0))
+	b := s.AddPoint(geom.V2(40, 0))
+	c1 := s.AddPoint(geom.V2(40, 20))
+	c2 := s.AddPoint(geom.V2(0, 30))
+	s.AddLine(a.ID, b.ID)
+	sp := s.AddSpline(b.ID, c1.ID, c2.ID, a.ID)
+	rs := s.Regions()
+	if len(rs) != 1 {
+		t.Fatalf("%d regions", len(rs))
+	}
+	// the curve's area against a fine polygon of it
+	poly := []geom.Vec2{{X: 0, Y: 0}}
+	for i := 0; i <= 20000; i++ {
+		poly = append(poly, bezAt(s.Ctrl(sp), float64(i)/20000))
+	}
+	want := 0.0
+	for i := range poly {
+		want += poly[i].Cross(poly[(i+1)%len(poly)]) / 2
+	}
+	if math.Abs(rs[0].Area-math.Abs(want)) > 1e-4 {
+		t.Fatalf("area %.6f, want %.6f", rs[0].Area, math.Abs(want))
+	}
+	// a vertical line through it splits it
+	s.AddLineXY(geom.V2(20, -5), geom.V2(20, 40))
+	rs = s.Regions()
+	if len(rs) != 2 {
+		t.Fatalf("%d regions after the cut", len(rs))
+	}
+	if sum := rs[0].Area + rs[1].Area; math.Abs(sum-math.Abs(want)) > 1e-4 {
+		t.Fatalf("pieces add up to %.6f, want %.6f", sum, math.Abs(want))
+	}
+	for _, r := range rs {
+		n := 0
+		for _, sg := range r.Outer {
+			if sg.Ctrl != nil {
+				n++
+				if sg.Ctrl[0] != sg.A || sg.Ctrl[len(sg.Ctrl)-1] != sg.B {
+					t.Fatal("a spline piece's ends aren't its segment's")
+				}
+			}
+		}
+		if n != 1 {
+			t.Fatalf("a piece has %d spline segments", n)
+		}
+	}
+	// tangent to a line at the shared end
+	l := s.AddLineXY(geom.V2(-20, 0), geom.V2(-10, 0))
+	s.AddConstraint(Coincident, []int{l.Pts[1], a.ID}, 0)
+	if _, err := s.AddConstraint(Tangent, []int{sp.ID, l.ID}, 0); err != nil {
+		t.Fatal(err)
+	}
+	leg := s.P(c2.ID).Sub(s.P(a.ID))
+	dir := s.P(l.Pts[1]).Sub(s.P(l.Pts[0]))
+	if math.Abs(leg.Cross(dir))/(leg.Len()*dir.Len()) > 1e-8 {
+		t.Fatalf("leg %v not along the line %v", leg, dir)
+	}
+}
+
 func rect(s *Sketch, x0, y0, x1, y1 float64) {
 	a, b := s.AddPoint(geom.V2(x0, y0)), s.AddPoint(geom.V2(x1, y0))
 	c, d := s.AddPoint(geom.V2(x1, y1)), s.AddPoint(geom.V2(x0, y1))

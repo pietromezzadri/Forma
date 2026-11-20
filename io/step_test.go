@@ -15,6 +15,7 @@ import (
 	"forma/geom"
 	fio "forma/io"
 	"forma/ops"
+	"forma/sketch"
 )
 
 func boolean(t *testing.T, a, b *brep.Body, op brep.BoolOp) *brep.Body {
@@ -69,6 +70,22 @@ func stepParts(t *testing.T) map[string]*brep.Body {
 		t.Fatal(err)
 	}
 	out["slant"] = boolean(t, mk(ops.Cylinder(at(0, 0, -20), 4, 40)), tilt, brep.Subtract)
+
+	// a bowl section closed by a cubic Bézier: extruded (a surface of
+	// linear extrusion) and turned about its axis (a surface of revolution)
+	sk := sketch.New("s", geom.World)
+	o := sk.AddPoint(geom.V2(0, 0)).ID
+	top := sk.AddPoint(geom.V2(0, 30)).ID
+	rim := sk.AddPoint(geom.V2(25, 30)).ID
+	c1 := sk.AddPoint(geom.V2(32, 8)).ID
+	c2 := sk.AddPoint(geom.V2(12, 0)).ID
+	sk.AddLine(o, top)
+	sk.AddLine(top, rim)
+	sk.AddSpline(rim, c1, c2, o)
+	reg := sk.Regions()[0]
+	out["splineext"] = mk(ops.Extrude("e", reg, geom.World, 0, 10))
+	bowl := mk(ops.Revolve("r", reg, geom.World, geom.V2(0, 0), geom.V2(0, 1), 2*math.Pi))
+	out["splinerev"] = boolean(t, bowl, box(-50, 20, -50, 50, 60, 50), brep.Subtract)
 
 	out["steinmetz"] = boolean(t, mk(ops.Cylinder(at(0, 0, -15), 5, 30)), mk(ops.Cylinder(rx, 4, 30)), brep.Union)
 

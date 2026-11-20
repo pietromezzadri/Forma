@@ -1,0 +1,36 @@
+{
+  "width": 1600, "height": 900, "out": "out/bowl",
+  "shots": [
+    {"name": "a_ring", "frames": 8, "do": [
+      "snap.step:0.5", "sketch.xy", "wait:15", "view.fit", "wait:6",
+      "move:btn:tool.circle@4", "click", "move:sk:0,0@6", "wait:3", "click", "move:sk:60,0@6", "wait:3", "click", "wait:4",
+      "move:btn:tool.circle@4", "click", "move:sk:0,0@6", "wait:3", "click", "move:sk:67.5,0@6", "wait:3", "click", "wait:4",
+      "move:btn:sketch.finish@4", "click", "wait:8", "view.iso:now", "view.fit", "wait:8",
+      "move:w:63.7,0,0@6", "wait:4", "click", "wait:4",
+      "move:btn:feature.extrude@4", "click", "wait:10", "feature.set:Distance=50", "wait:10"
+    ]},
+    {"name": "b_profile", "frames": 8, "do": [
+      "edit.clear", "sketch.xz", "wait:15",
+      "move:btn:tool.spline@4", "click",
+      "move:sk:67.5,0@6", "wait:3", "click", "move:sk:75,0@6", "wait:3", "click",
+      "move:sk:75,15@6", "wait:3", "click", "move:sk:72.5,27.5@6", "wait:3", "click", "wait:4",
+      "move:sk:80,40@6", "wait:6"
+    ]},
+    {"name": "c_closed", "frames": 8, "do": [
+      "key:escape", "move:btn:tool.line@4", "click",
+      "move:sk:72.5,27.5@6", "wait:4", "click", "move:sk:67.5,50@6", "wait:4", "click",
+      "move:sk:67.5,0@6", "wait:4", "click", "key:escape", "wait:4",
+      "move:btn:tool.select@4", "click", "move:vp:0.98,0.98@2", "wait:8", "log"
+    ]},
+    {"name": "d_bowl", "frames": 8, "do": [
+      "move:btn:sketch.finish@4", "click", "wait:8",
+      "move:w:70,0,12@6", "wait:4", "click", "wait:4",
+      "move:btn:feature.revolve@4", "click", "wait:15", "feature.set:Operation=Join", "wait:15",
+      "edit.clear", "view.iso:now", "view.fit", "wait:10", "move:vp:0.98,0.98@2", "wait:6", "log"
+    ]},
+    {"name": "e_close", "frames": 8, "do": [
+      "camto:200,-12", "wait:30", "move:vp:0.5,0.6@2", "wheel:2@8", "wait:8", "move:vp:0.98,0.98@2", "wait:6",
+      "export:out/bowl/bowl.step", "file.save:captures/out/bowl/bowl.forma"
+    ]}
+  ]
+}

@@ -73,7 +73,10 @@ func Extrude(name string, reg sketch.Region, plane geom.Frame, d0, d1 float64) (
 			j := (i + 1) % n
 			var surf geom.Surface
 			rev := false
-			if s.Arc {
+			if s.Ctrl != nil {
+				// C' × N is to the right of the travel: outward
+				surf = geom.Extruded{C: bezier3(plane, s.Ctrl, d0), D: N}
+			} else if s.Arc {
 				f := plane
 				f.O = plane.At2(s.C)
 				surf = geom.Cylinder{F: f, R: s.R}
@@ -94,6 +97,9 @@ func Extrude(name string, reg sketch.Region, plane geom.Frame, d0, d1 float64) (
 
 // segEdge makes the 3D edge of a profile segment at offset d.
 func segEdge(b *brep.Builder, plane geom.Frame, s sketch.Seg, d float64, va, vb *brep.Vertex) *brep.Edge {
+	if s.Ctrl != nil {
+		return b.Edge(va, vb, bezier3(plane, s.Ctrl, d), 0, 1)
+	}
 	if !s.Arc {
 		return b.LineEdge(va, vb)
 	}
@@ -116,4 +122,13 @@ func segEdge(b *brep.Builder, plane geom.Frame, s sketch.Seg, d float64, va, vb 
 		t1 = a0 - sw
 	}
 	return b.Edge(va, vb, geom.Circle{F: f, R: s.R}, a0, t1)
+}
+
+// bezier3 is a sketch Bézier in 3D, offset d along the plane's normal.
+func bezier3(plane geom.Frame, ctrl []geom.Vec2, d float64) *geom.BSpline {
+	pts := make([]geom.Vec3, len(ctrl))
+	for i, c := range ctrl {
+		pts[i] = plane.At2(c).Add(plane.Z.Scale(d))
+	}
+	return geom.Bezier(pts...)
 }

@@ -16,6 +16,9 @@ type Seg struct {
 	R    float64
 	CCW  bool
 	Src  int // the entity it came from
+	// Ctrl, when set, makes it a Bézier from A (Ctrl[0]) to B (the last),
+	// the piece of a spline it was cut from
+	Ctrl []geom.Vec2
 }
 
 // Region is a closed area the sketch's curves bound: an outer loop
@@ -31,6 +34,9 @@ type Region struct {
 
 // SegPoints samples a segment (both ends included).
 func SegPoints(sg Seg, chordTol float64) []geom.Vec2 {
+	if sg.Ctrl != nil {
+		return bezPoints(sg.Ctrl, chordTol)
+	}
 	if !sg.Arc {
 		return []geom.Vec2{sg.A, sg.B}
 	}
@@ -93,6 +99,7 @@ func pointInPoly(q geom.Vec2, p []geom.Vec2) bool {
 
 // a curve of the planar graph
 type gcurve struct {
+	bez  []geom.Vec2 // a spline's control points
 	arc  bool
 	a, b geom.Vec2 // line ends
 	c    geom.Vec2
@@ -104,6 +111,9 @@ type gcurve struct {
 }
 
 func (g *gcurve) at(t float64) geom.Vec2 {
+	if g.bez != nil {
+		return bezAt(g.bez, t)
+	}
 	if !g.arc {
 		return g.a.Lerp(g.b, t)
 	}
@@ -147,6 +157,11 @@ func (s *Sketch) Regions() []Region {
 			r := s.Radius(e)
 			if r > 1e-9 {
 				cs = append(cs, &gcurve{arc: true, c: s.center(e.ID), r: r, a0: a0, sw: sw, src: e.ID})
+			}
+		case Spline:
+			c := s.Ctrl(e)
+			if len(c) >= 2 {
+				cs = append(cs, &gcurve{bez: c, a: c[0], b: c[len(c)-1], src: e.ID})
 			}
 		}
 	}
@@ -210,6 +225,10 @@ func (s *Sketch) Regions() []Region {
 		if g.arc && g.sw > 2*math.Pi-1e-9 && len(ts) <= 2 {
 			ts = []float64{0, 0.5, 1}
 		}
+		// so does a spline closed on itself
+		if g.bez != nil && g.a.Dist(g.b) <= tol*10 && len(ts) <= 2 {
+			ts = []float64{0, 0.5, 1}
+		}
 		for k := 0; k+1 < len(ts); k++ {
 			t0, t1 := ts[k], ts[k+1]
 			pa, pb := g.at(t0), g.at(t1)
@@ -219,13 +238,21 @@ func (s *Sketch) Regions() []Region {
 			}
 			sg := Seg{Arc: g.arc, A: verts[va], B: verts[vb], C: g.c, R: g.r, CCW: true, Src: g.src}
 			var dirA, dirB geom.Vec2
-			var curv float64
-			if g.arc {
+			var curv, curvB float64
+			if g.bez != nil {
+				sub := bezSub(g.bez, t0, t1)
+				sub[0], sub[len(sub)-1] = verts[va], verts[vb]
+				sg.Ctrl = sub
+				dirA = bezDeriv(sub, 0).Norm()
+				dirB = bezDeriv(sub, 1).Norm().Scale(-1)
+				curv, curvB = bezCurvature(sub, 0), -bezCurvature(sub, 1)
+			} else if g.arc {
 				aa := g.a0 + g.sw*t0
 				ab := g.a0 + g.sw*t1
 				dirA = geom.Vec2{X: -math.Sin(aa), Y: math.Cos(aa)}
 				dirB = geom.Vec2{X: math.Sin(ab), Y: -math.Cos(ab)}
 				curv = 1 / g.r
+				curvB = -curv
 			} else {
 				dirA = pb.Sub(pa).Norm()
 				dirB = pa.Sub(pb).Norm()
@@ -234,7 +261,10 @@ func (s *Sketch) Regions() []Region {
 			hs = append(hs, half{from: va, to: vb, seg: sg, angle: dirA.Angle(), curv: curv, twin: i + 1})
 			rev := sg
 			rev.A, rev.B, rev.CCW = sg.B, sg.A, false
-			hs = append(hs, half{from: vb, to: va, seg: rev, angle: dirB.Angle(), curv: -curv, twin: i})
+			if sg.Ctrl != nil {
+				rev.Ctrl = bezReversed(sg.Ctrl)
+			}
+			hs = append(hs, half{from: vb, to: va, seg: rev, angle: dirB.Angle(), curv: curvB, twin: i})
 		}
 	}
 	// outgoing half-edges of each vertex, counter-clockwise
@@ -379,6 +409,9 @@ func intersect(a, b *gcurve, tol float64) [][2]float64 {
 			out = append(out, [2]float64{ta, tb})
 		}
 	}
+	if a.bez != nil || b.bez != nil {
+		return intersectNumeric(a, b, tol)
+	}
 	switch {
 	case !a.arc && !b.arc:
 		d1, d2 := a.b.Sub(a.a), b.b.Sub(b.a)
@@ -411,7 +444,110 @@ func intersect(a, b *gcurve, tol float64) [][2]float64 {
 	return out
 }
 
+// deriv is the curve's derivative in its [0, 1] parameter.
+func (g *gcurve) deriv(t float64) geom.Vec2 {
+	switch {
+	case g.bez != nil:
+		return bezDeriv(g.bez, t)
+	case g.arc:
+		a := g.a0 + g.sw*t
+		return geom.Vec2{X: -math.Sin(a), Y: math.Cos(a)}.Scale(g.r * g.sw)
+	}
+	return g.b.Sub(g.a)
+}
+
+// intersectNumeric finds where two curves meet (at least one a spline):
+// crossings of their sampled polylines refined by Newton steps on
+// a(s) = b(t), plus ends of either lying on the other.
+func intersectNumeric(a, b *gcurve, tol float64) [][2]float64 {
+	samples := func(g *gcurve) []float64 {
+		n := 1
+		switch {
+		case g.bez != nil:
+			n = 4 * bezSteps(g.bez, tol*1e3)
+		case g.arc:
+			n = int(math.Ceil(g.sw / (math.Pi / 32)))
+		}
+		ts := make([]float64, n+1)
+		for i := range ts {
+			ts[i] = float64(i) / float64(n)
+		}
+		return ts
+	}
+	ta, tb := samples(a), samples(b)
+	var out [][2]float64
+	addPair := func(s, t float64) {
+		for _, o := range out {
+			if a.at(o[0]).Dist(a.at(s)) < tol*10 {
+				return
+			}
+		}
+		out = append(out, [2]float64{s, t})
+	}
+	refine := func(s, t float64) (float64, float64, bool) {
+		for it := 0; it < 40; it++ {
+			f := a.at(s).Sub(b.at(t))
+			if f.Len() < tol*0.01 {
+				break
+			}
+			da, db := a.deriv(s), b.deriv(t)
+			// solve [da −db] [Δs Δt]ᵀ = −f
+			det := da.X*(-db.Y) - (-db.X)*da.Y
+			if math.Abs(det) < 1e-18 {
+				return s, t, false
+			}
+			ds := (-f.X*(-db.Y) - (-db.X)*(-f.Y)) / det
+			dt := (da.X*(-f.Y) - (-f.X)*da.Y) / det
+			s = math.Max(0, math.Min(1, s+ds))
+			t = math.Max(0, math.Min(1, t+dt))
+		}
+		return s, t, a.at(s).Dist(b.at(t)) < tol*10
+	}
+	for i := 0; i+1 < len(ta); i++ {
+		p0, p1 := a.at(ta[i]), a.at(ta[i+1])
+		for j := 0; j+1 < len(tb); j++ {
+			q0, q1 := b.at(tb[j]), b.at(tb[j+1])
+			d1, d2 := p1.Sub(p0), q1.Sub(q0)
+			den := d1.Cross(d2)
+			if math.Abs(den) < 1e-18 {
+				continue
+			}
+			u := q0.Sub(p0).Cross(d2) / den
+			v := q0.Sub(p0).Cross(d1) / den
+			const m = 1e-6
+			if u < -m || u > 1+m || v < -m || v > 1+m {
+				continue
+			}
+			s := ta[i] + (ta[i+1]-ta[i])*u
+			t := tb[j] + (tb[j+1]-tb[j])*v
+			if s, t, ok := refine(s, t); ok {
+				addPair(s, t)
+			}
+		}
+	}
+	// ends touching the other curve (shared points, T junctions)
+	for _, s := range []float64{0, 1} {
+		if t := b.param(a.at(s), tol); t >= 0 {
+			addPair(s, t)
+		}
+	}
+	for _, t := range []float64{0, 1} {
+		p := b.at(t)
+		if s := a.param(p, tol); s >= 0 {
+			addPair(s, t)
+		}
+	}
+	return out
+}
+
 func (g *gcurve) param(p geom.Vec2, tol float64) float64 {
+	if g.bez != nil {
+		t := bezProject(g.bez, p)
+		if bezAt(g.bez, t).Dist(p) > tol*100 {
+			return -1
+		}
+		return t
+	}
 	if g.arc {
 		if math.Abs(p.Dist(g.c)-g.r) > tol*100 {
 			return -1
@@ -477,6 +613,10 @@ func circleCircle(c1 geom.Vec2, r1 float64, c2 geom.Vec2, r2 float64, tol float6
 func LoopArea(l []Seg) float64 {
 	a := 0.0
 	for _, s := range l {
+		if s.Ctrl != nil {
+			a += bezArea(s.Ctrl)
+			continue
+		}
 		a += s.A.Cross(s.B) / 2
 		if s.Arc {
 			a0 := s.A.Sub(s.C).Angle()

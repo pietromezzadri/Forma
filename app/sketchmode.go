@@ -22,9 +22,10 @@ const (
 	toolArc
 	toolPoint
 	toolDim
+	toolSpline
 )
 
-var toolNames = [...]string{"Select", "Line", "Rectangle", "Circle", "Arc", "Point", "Dimension"}
+var toolNames = [...]string{"Select", "Line", "Rectangle", "Circle", "Arc", "Point", "Dimension", "Spline"}
 
 var toolHints = [...]string{
 	"Click to select, drag points and curves to move them. Esc clears.",
@@ -34,6 +35,7 @@ var toolHints = [...]string{
 	"Click the centre, the start, then the end (counter-clockwise).",
 	"Click to place a point.",
 	"Click a line, circle or arc; or two points, a point and a line, or two lines.",
+	"Click the start, two handles, then the end; it chains on smoothly. Esc stops.",
 }
 
 // snapPt is where a click lands after snapping.
@@ -62,6 +64,13 @@ type sketchMode struct {
 	dragEnt  int
 	dragGrab geom.Vec2
 	dragging bool
+	// a drag's own cursor (slowed while Shift is held), where it began and
+	// where the dragged curve's first point was then
+	dragX, dragY        fineDrag
+	dragStart, dragFrom geom.Vec2
+	dragLabel           string
+	// the spline tool: the last spline of a chain and the chain's first point
+	prevSpline, splineFirst int
 
 	dimFirst Ref
 
@@ -72,11 +81,10 @@ type sketchMode struct {
 
 	dimRects map[int][4]float32 // constraint ID → label rect (last frame)
 	hoverDim int
-	gridSnap bool
 }
 
 func (a *App) enterSketch(item *SketchItem) {
-	a.sk = &sketchMode{app: a, item: item, tool: toolLine, gridSnap: true, dimRects: map[int][4]float32{}}
+	a.sk = &sketchMode{app: a, item: item, tool: toolLine, dimRects: map[int][4]float32{}}
 	a.sel = a.sel[:0]
 	a.hover = Ref{}
 	item.Visible = true
@@ -193,9 +201,11 @@ func (sm *sketchMode) snap(a *App) (snapPt, bool) {
 			sp.p.X, sp.hv, sp.label = prev.X, 2, "vertical"
 		}
 	}
-	if sm.gridSnap {
-		step := niceStep(a.cam.WorldPerPixel(a.vp.py) * 24 * float64(a.vp.scale))
-		sub := step / 2
+	if k := a.dragKeys(); k.snap {
+		sub := a.increment()
+		if k.fine {
+			sub /= 10
+		}
 		gx, gy := math.Round(sp.p.X/sub)*sub, math.Round(sp.p.Y/sub)*sub
 		if sp.hv != 1 {
 			sp.p.Y = gy
@@ -250,6 +260,7 @@ func (sm *sketchMode) changed() {
 func (sm *sketchMode) cancel() {
 	sm.clicks = sm.clicks[:0]
 	sm.chain, sm.first = 0, 0
+	sm.prevSpline, sm.splineFirst = 0, 0
 	sm.dimFirst = Ref{}
 }
 
@@ -373,6 +384,8 @@ func (sm *sketchMode) press(a *App) {
 		id := sm.pointFor(sp)
 		sm.snapConstraints(id, sp)
 		sm.changed()
+	case toolSpline:
+		sm.splineClick(sp)
 	case toolDim:
 		sm.dimClick(a)
 	}
@@ -386,11 +399,54 @@ func (sm *sketchMode) drag(a *App) {
 	if !ok {
 		return
 	}
-	if !sm.dragging && a.skScreenDist(sm.item.S, c, sm.dragGrab) < 4 {
+	s := sm.item.S
+	e := s.Ent(sm.dragEnt)
+	if e == nil {
 		return
 	}
+	if !sm.dragging {
+		if a.skScreenDist(s, c, sm.dragGrab) < 4 {
+			return
+		}
+		// start from where it was grabbed
+		sm.dragX.reset()
+		sm.dragY.reset()
+		sm.dragX.follow(sm.dragGrab.X, false)
+		sm.dragY.follow(sm.dragGrab.Y, false)
+		sm.dragStart = sm.dragGrab
+		if e.Kind != sketch.Point {
+			sm.dragFrom = s.P(e.Pts[0])
+		}
+	}
 	sm.dragging = true
-	sm.item.S.Drag(sm.dragEnt, sm.dragGrab, c)
+	k := a.dragKeys()
+	v := geom.Vec2{X: sm.dragX.follow(c.X, k.fine), Y: sm.dragY.follow(c.Y, k.fine)}
+	snap2 := func(p geom.Vec2) geom.Vec2 { return geom.Vec2{X: a.snapLen(p.X, k), Y: a.snapLen(p.Y, k)} }
+	switch e.Kind {
+	case sketch.Point:
+		t := snap2(v)
+		s.Drag(e.ID, s.P(e.ID), t)
+		p := s.P(e.ID)
+		sm.dragLabel = fmtLen(p.X) + ", " + fmtLen(p.Y)
+	case sketch.Circle:
+		cc := s.P(e.Pts[0])
+		dir := v.Sub(cc).Norm()
+		if dir.Len() == 0 {
+			dir = geom.Vec2{X: 1}
+		}
+		r := math.Max(a.snapLen(v.Dist(cc), k), a.increment()/10)
+		s.Drag(e.ID, v, cc.Add(dir.Scale(r)))
+		sm.dragLabel = "Ø " + fmtLen(2*s.Radius(e))
+	default:
+		// move the whole curve: its first point goes onto the grid
+		to := snap2(sm.dragFrom.Add(v.Sub(sm.dragStart)))
+		s.Drag(e.ID, s.P(e.Pts[0]), to)
+		d := s.P(e.Pts[0]).Sub(sm.dragFrom)
+		sm.dragLabel = "Δ " + fmtLen(d.X) + ", " + fmtLen(d.Y)
+		if e.Kind == sketch.Line {
+			sm.dragLabel += "   (" + fmtLen(s.P(e.Pts[0]).Dist(s.P(e.Pts[1]))) + " mm)"
+		}
+	}
 	sm.dragGrab = c
 	sm.item.markDirty()
 }
@@ -398,7 +454,7 @@ func (sm *sketchMode) drag(a *App) {
 // release ends a drag; it returns true when it used the click.
 func (sm *sketchMode) release(a *App, moved bool) bool {
 	was := sm.dragging
-	sm.dragEnt, sm.dragging = 0, false
+	sm.dragEnt, sm.dragging, sm.dragLabel = 0, false, ""
 	if was {
 		sm.app.doc.Commit()
 		return true
@@ -689,6 +745,8 @@ func (sm *sketchMode) drawPreview(a *App, v render.View) {
 		pts = append(pts, l)
 	case toolCircle:
 		pts = append(pts, circlePts(pl, c0, c0.Dist(sp.p), 0, 2*math.Pi))
+	case toolSpline:
+		pts = append(pts, splinePreview(pl, sm.clicks, sp.p)...)
 	case toolArc:
 		if len(sm.clicks) == 1 {
 			pts = append(pts, []geom.Vec3{pl.At2(c0), pl.At2(sp.p)})
@@ -715,6 +773,64 @@ func circlePts(pl geom.Frame, c geom.Vec2, r, a0, sw float64) []geom.Vec3 {
 	for i := 0; i <= n; i++ {
 		t := a0 + sw*float64(i)/float64(n)
 		out = append(out, pl.At2(c.Add(geom.Vec2{X: math.Cos(t), Y: math.Sin(t)}.Scale(r))))
+	}
+	return out
+}
+
+// splineClick takes the spline tool's clicks: start, two handles, end. A
+// finished curve chains on: the next starts at its end with its first
+// handle mirrored and held tangent, so it needs only a handle and an end.
+func (sm *sketchMode) splineClick(sp snapPt) {
+	s := sm.item.S
+	if n := len(sm.clicks); n > 0 && sm.clicks[n-1].p.Dist(sp.p) < 1e-9 {
+		return // a double click
+	}
+	sm.clicks = append(sm.clicks, sp)
+	if len(sm.clicks) < 4 {
+		return
+	}
+	c := sm.clicks
+	p0 := sm.pointFor(c[0])
+	if sm.splineFirst == 0 {
+		sm.splineFirst = p0
+	}
+	h1 := s.AddPoint(c[1].p).ID
+	h2 := s.AddPoint(c[2].p).ID
+	p3 := sm.pointFor(c[3])
+	e := s.AddSpline(p0, h1, h2, p3)
+	sm.snapConstraints(p0, c[0])
+	sm.snapConstraints(p3, c[3])
+	if sm.prevSpline != 0 {
+		s.AddConstraint(sketch.Tangent, []int{sm.prevSpline, e.ID}, 0)
+	}
+	sm.changed()
+	if p3 == sm.splineFirst {
+		sm.cancel() // closed the loop
+		return
+	}
+	// chain on from the end, the next first handle mirrored through it
+	end := s.P(p3)
+	mirror := end.Add(end.Sub(s.P(h2)))
+	sm.prevSpline = e.ID
+	sm.clicks = append(sm.clicks[:0], snapPt{p: end, point: p3}, snapPt{p: mirror})
+}
+
+// splinePreview is the curve the spline tool would make with the cursor as
+// its next click, and its control polygon.
+func splinePreview(pl geom.Frame, clicks []snapPt, cur geom.Vec2) [][]geom.Vec3 {
+	var c []geom.Vec3
+	for _, k := range clicks {
+		c = append(c, pl.At2(k.p))
+	}
+	c = append(c, pl.At2(cur))
+	out := [][]geom.Vec3{c}
+	if len(c) >= 3 {
+		b := geom.Bezier(c...)
+		var curve []geom.Vec3
+		for i := 0; i <= 64; i++ {
+			curve = append(curve, b.Eval(float64(i)/64))
+		}
+		out = append(out, curve)
 	}
 	return out
 }

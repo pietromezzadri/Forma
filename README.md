@@ -46,8 +46,8 @@ interference checks.</td>
 
 ## Features
 
-- **Sketcher.** Points, lines, rectangles, circles, arcs and construction
-  geometry.
+- **Sketcher.** Points, lines, rectangles, circles, arcs, Bézier splines and
+  construction geometry.
   - Constraints: coincident, horizontal, vertical, parallel, perpendicular,
     tangent, equal, concentric, midpoint and fix.
   - Dimensions: distance, angle, radius and diameter, each of which can be an
@@ -84,6 +84,9 @@ interference checks.</td>
   - STEP output is checked against OpenCASCADE in the tests.
 - **App.** A ribbon toolbar, a Ctrl+K command palette, native file dialogs,
   autosave, and exact picking from an ID buffer.
+- **Dragging.** Arrows to resize features, a Resize · Move · Turn · Scale
+  bar, and snapping to a set increment with Ctrl for free movement and
+  Shift for fine control.
 
 What doesn't work yet is listed, with IDs, in
 [docs/LIMITATIONS.md](docs/LIMITATIONS.md). What each milestone added is in
@@ -126,6 +129,8 @@ dialogs on macOS and Linux go through zenity and haven't been tried.
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Ctrl+S / Ctrl+O | Save / open a `.forma` design |
 | Ctrl+I / Ctrl+E | Import / export (STEP, STL, OBJ) |
+| G | Grid snap on / off (Ctrl held while dragging: free; Shift: fine) |
+| B (in a sketch) | Spline tool |
 | F1 | Shortcuts |
 
 A typical part:
@@ -162,10 +167,25 @@ PNGs to `captures/out/`. The images above come from that script. See
 
 ## Roadmap
 
-- Corner patches where three fillets meet ([F2](docs/LIMITATIONS.md)).
-- Faster booleans ([K3](docs/LIMITATIONS.md)).
-- 2D drawings exported to SVG and PDF.
-- Scripted parts in Starlark.
+- **M9 splines** (mostly done): Bézier curves in sketches, extruded and
+  revolved into exact faces, in booleans and STEP; dragging with snapping,
+  increments and fine control; Resize · Move · Turn · Scale. Left: a
+  transform box for sketch selections, fillets on spline faces.
+- **M10 text and projection:** text in sketches from system fonts, with the
+  text itself a design parameter so everything built on it follows an edit;
+  body edges projected into a sketch and kept linked.
+- **M11 emboss and inlay:** sketches wrapped onto curved faces, raised or
+  cut, and an inlay mode giving the pocket with a clearance and the inlay as
+  its own body (a name inlaid into a bowl, printed in two colours).
+- **M12 ribbed forms:** a sketch offset tool, many fins patterned round a
+  revolved body, and much faster booleans ([K3](docs/LIMITATIONS.md)).
+- **M13 assembly:** a bill of materials, exploded views, grounding, joint
+  limits.
+- **M14 simulation:** static stress analysis (volume mesh, loads and supports
+  on faces, materials, stress and displacement plots).
+- Later: corner patches where three fillets meet
+  ([F2](docs/LIMITATIONS.md)), 2D drawings to SVG / PDF, scripted parts in
+  Starlark.
 
 ## Stack
 

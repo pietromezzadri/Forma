@@ -1,0 +1,25 @@
+{
+  "width": 1600, "height": 900, "out": "out/drag",
+  "shots": [
+    {"name": "a_box_handles", "frames": 6, "do": [
+      "create.box:X=0,Y=0,Width=40,Depth=30,Height=20", "view.iso:now", "view.fit", "wait:10",
+      "move:step:Box 1@4", "click", "wait:6", "move:w:40,15,10@6", "wait:6"
+    ]},
+    {"name": "b_box_dragged", "frames": 6, "do": [
+      "drag:w:57.3,15,10@20", "wait:10", "log"
+    ]},
+    {"name": "c_box_free", "frames": 6, "do": [
+      "move:w:57.5,15,10@6", "wait:4", "hold:ctrl", "drag:w:63.37,15,10@20", "release:ctrl", "wait:10", "log"
+    ]},
+    {"name": "d_sketch_drag", "frames": 6, "do": [
+      "file.new", "wait:4", "sketch.xy", "wait:20", "move:btn:tool.line@4", "click",
+      "move:sk:-30,-10@6", "click", "move:sk:20,-10@6", "click", "key:escape", "wait:4",
+      "move:btn:tool.circle@4", "click", "move:sk:10,15@6", "click", "move:sk:18,15@6", "click", "wait:4",
+      "move:btn:tool.select@4", "click", "wait:4",
+      "move:sk:20,-10@6", "wait:4", "drag:sk:31.3,7.2@25", "wait:6", "log"
+    ]},
+    {"name": "e_circle_drag", "frames": 6, "do": [
+      "move:sk:18,15@6", "wait:4", "drag:sk:23.7,15.4@20", "wait:6", "log"
+    ]}
+  ]
+}

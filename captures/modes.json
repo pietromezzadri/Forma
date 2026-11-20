@@ -1,0 +1,23 @@
+{
+  "width": 1600, "height": 900, "out": "out/modes",
+  "shots": [
+    {"name": "a_resize", "frames": 6, "do": [
+      "create.box:X=0,Y=0,Width=40,Depth=30,Height=20", "view.iso:now", "view.fit", "wait:6",
+      "move:step:Box 1@4", "click", "wait:6"
+    ]},
+    {"name": "b_move", "frames": 6, "do": [
+      "move:btn:mode.move@4", "click", "wait:6",
+      "move:gz:x,0.8@6", "wait:4", "drag:gz:x,1.9@20", "wait:8"
+    ]},
+    {"name": "c_scale", "frames": 6, "do": [
+      "move:btn:mode.scale@4", "click", "wait:6",
+      "move:gz:x,0.97@6", "wait:4", "drag:gz:x,1.5@20", "wait:8"
+    ]},
+    {"name": "d_turn_adds_move", "frames": 6, "do": [
+      "move:btn:mode.turn@4", "click", "wait:10"
+    ]},
+    {"name": "e_back_to_resize", "frames": 6, "do": [
+      "move:btn:mode.resize@4", "click", "wait:10"
+    ]}
+  ]
+}

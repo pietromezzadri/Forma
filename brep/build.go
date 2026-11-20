@@ -94,7 +94,13 @@ func (b *Builder) Finish() (*Body, error) {
 	}
 	for _, e := range b.edges {
 		if e.HE[0] == nil || e.HE[1] == nil {
-			return nil, fmt.Errorf("edge %d is not used both ways", e.ID)
+			by := ""
+			for _, h := range e.HE {
+				if h != nil && h.Loop != nil && h.Loop.Face != nil {
+					by = fmt.Sprintf(" (only face %q uses it)", h.Loop.Face.Name)
+				}
+			}
+			return nil, fmt.Errorf("edge %d (a %s from %v to %v) is not used both ways%s", e.ID, e.Curve.Kind(), e.Verts[0].P, e.Verts[1].P, by)
 		}
 	}
 	b.splitShells()

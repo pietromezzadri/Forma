@@ -400,6 +400,9 @@ func (c *bctx) edgeOn(e *Edge, s geom.Surface) bool {
 
 // ssi finds the intersection curves of two faces.
 func (c *bctx) ssi(x, y *bface) error {
+	if done, err := c.ssiCoaxial(x, y); done {
+		return err
+	}
 	// contour on a plane when there is one (its grid is the most even)
 	D, O := x, y
 	if _, ok := y.s.(geom.Plane); ok {
@@ -467,40 +470,54 @@ func (c *bctx) ssi(x, y *bface) error {
 		if len(pts) < 2 {
 			continue
 		}
-		for _, p1 := range c.clip(D, pts, closed, O.s, nil) {
-			for _, p2 := range c.clip(O, p1.pts, p1.closed, D.s, nil) {
-				if p2.start == nil && !p2.closed && p2.pts[0].Dist(p1.pts[0]) < 1e-12 {
-					p2.start = p1.start
-				}
-				if p2.end == nil && !p2.closed && p2.pts[len(p2.pts)-1].Dist(p1.pts[len(p1.pts)-1]) < 1e-12 {
-					p2.end = p1.end
-				}
-				if !p2.closed && (p2.start == nil || p2.end == nil) {
-					continue // ran off the grid: no real curve
-				}
-				if len(p2.pts) < 2 {
-					continue
-				}
-				if c.alongEdge(p2.pts, D.f, O.f) {
-					continue // an existing edge (imprinted instead)
-				}
-				if polyLen(p2.pts) < c.weldLoose*2 && !p2.closed {
-					continue
-				}
-				c.addEvent(p2.start)
-				c.addEvent(p2.end)
-				if !both {
-					p2.pts = c.densify(D.s, O.s, p2.pts)
-				}
-				cut := &bcut{id: len(c.cuts) + 1, pts: p2.pts, closed: p2.closed, faces: [2]*bface{D, O}}
-				cut.cum = cumLen(cut.pts)
-				c.cuts = append(c.cuts, cut)
-				D.cuts = append(D.cuts, cut)
-				O.cuts = append(O.cuts, cut)
-			}
-		}
+		c.addCut(D, O, pts, closed, both)
 	}
 	return nil
+}
+
+// addCut trims an intersection curve of faces D and O to both faces and keeps
+// the pieces that are new edges.
+func (c *bctx) addCut(D, O *bface, pts []geom.Vec3, closed, both bool) {
+	for _, p1 := range c.clip(D, pts, closed, O.s, nil) {
+		for _, p2 := range c.clip(O, p1.pts, p1.closed, D.s, nil) {
+			if p2.start == nil && !p2.closed && p2.pts[0].Dist(p1.pts[0]) < 1e-12 {
+				p2.start = p1.start
+			}
+			if p2.end == nil && !p2.closed && p2.pts[len(p2.pts)-1].Dist(p1.pts[len(p1.pts)-1]) < 1e-12 {
+				p2.end = p1.end
+			}
+			if !p2.closed && (p2.start == nil || p2.end == nil) {
+				continue // ran off the grid: no real curve
+			}
+			if len(p2.pts) < 2 {
+				continue
+			}
+			if c.alongEdge(p2.pts, D.f, O.f) {
+				continue // an existing edge (imprinted instead)
+			}
+			if polyLen(p2.pts) < c.weldLoose*2 && !p2.closed {
+				continue
+			}
+			c.addEvent(p2.start)
+			c.addEvent(p2.end)
+			// an end on edges of both faces at once (two edges crossing
+			// there): split both
+			if p1.start != nil && p2.start != nil && p2.start != p1.start && p1.start.e != p2.start.e && p1.start.p.Dist(p2.start.p) < 1e-9*math.Max(1, c.scale) && !isEnd([]geom.Vec3{p1.start.e.Verts[0].P, p1.start.e.Verts[1].P}, p1.start.p, c.weldLoose) {
+				c.addEvent(p1.start)
+			}
+			if p1.end != nil && p2.end != nil && p2.end != p1.end && p1.end.e != p2.end.e && p1.end.p.Dist(p2.end.p) < 1e-9*math.Max(1, c.scale) && !isEnd([]geom.Vec3{p1.end.e.Verts[0].P, p1.end.e.Verts[1].P}, p1.end.p, c.weldLoose) {
+				c.addEvent(p1.end)
+			}
+			if !both {
+				p2.pts = c.densify(D.s, O.s, p2.pts)
+			}
+			cut := &bcut{id: len(c.cuts) + 1, pts: p2.pts, closed: p2.closed, faces: [2]*bface{D, O}}
+			cut.cum = cumLen(cut.pts)
+			c.cuts = append(c.cuts, cut)
+			D.cuts = append(D.cuts, cut)
+			O.cuts = append(O.cuts, cut)
+		}
+	}
 }
 
 func isPlane(s geom.Surface) bool { _, ok := s.(geom.Plane); return ok }

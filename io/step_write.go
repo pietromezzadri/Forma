@@ -244,6 +244,15 @@ func (s *stepWriter) surface(g geom.Surface) (int, error) {
 		} else {
 			id = s.add("DEGENERATE_TOROIDAL_SURFACE('',#%d,%s,%s,.T.)", s.frameAxis(k.F), real(k.R), real(k.Rm))
 		}
+	case geom.Revolved:
+		// the profile at u = 0, in the world; the axis along F.Z (u turns
+		// right-handed about it, as ours does)
+		prof := k.C.Map(func(p geom.Vec3) geom.Vec3 { return k.F.O.Add(k.F.X.Scale(p.X)).Add(k.F.Z.Scale(p.Z)) })
+		ax := s.add("AXIS1_PLACEMENT('',#%d,#%d)", s.point(k.F.O), s.direction(k.F.Z))
+		id = s.add("SURFACE_OF_REVOLUTION('',#%d,#%d)", s.bspline(prof), ax)
+	case geom.Extruded:
+		vec := s.add("VECTOR('',#%d,1.)", s.direction(k.D))
+		id = s.add("SURFACE_OF_LINEAR_EXTRUSION('',#%d,#%d)", s.bspline(k.C), vec)
 	default:
 		return 0, fmt.Errorf("no STEP form for a %s surface", g.Kind())
 	}
@@ -283,12 +292,36 @@ func (s *stepWriter) edge(e *brep.Edge) (int, error) {
 	case geom.Ellipse:
 		curve = s.add("ELLIPSE('',#%d,%s,%s)", s.axis(k.F.O, k.F.X.Cross(k.F.Y), k.F.X), real(k.A), real(k.B))
 		sense = e.T1 >= e.T0
+	case *geom.BSpline:
+		curve = s.bspline(k)
+		sense = e.T1 >= e.T0
 	default:
 		curve = s.fitted(e)
 	}
 	id := s.add("EDGE_CURVE('',#%d,#%d,#%d,%s)", v0, v1, curve, logical(sense))
 	s.edges[e] = id
 	return id, nil
+}
+
+// bspline writes a (non-rational) B-spline curve: its distinct knots with
+// their multiplicities.
+func (s *stepWriter) bspline(b *geom.BSpline) int {
+	var cps []int
+	for _, p := range b.Ctrl {
+		cps = append(cps, s.point(p))
+	}
+	var ks, ms []string
+	for i := 0; i < len(b.Knots); {
+		j := i
+		for j < len(b.Knots) && b.Knots[j] == b.Knots[i] {
+			j++
+		}
+		ks = append(ks, real(b.Knots[i]))
+		ms = append(ms, fmt.Sprint(j-i))
+		i = j
+	}
+	return s.add("B_SPLINE_CURVE_WITH_KNOTS('',%d,%s,.UNSPECIFIED.,.F.,.F.,(%s),(%s),.UNSPECIFIED.)",
+		b.Deg, refs(cps), strings.Join(ms, ","), strings.Join(ks, ","))
 }
 
 func (s *stepWriter) line(p, d geom.Vec3) int {
