@@ -268,7 +268,7 @@ func (a *App) sketchRibbon(r *ribbon) {
 		icon rune
 		name string
 	}{{"select", toolSelect, 0xf245, "Select"}, {"line", toolLine, ui.FaSlash, "Line"}, {"rect", toolRect, ui.FaSquare, "Rectangle"},
-		{"circle", toolCircle, ui.FaCircle, "Circle"}, {"arc", toolArc, ui.FaBezier, "Arc"}, {"point", toolPoint, ui.FaDotCircle, "Point"}, {"spline", toolSpline, ui.FaBezier, "Spline"},
+		{"circle", toolCircle, ui.FaCircle, "Circle"}, {"arc", toolArc, ui.FaBezier, "Arc"}, {"point", toolPoint, ui.FaDotCircle, "Point"}, {"spline", toolSpline, ui.FaBezier, "Spline"}, {"text", toolText, 0xf031, "Text"}, {"project", toolProject, 0xf247, "Project"},
 		{"dim", toolDim, ui.FaRuler, "Dimension"}} {
 		r.cmd("tool."+t.id, t.icon, t.name, tool == t.t)
 	}

@@ -169,11 +169,11 @@ PNGs to `captures/out/`. The images above come from that script. See
 
 - **M9 splines** (mostly done): Bézier curves in sketches, extruded and
   revolved into exact faces, in booleans and STEP; dragging with snapping,
-  increments and fine control; Resize · Move · Turn · Scale. Left: a
-  transform box for sketch selections, fillets on spline faces.
-- **M10 text and projection:** text in sketches from system fonts, with the
-  text itself a design parameter so everything built on it follows an edit;
-  body edges projected into a sketch and kept linked.
+  increments and fine control; Resize · Move · Turn · Scale; a transform
+  box for sketch selections. Left: fillets and shells on spline faces.
+- **M10 text and projection** (done): text in sketches from system fonts,
+  with the text itself a design parameter so everything built on it follows
+  an edit; body edges projected into a sketch and kept linked.
 - **M11 emboss and inlay:** sketches wrapped onto curved faces, raised or
   cut, and an inlay mode giving the pocket with a clearance and the inlay as
   its own body (a name inlaid into a bowl, printed in two colours).

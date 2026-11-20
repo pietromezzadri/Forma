@@ -27,6 +27,11 @@ type Region struct {
 	Outer []Seg
 	Holes [][]Seg
 	Area  float64
+	// Text is the text entity a region is a letter of (its outline all that
+	// text's), Ink whether it is a letter's body rather than a counter (the
+	// inside of an o) by the non-zero winding rule
+	Text int
+	Ink  bool
 	// Poly / HolePolys are the loops sampled, for display and tests.
 	Poly      []geom.Vec2
 	HolePolys [][]geom.Vec2
@@ -137,6 +142,7 @@ func (g *gcurve) arcParam(p geom.Vec2, tol float64) float64 {
 // curves, splitting them where they cross.
 func (s *Sketch) Regions() []Region {
 	var cs []*gcurve
+	var textPolys map[int][][]geom.Vec2
 	for _, e := range s.Ents {
 		if e.Construction {
 			continue
@@ -163,6 +169,22 @@ func (s *Sketch) Regions() []Region {
 			if len(c) >= 2 {
 				cs = append(cs, &gcurve{bez: c, a: c[0], b: c[len(c)-1], src: e.ID})
 			}
+		case Text:
+			var polys [][]geom.Vec2
+			for _, loop := range s.TextContours(e) {
+				for _, sg := range loop {
+					if sg.Ctrl != nil {
+						cs = append(cs, &gcurve{bez: sg.Ctrl, a: sg.A, b: sg.B, src: e.ID})
+					} else if sg.A.Dist(sg.B) > 1e-9 {
+						cs = append(cs, &gcurve{a: sg.A, b: sg.B, src: e.ID})
+					}
+				}
+				polys = append(polys, loopPoly(loop, 2e-5))
+			}
+			if textPolys == nil {
+				textPolys = map[int][][]geom.Vec2{}
+			}
+			textPolys[e.ID] = polys
 		}
 	}
 	if len(cs) == 0 {
@@ -234,6 +256,11 @@ func (s *Sketch) Regions() []Region {
 			pa, pb := g.at(t0), g.at(t1)
 			va, vb := vertex(pa), vertex(pb)
 			if va == vb && !g.arc {
+				continue
+			}
+			// a text's piece with ink on both sides (strokes overlapping) or
+			// none is no outline
+			if polys, ok := textPolys[g.src]; ok && !textOutline(g, t0, t1, polys) {
 				continue
 			}
 			sg := Seg{Arc: g.arc, A: verts[va], B: verts[vb], C: g.c, R: g.r, CCW: true, Src: g.src}
@@ -355,6 +382,7 @@ func (s *Sketch) Regions() []Region {
 			r.Area += c.area
 		}
 	}
+	markText(regions, textPolys)
 	sort.SliceStable(regions, func(a, b int) bool { return regions[a].Area > regions[b].Area })
 	return regions
 }
@@ -637,4 +665,84 @@ func LoopArea(l []Seg) float64 {
 		}
 	}
 	return a
+}
+
+// markText marks the regions that are a text's letters, and whether each
+// is ink: the text's contours wind round a point just inside its outline
+// (the non-zero rule fonts are drawn by: overlapping strokes stay ink).
+func markText(regions []Region, textPolys map[int][][]geom.Vec2) {
+	if len(textPolys) == 0 {
+		return
+	}
+	for i := range regions {
+		r := &regions[i]
+		src := -1
+		for _, sg := range r.Outer {
+			if src == -1 {
+				src = sg.Src
+			} else if sg.Src != src {
+				src = 0
+			}
+		}
+		polys, ok := textPolys[src]
+		if src <= 0 || !ok {
+			continue
+		}
+		r.Text = src
+		// a point just inside: left of the (counter-clockwise) outline's
+		// longest segment, a little way in
+		best, bl := r.Outer[0], -1.0
+		for _, sg := range r.Outer {
+			if l := sg.A.Dist(sg.B); l > bl {
+				best, bl = sg, l
+			}
+		}
+		m, d := best.A.Lerp(best.B, 0.5), best.B.Sub(best.A)
+		if best.Ctrl != nil {
+			m, d = bezAt(best.Ctrl, 0.5), bezDeriv(best.Ctrl, 0.5)
+		}
+		in := m.Add(d.Norm().Perp().Scale(math.Max(bl*1e-3, 5e-4)))
+		w := 0
+		for _, p := range polys {
+			w += windingAround(in, p)
+		}
+		r.Ink = w != 0
+	}
+}
+
+// windingAround is how many times polygon p winds round q (signed).
+func windingAround(q geom.Vec2, p []geom.Vec2) int {
+	w := 0
+	for i := range p {
+		a, b := p[i], p[(i+1)%len(p)]
+		if a.Y <= q.Y {
+			if b.Y > q.Y && b.Sub(a).Cross(q.Sub(a)) > 0 {
+				w++
+			}
+		} else if b.Y <= q.Y && b.Sub(a).Cross(q.Sub(a)) < 0 {
+			w--
+		}
+	}
+	return w
+}
+
+// textOutline: the piece of a text's curve between t0 and t1 has ink on
+// exactly one side (non-zero winding of the text's contours).
+func textOutline(g *gcurve, t0, t1 float64, polys [][]geom.Vec2) bool {
+	tm := (t0 + t1) / 2
+	m := g.at(tm)
+	d := g.deriv(tm)
+	if d.Len() < 1e-12 {
+		return true
+	}
+	// well clear of the sampled contours' chords (2e-5 mm) yet inside a stroke
+	n := d.Norm().Perp().Scale(math.Max(g.at(t0).Dist(g.at(t1))*1e-3, 5e-4))
+	ink := func(q geom.Vec2) bool {
+		w := 0
+		for _, p := range polys {
+			w += windingAround(q, p)
+		}
+		return w != 0
+	}
+	return ink(m.Add(n)) != ink(m.Sub(n))
 }

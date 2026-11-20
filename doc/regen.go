@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 
 	"forma/brep"
 	"forma/expr"
@@ -261,6 +262,14 @@ func (d *Document) signature(f *Feature, sigs map[int]uint64) uint64 {
 	for _, k := range names {
 		fmt.Fprintf(h, "%s=%g;", k, d.vars[k])
 	}
+	tnames := make([]string, 0, len(d.texts))
+	for k := range d.texts {
+		tnames = append(tnames, k)
+	}
+	sort.Strings(tnames)
+	for _, k := range tnames {
+		fmt.Fprintf(h, "%s=%q;", k, d.texts[k])
+	}
 	for _, dep := range f.deps() {
 		fmt.Fprintf(h, "dep%d=%d;", dep, sigs[dep])
 		if g := d.Feature(dep); g != nil {
@@ -366,6 +375,21 @@ func (d *Document) buildSketch(f *Feature) error {
 		}
 	}
 	var dimErr error
+	// edges projected into it follow the bodies
+	if err := d.updateProjections(s); err != nil {
+		dimErr = err
+	}
+	// texts naming a text parameter say what it says now
+	for _, e := range s.Ents {
+		if e.Kind == sketch.Text && strings.HasPrefix(e.Str, "=") {
+			name := strings.TrimSpace(e.Str[1:])
+			t, ok := d.texts[name]
+			if !ok {
+				dimErr = fmt.Errorf("text parameter %q not found", name)
+			}
+			e.Shown = t
+		}
+	}
 	for _, c := range s.Cons {
 		if c.Expr == "" || !c.Kind.Dimensional() {
 			continue
@@ -419,36 +443,50 @@ func (d *Document) buildSweep(f *Feature) error {
 		if !sk.Active {
 			return fmt.Errorf("%s is suppressed or rolled back", sk.Name)
 		}
-		ri, ok := matchRegion(ref, sk.Regions)
-		if !ok {
-			return fmt.Errorf("profile %d of %s is gone (is the loop still closed?)", i+1, sk.Name)
-		}
-		reg := sk.Regions[ri]
-		plane := sk.Sketch.Plane
-		var b *brep.Body
-		var err error
-		if f.Kind == KExtrude {
-			d0, d1, e := d.extent(f)
-			if e != nil {
-				return e
+		var regs []sketch.Region
+		if ref.Text != 0 {
+			for _, r := range sk.Regions {
+				if r.Text == ref.Text && r.Ink {
+					regs = append(regs, r)
+				}
 			}
-			b, err = ops.Extrude(f.Name, reg, plane, d0, d1)
+			if len(regs) == 0 {
+				return fmt.Errorf("the text of profile %d of %s is gone or says nothing", i+1, sk.Name)
+			}
 		} else {
-			ang, e := d.input(f, "Angle")
-			if e != nil {
-				return e
+			ri, ok := matchRegion(ref, sk.Regions)
+			if !ok {
+				return fmt.Errorf("profile %d of %s is gone (is the loop still closed?)", i+1, sk.Name)
 			}
-			p, dir, e := axisOf(f.Axis, sk.Sketch)
-			if e != nil {
-				return e
+			regs = []sketch.Region{sk.Regions[ri]}
+		}
+		for _, reg := range regs {
+			plane := sk.Sketch.Plane
+			var b *brep.Body
+			var err error
+			if f.Kind == KExtrude {
+				d0, d1, e := d.extent(f)
+				if e != nil {
+					return e
+				}
+				b, err = ops.Extrude(f.Name, reg, plane, d0, d1)
+			} else {
+				ang, e := d.input(f, "Angle")
+				if e != nil {
+					return e
+				}
+				p, dir, e := axisOf(f.Axis, sk.Sketch)
+				if e != nil {
+					return e
+				}
+				b, err = ops.Revolve(f.Name, reg, plane, p, dir, ang*math.Pi/180)
 			}
-			b, err = ops.Revolve(f.Name, reg, plane, p, dir, ang*math.Pi/180)
+			if err != nil {
+				return err
+			}
+			b.Name = f.BodyName(len(f.Bodies))
+			f.Bodies = append(f.Bodies, b)
 		}
-		if err != nil {
-			return err
-		}
-		b.Name = f.BodyName(i)
-		f.Bodies = append(f.Bodies, b)
 	}
 	return nil
 }

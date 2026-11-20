@@ -102,6 +102,7 @@ func (a *App) drawSketchOverlay(dl *imgui.DrawList) {
 		rects[c.ID] = [4]float32{mn.X, mn.Y, mx.X, mx.Y}
 	}
 	sm.dimRects = rects
+	sm.drawXform(a, dl)
 
 	// what a drag is setting, by the cursor
 	if sm.dragging && sm.dragLabel != "" {

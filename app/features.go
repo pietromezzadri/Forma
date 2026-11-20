@@ -45,6 +45,21 @@ func (a *App) planeFor(name string) (doc.PlaneRef, bool) {
 func (a *App) selectedProfiles() []doc.ProfileRef {
 	var out []doc.ProfileRef
 	for _, r := range a.sel {
+		if r.Kind == KindSkCurve {
+			// a text picked is the whole text as a profile
+			if s := a.doc.Sketch(r.Item); s != nil && s.F != nil {
+				if e := s.S.Ent(r.Local); e != nil && e.Kind == sketch.Text {
+					dup := false
+					for _, o := range out {
+						dup = dup || o.Text == e.ID && o.Sketch == s.F.ID
+					}
+					if !dup {
+						out = append(out, doc.ProfileRef{Sketch: s.F.ID, Outer: []int{e.ID}, Text: e.ID})
+					}
+				}
+			}
+			continue
+		}
 		if r.Kind != KindSkRegion {
 			continue
 		}
@@ -52,7 +67,15 @@ func (a *App) selectedProfiles() []doc.ProfileRef {
 		if s == nil || r.Local-1 >= len(s.Regions) {
 			continue
 		}
-		out = append(out, doc.RefFor(s.F.ID, s.Regions[r.Local-1]))
+		ref := doc.RefFor(s.F.ID, s.Regions[r.Local-1])
+		dup := false
+		for _, o := range out {
+			// any letter of a text means the whole text, once
+			dup = dup || ref.Text != 0 && o.Text == ref.Text && o.Sketch == ref.Sketch
+		}
+		if !dup {
+			out = append(out, ref)
+		}
 	}
 	return out
 }

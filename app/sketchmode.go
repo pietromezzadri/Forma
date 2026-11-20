@@ -23,9 +23,11 @@ const (
 	toolPoint
 	toolDim
 	toolSpline
+	toolText
+	toolProject
 )
 
-var toolNames = [...]string{"Select", "Line", "Rectangle", "Circle", "Arc", "Point", "Dimension", "Spline"}
+var toolNames = [...]string{"Select", "Line", "Rectangle", "Circle", "Arc", "Point", "Dimension", "Spline", "Text", "Project"}
 
 var toolHints = [...]string{
 	"Click to select, drag points and curves to move them. Esc clears.",
@@ -36,6 +38,8 @@ var toolHints = [...]string{
 	"Click to place a point.",
 	"Click a line, circle or arc; or two points, a point and a line, or two lines.",
 	"Click the start, two handles, then the end; it chains on smoothly. Esc stops.",
+	"Click where the text starts; type it in Properties (=name for a text parameter).",
+	"Click a body's edge to project it, or a face for all its edges; they follow the body.",
 }
 
 // snapPt is where a click lands after snapping.
@@ -71,6 +75,8 @@ type sketchMode struct {
 	dragLabel           string
 	// the spline tool: the last spline of a chain and the chain's first point
 	prevSpline, splineFirst int
+	// the transform box being dragged
+	xf skXform
 
 	dimFirst Ref
 
@@ -284,6 +290,9 @@ func (sm *sketchMode) press(a *App) {
 	}
 	switch sm.tool {
 	case toolSelect:
+		if sm.xformPress(a) {
+			break
+		}
 		h := a.hover
 		if h.Item == sm.item.ID && (h.Kind == KindSkPoint || h.Kind == KindSkCurve) {
 			c, _ := sm.cursor2(a)
@@ -386,12 +395,25 @@ func (sm *sketchMode) press(a *App) {
 		sm.changed()
 	case toolSpline:
 		sm.splineClick(sp)
+	case toolProject:
+		sm.projectClick(a)
+	case toolText:
+		id := sm.pointFor(sp)
+		sm.snapConstraints(id, sp)
+		e := s.AddText(id, "Text", sketch.DefaultFont, 10)
+		sm.changed()
+		a.sel = append(a.sel[:0], Ref{Kind: KindSkCurve, Item: sm.item.ID, Local: e.ID})
+		sm.setTool(toolSelect)
 	case toolDim:
 		sm.dimClick(a)
 	}
 }
 
 func (sm *sketchMode) drag(a *App) {
+	if sm.xf.on {
+		sm.xformDrag(a)
+		return
+	}
 	if sm.tool != toolSelect || sm.dragEnt == 0 {
 		return
 	}
@@ -453,6 +475,12 @@ func (sm *sketchMode) drag(a *App) {
 
 // release ends a drag; it returns true when it used the click.
 func (sm *sketchMode) release(a *App, moved bool) bool {
+	if sm.xf.on {
+		sm.xf.on = false
+		sm.dragging, sm.dragLabel = false, ""
+		sm.app.doc.Commit()
+		return true
+	}
 	was := sm.dragging
 	sm.dragEnt, sm.dragging, sm.dragLabel = 0, false, ""
 	if was {

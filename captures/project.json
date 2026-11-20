@@ -1,0 +1,20 @@
+{
+  "width": 1600, "height": 900, "out": "out/project",
+  "shots": [
+    {"name": "a_projected", "frames": 8, "do": [
+      "create.box:X=0,Y=0,Width=40,Depth=30,Height=20",
+      "create.cylinder:X=70,Y=15,Radius=10,Height=12",
+      "view.iso:now", "view.fit", "wait:6",
+      "sketch.xy", "wait:15", "view.iso:now", "view.fit", "wait:10",
+      "move:btn:tool.project@4", "click", "wait:3",
+      "move:w:20,0,20@6", "wait:4", "log", "click", "wait:4",
+      "move:w:70,15,12@6", "wait:4", "log", "click", "wait:6",
+      "move:vp:0.98,0.98@2", "wait:6", "log"
+    ]},
+    {"name": "b_follows", "frames": 8, "do": [
+      "move:btn:sketch.finish@4", "click", "wait:6",
+      "move:step:Box 1@4", "click", "wait:4", "feature.set:Width=60", "wait:10",
+      "edit.clear", "view.fit", "wait:8", "move:vp:0.98,0.98@2", "wait:6"
+    ]}
+  ]
+}

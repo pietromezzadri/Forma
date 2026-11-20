@@ -24,6 +24,9 @@ type Param struct {
 	Expr  string  `json:"expr"`
 	Value float64 `json:"-"`
 	Err   string  `json:"-"`
+	// Text is a text parameter's value (its expression in quotes: "Luna")
+	Text   string `json:"-"`
+	IsText bool   `json:"-"`
 }
 
 // Feature kinds.
@@ -87,6 +90,9 @@ type ProfileRef struct {
 	Sketch int     `json:"sketch"`
 	Outer  []int   `json:"outer"`
 	Holes  [][]int `json:"holes,omitempty"`
+	// Text, when set, is a text entity: every letter of it, whatever it
+	// says (so editing the text carries on through)
+	Text int `json:"text,omitempty"`
 }
 
 // AxisRef is a revolve's axis: the sketch's X or Y axis, or one of its lines.
@@ -145,6 +151,7 @@ type Document struct {
 	Bodies []*BodyRef `json:"-"`
 
 	vars  map[string]float64
+	texts map[string]string
 	state []*BodyRef // the bodies so far, while regenerating
 	regen bool
 	gen   int
@@ -374,9 +381,17 @@ func (d *Document) Vars() map[string]float64 { return d.vars }
 // or an unknown name).
 func (d *Document) evalParams() {
 	vars := map[string]float64{}
+	d.texts = map[string]string{}
 	done := map[*Param]bool{}
 	for _, p := range d.Params {
 		p.Err = ""
+		p.IsText = false
+		if t, ok := quoted(p.Expr); ok && validName(p.Name) {
+			p.Text, p.IsText = t, true
+			d.texts[p.Name] = t
+			done[p] = true
+			continue
+		}
 		if !validName(p.Name) {
 			p.Err = "not a name (letters, digits, _)"
 			done[p] = true
@@ -509,6 +524,9 @@ func StdPlane(name string) (geom.Frame, bool) {
 
 // RefFor makes the persistent reference of a region of a sketch.
 func RefFor(sketchID int, r sketch.Region) ProfileRef {
+	if r.Text != 0 && r.Ink {
+		return ProfileRef{Sketch: sketchID, Outer: []int{r.Text}, Text: r.Text}
+	}
 	ref := ProfileRef{Sketch: sketchID, Outer: srcSet(r.Outer)}
 	for _, h := range r.Holes {
 		ref.Holes = append(ref.Holes, srcSet(h))
@@ -579,3 +597,15 @@ func matchRegion(ref ProfileRef, rs []sketch.Region) (int, bool) {
 	}
 	return best, best >= 0 && bestScore >= 5
 }
+
+// quoted reports a text parameter's expression ("…" or '…') and its text.
+func quoted(s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 && (s[0] == '"' && s[len(s)-1] == '"' || s[0] == '\'' && s[len(s)-1] == '\'') {
+		return strings.ReplaceAll(s[1:len(s)-1], `\n`, "\n"), true
+	}
+	return "", false
+}
+
+// Texts are the design's text parameters by name.
+func (d *Document) Texts() map[string]string { return d.texts }

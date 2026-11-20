@@ -20,10 +20,11 @@ const (
 	Circle
 	Arc
 	Spline // a Bézier curve through its control points
+	Text   // letters from a font, anchored at a point
 )
 
 func (k Kind) String() string {
-	return [...]string{"Point", "Line", "Circle", "Arc", "Spline"}[k]
+	return [...]string{"Point", "Line", "Circle", "Arc", "Spline", "Text"}[k]
 }
 
 // Entity is a sketch element. Points own two parameters (x, y); a line
@@ -36,6 +37,21 @@ type Entity struct {
 	Pts          []int // point entity IDs: line [a b], circle [c], arc [c start end], spline [p0 c1 … pn]
 	Par          int   // point: index of x (y is Par+1); circle: radius index
 	Construction bool
+	// text: what it says ("=name" for a text parameter of the design),
+	// the font (a file's base name), the capitals' height (mm), the angle
+	// (radians) and the alignment on the anchor
+	Str   string  `json:",omitempty"`
+	Font  string  `json:",omitempty"`
+	Size  float64 `json:",omitempty"`
+	Rot   float64 `json:",omitempty"`
+	Align int     `json:",omitempty"`
+	// Shown is what a parameter text resolved to (set by the design)
+	Shown string `json:"-"`
+	// Proj, when set, is the reference of the body edge this entity was
+	// projected from (the design keeps it up to date); ProjK the piece of
+	// it a line of a chain is
+	Proj  string `json:",omitempty"`
+	ProjK int    `json:",omitempty"`
 }
 
 // Sketch is a set of entities and constraints on a plane.
@@ -325,6 +341,14 @@ func (s *Sketch) Polyline(e *Entity, chordTol float64) []geom.Vec2 {
 		return out
 	case Spline:
 		return bezPoints(s.Ctrl(e), chordTol)
+	case Text:
+		// every letter's outline one after another (for extents; drawn
+		// loop by loop from TextContours)
+		out := []geom.Vec2{s.P(e.Pts[0])}
+		for _, l := range s.TextContours(e) {
+			out = append(out, loopPoly(l, chordTol)...)
+		}
+		return out
 	}
 	return nil
 }
@@ -355,6 +379,8 @@ func (s *Sketch) Describe(id int) string {
 		return fmt.Sprintf("Arc %d (R %.3f mm)", e.ID, s.Radius(e))
 	case Spline:
 		return fmt.Sprintf("Spline %d (degree %d)", e.ID, len(e.Pts)-1)
+	case Text:
+		return fmt.Sprintf("Text %d (\"%s\", %.1f mm)", e.ID, e.TextOf(), e.Size)
 	}
 	p := s.P(e.ID)
 	return fmt.Sprintf("Point %d (%.3f, %.3f)", e.ID, p.X, p.Y)
@@ -386,4 +412,42 @@ func sortedIDs(m map[int]bool) []int {
 func (s *Sketch) SplineAt(e *Entity, t float64) (geom.Vec2, geom.Vec2) {
 	c := s.Ctrl(e)
 	return bezAt(c, t), bezDeriv(c, t).Norm()
+}
+
+// Lock holds a point where it is by an internal constraint (projected
+// geometry: the design moves it by changing the constraint).
+func (s *Sketch) Lock(pt int) *Constraint {
+	p := s.P(pt)
+	c := &Constraint{ID: s.id(), Kind: Fix, E: []int{pt}, Value: p.X, Value2: p.Y, Internal: true}
+	s.Cons = append(s.Cons, c)
+	return c
+}
+
+// LockRadius holds a circle's radius by an internal constraint.
+func (s *Sketch) LockRadius(circle int) *Constraint {
+	e := s.Ent(circle)
+	c := &Constraint{ID: s.id(), Kind: Radius, E: []int{circle}, Value: s.Radius(e), Internal: true}
+	s.Cons = append(s.Cons, c)
+	return c
+}
+
+// MoveLocked moves a locked point (and its lock) to p.
+func (s *Sketch) MoveLocked(pt int, p geom.Vec2) {
+	s.SetP(pt, p)
+	for _, c := range s.Cons {
+		if c.Internal && c.Kind == Fix && c.E[0] == pt {
+			c.Value, c.Value2 = p.X, p.Y
+		}
+	}
+}
+
+// SetLockedRadius changes a locked circle's radius.
+func (s *Sketch) SetLockedRadius(circle int, r float64) {
+	e := s.Ent(circle)
+	s.Params[e.Par] = r
+	for _, c := range s.Cons {
+		if c.Internal && c.Kind == Radius && c.E[0] == circle {
+			c.Value = r
+		}
+	}
 }

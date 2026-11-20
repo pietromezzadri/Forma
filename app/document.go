@@ -362,6 +362,25 @@ func (s *SketchItem) upload(chordTol float64) *sketchGPU {
 			pids = append(pids, uint32(e.ID))
 			continue
 		}
+		if e.Kind == sketch.Text {
+			// each letter's outline on its own
+			for _, l := range sk.TextContours(e) {
+				var p3 []geom.Vec3
+				for _, p := range sketch.SegPoints2(l, chordTol) {
+					p3 = append(p3, sk.Plane.At2(p))
+				}
+				if len(p3) > 1 {
+					p3 = append(p3, p3[0])
+				}
+				pl := render.Polyline{ID: uint32(e.ID), Pts: p3}
+				if e.Construction {
+					constr = append(constr, pl)
+				} else {
+					curves = append(curves, pl)
+				}
+			}
+			continue
+		}
 		var p3 []geom.Vec3
 		for _, p := range sk.Polyline(e, chordTol) {
 			p3 = append(p3, sk.Plane.At2(p))

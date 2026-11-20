@@ -189,6 +189,7 @@ func (a *App) sketchProperties(s *SketchItem) {
 			a.enterSketch(s)
 		}
 	}
+	a.textProperties(s)
 	imgui.SeparatorText(fmt.Sprintf("Profiles (%d)", len(s.Regions)))
 	for i, r := range s.Regions {
 		holes := ""

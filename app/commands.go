@@ -202,7 +202,7 @@ func (a *App) registerCommands() *Commands {
 		icon rune
 	}{
 		{"select", toolSelect, "S", 0xf245}, {"line", toolLine, "L", ui.FaSlash}, {"rect", toolRect, "R", ui.FaSquare},
-		{"circle", toolCircle, "C", ui.FaCircle}, {"arc", toolArc, "A", ui.FaBezier}, {"point", toolPoint, "P", ui.FaDotCircle}, {"spline", toolSpline, "B", ui.FaBezier},
+		{"circle", toolCircle, "C", ui.FaCircle}, {"arc", toolArc, "A", ui.FaBezier}, {"point", toolPoint, "P", ui.FaDotCircle}, {"spline", toolSpline, "B", ui.FaBezier}, {"text", toolText, "", 0xf031}, {"project", toolProject, "", 0xf247},
 		{"dim", toolDim, "D", ui.FaRuler},
 	}
 	for _, t := range tools {
@@ -277,6 +277,7 @@ func (a *App) registerCommands() *Commands {
 	a.registerAssemblyCommands(c)
 	a.registerInspectCommands(c)
 	a.registerSnapCommands(c)
+	a.registerTextCommands(c)
 	return c
 }
 

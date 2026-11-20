@@ -108,14 +108,27 @@ new ones as features land.
 ## Sketcher (`sketch/`)
 
 - **SK1 Few tools:** no ellipses, slots, polygons, offset, trim, extend or
-  sketch fillets; no projecting body edges into a sketch (M10). Splines (M9)
+  sketch fillets. Splines (M9)
   are single Bézier curves (quadratic or cubic) chained with tangency: no
   fit-point splines, no point-on-spline constraint, no dimensions on a
   spline's length or curvature.
-- **SK3 No transform box:** a sketch selection can't yet be moved, stretched
-  or scaled as a whole by handles (bodies can: Resize · Move · Turn · Scale).
+- ~~SK3 No transform box~~ (M9: drag inside a selection to move it, a side
+  handle to stretch it, a corner to scale it). Still: no rotate handle, and
+  a circle in a stretched selection keeps its roundness (its radius by the
+  mean of the two stretches).
 
 - **SK2 Solver:** numerical Jacobian, one cluster; big sketches will slow down.
+- **SK4 Text:** fonts are read from the system's font folders and
+  `assets/fonts` (TrueType, OpenType, the first face of a collection);
+  kerning only from a font's old `kern` table (not OpenType GPOS), no
+  ligatures or right-to-left shaping, no text on a path, no bold / italic
+  but by picking that font's file. Each letter extrudes as a body of its
+  own, and the edges between a letter's curve segments are drawn dark
+  (U3).
+- **SK5 Projection:** edges only (no silhouettes of curved faces); a curve
+  that isn't a line or a circle square to the sketch comes in as 24 lines;
+  a projected circle that later becomes another kind of curve stops
+  following (reported on the sketch).
 
 ## Design history and references (`doc/`)
 

@@ -76,7 +76,11 @@ func (a *App) browserPanel() {
 			if p.Err != "" {
 				col = colErr
 			}
-			imgui.TextColored(col, fmt.Sprintf("%s = %s", p.Name, fmtLen(p.Value)))
+			val := fmtLen(p.Value)
+			if p.IsText {
+				val = "\"" + p.Text + "\""
+			}
+			imgui.TextColored(col, fmt.Sprintf("%s = %s", p.Name, val))
 		}
 		if imgui.SmallButton("Edit parameters…") {
 			a.showParams = true
@@ -524,7 +528,11 @@ func (a *App) paramsWindow() {
 					imgui.TextColored(colErr, "error")
 					imgui.SetItemTooltip(p.Err)
 				} else {
-					imgui.TextUnformatted(fmtLen(p.Value))
+					if p.IsText {
+						imgui.TextUnformatted("\"" + p.Text + "\"")
+					} else {
+						imgui.TextUnformatted(fmtLen(p.Value))
+					}
 				}
 				imgui.TableNextColumn()
 				if imgui.SmallButton("x") {

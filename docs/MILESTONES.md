@@ -259,8 +259,41 @@ What each milestone added, in the order they were built. The current gaps are in
   Resize goes back from a move feature to the feature that made the body.
   The sketch snaps to its origin and pins what is drawn there; changing a
   dimension moves the loosest geometry first.
+- **Sketch transform box** (`app/sketch_xform.go`): round a sketch selection
+  of more than a point, with the Select tool; inside it (on a selected
+  curve) moves the selection, a side handle stretches it along that axis
+  about the opposite side, a corner scales it evenly about the opposite
+  corner; snapped like every drag. Fixed points and plain-number
+  dimensions within the selection take the new places and sizes.
 - Tests: `geom/bspline_test.go`, `sketch` (spline regions, tangency),
   `ops/spline_test.go` (extruded and revolved splines against exact
   volumes, booleans through them), `ops/bowl_test.go` and
   `ops/bowlprobe_test.go` (a dog bowl's foot joined eight ways),
   `brep/scale_test.go`, `io` (spline parts through OpenCASCADE).
+
+## M10: text and projection
+
+- **Text** (`sketch/text.go`, `app/text_ui.go`): a Text entity placed by
+  the ribbon's Text tool and edited in Properties: the words (several
+  lines), font, height (the capital height), angle and alignment. Fonts are
+  the TrueType and OpenType files in `assets/fonts` and the system's font
+  folders (`golang.org/x/image/font/sfnt`), with kerning from the font's
+  `kern` table. The letters' outlines (lines, quadratic and cubic Béziers)
+  are sketch curves: profiles find their regions by non-zero winding, so
+  counters (the holes in o, a, e) are holes and overlapping strokes make one
+  region. Picking a text, or any region of it, takes the whole text as the
+  profile, so an extrude of it still takes every letter after an edit.
+- **Text parameters**: a parameter can hold text (`"Luna"`, in quotes), and
+  a sketch text can show one (`=name`): change the parameter and every text
+  showing it, and everything built on them, follows (also the `text.set`,
+  `text.font` and `text.size` commands).
+- **Projection** (`doc/project.go`): the ribbon's Project tool brings a
+  body's edge into the sketch: a line as a line, a circle or arc square to
+  the sketch as one, any other curve as a chain of lines. Its points are
+  fixed (and a circle's radius) and it is drawn purple. Every rebuild
+  projects the edges again, so the sketch follows the bodies it was drawn
+  from; if an edge is gone, its geometry stays where it was and the sketch
+  says so.
+- Tests: `doc/text_test.go` (a name parameter carried through an extrude,
+  counters as holes), `doc/project_test.go` (a box's edge and a cylinder's
+  rim followed through edits).

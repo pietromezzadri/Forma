@@ -398,7 +398,8 @@ func (a *App) renderScene() {
 	// the ID buffer
 	vp.slots.reset()
 	r.BeginPick()
-	if !inSketch {
+	// bodies are picked outside sketches, and in one while projecting
+	if !inSketch || a.sk.tool == toolProject {
 		for _, b := range a.doc.Bodies {
 			if !b.Visible || b.gpu == nil {
 				continue
@@ -410,7 +411,7 @@ func (a *App) renderScene() {
 		}
 	}
 	for _, s := range a.doc.Sketches {
-		if s.gpu == nil || (inSketch && a.sk.item != s) || (!inSketch && !s.Visible) {
+		if s.gpu == nil || (inSketch && a.sk.item != s) || (!inSketch && !s.Visible) || (inSketch && a.sk.tool == toolProject) {
 			continue
 		}
 		slot := vp.slots.slot(s.ID)
@@ -515,6 +516,10 @@ func (a *App) drawSketch(s *SketchItem, v render.View, wpp float32) {
 	for _, e := range s.S.Ents {
 		if e.Kind != sketch.Point && !e.Construction && st.Fixed[e.ID] && uint32(e.ID) != hoverCurve {
 			r.DrawLineRange(v, g.curves, uint32(e.ID), render.Paint{Color: colFixed, Width: width, DepthBias: 2.5e-5})
+		}
+		// projected from a body: purple
+		if e.Kind != sketch.Point && !e.Construction && e.Proj != "" && uint32(e.ID) != hoverCurve {
+			r.DrawLineRange(v, g.curves, uint32(e.ID), render.Paint{Color: mgl32.Vec4{0.62, 0.32, 0.85, 1}, Width: width, DepthBias: 2.6e-5})
 		}
 	}
 	r.DrawLines(v, g.constr, render.Paint{Color: colConstr, HoverColor: colHover, Hover: hoverCurve, Width: 1.4 * px, Dash: wpp * 10 * px, DepthBias: 2e-5}, false)
