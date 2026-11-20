@@ -1,4 +1,4 @@
-# Forma
+<h1 align="center"><img src="docs/logo/forma_wordmark.png" alt="Forma" width="480"></h1>
 
 A parametric 3D CAD program written in Go, with its own geometry kernel.
 
