@@ -200,6 +200,31 @@ Milestones M0–M2 (the shell, kernel and sketcher):
   motion, instances, a reload, a face joint, interference) and `io`
   (OpenCASCADE's assembly read, ours written and read back by both).
 
+## M8: kernel exactness
+
+- **Exact intersection edges** (`brep/bool_exact.go`, `geom/conic.go`):
+  where a boolean's two surfaces meet in a line, a circle or an ellipse, the
+  edge in the result is that curve, not a polyline through the contoured
+  points: a plane square to a cylinder, cone or torus, a plane through a
+  sphere, two surfaces of revolution on one axis, straight runs (two planes,
+  a cylinder cut along its axis), and a plane cutting a cylinder at a slant
+  (`geom.Ellipse`). Circles are snapped to their surfaces (a drilled hole's
+  rim has the drill's radius to the last digit). The faces are still split
+  along the polyline; other curves (two crossing cylinders) stay polylines.
+  Arcs run over [0, t1] from their start (`geom.StartAt`), as the
+  primitives' circles do. STEP writes `ELLIPSE` and reads ellipse edges
+  exactly.
+- **Coplanar faces merge** (`brep/merge.go`, after every boolean): faces on
+  one plane facing the same way that share an edge become one face (holes
+  and all), and edges running on through a vertex with nothing else at it
+  (two lines on one line, two arcs of one circle) become one. Two blocks
+  side by side are a plain block.
+- Tests: `brep/exact_test.go` (a hole's rims, a fillet on one, a slanted cut,
+  a sphere's slice, crossing cylinders keeping their polyline),
+  `brep/merge_test.go` (side by side, an L, a frame round a hole, drilling
+  across a merged join), `io` (a slanted cut through OpenCASCADE, the oblique
+  hole's ellipses read back).
+
 ## Screenshots without touching the mouse
 
 `FORMA_CAPTURE=captures/basic.json` opens a hidden window that never takes
@@ -224,8 +249,9 @@ focus, runs each shot's actions (command IDs with `:args`, or `hover:fx,fy`,
   meshes.
 - **M7 assemblies** (done): components, joints, interference, STEP assembly
   structure in and out.
-- Next: kernel exactness (K2), coplanar face merging (K1), corner patches
-  for fillets (F2), speed (K3); drawings; scripting.
+- **M8 kernel exactness** (done): exact line, circle and ellipse edges from
+  booleans; coplanar faces merged.
+- Next: corner patches for fillets (F2), speed (K3); drawings; scripting.
 - Ideas: Starlark scripting for code-driven parts, 2D drawings to SVG / PDF.
 
 ## Stack

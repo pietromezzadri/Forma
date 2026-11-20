@@ -85,6 +85,10 @@ func (x Xform) Curve(c Curve) Curve {
 		f := Frame{O: x.Pt(k.F.O), X: x.Dir(k.F.X), Y: x.Dir(k.F.Y)}
 		f.Z = f.X.Cross(f.Y)
 		return Circle{F: f, R: k.R}
+	case Ellipse:
+		f := Frame{O: x.Pt(k.F.O), X: x.Dir(k.F.X), Y: x.Dir(k.F.Y)}
+		f.Z = f.X.Cross(f.Y)
+		return Ellipse{F: f, A: k.A, B: k.B, P: k.P}
 	case *Polyline:
 		pts := make([]Vec3, len(k.Pts))
 		for i, p := range k.Pts {

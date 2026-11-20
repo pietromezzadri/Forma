@@ -44,7 +44,11 @@ func Boolean(a, b *Body, op BoolOp) (*Body, error) {
 	}
 	c.aliasPieces()
 	c.classify(regions)
-	return c.sew(regions, op, a.Name)
+	body, err := c.sew(regions, op, a.Name)
+	if err != nil {
+		return nil, err
+	}
+	return MergeFaces(body), nil
 }
 
 type bctx struct {
@@ -101,6 +105,9 @@ type bcut struct {
 	cum    []float64
 	splits []float64
 	faces  [2]*bface
+
+	exact     geom.Curve // its closed form (bool_exact.go)
+	exactDone bool
 }
 
 type bevent struct {
@@ -548,13 +555,9 @@ func (c *bctx) alongEdge(pts []geom.Vec3, fs ...*Face) bool {
 		for _, e := range faceEdges(f) {
 			ok := true
 			for _, q := range probe {
-				if e.Curve.Eval(e.Curve.Project(q)).Dist(q) > c.weldLoose {
-					ok = false
-					break
-				}
-				t := e.Curve.Project(q)
-				lo, hi := math.Min(e.T0, e.T1), math.Max(e.T0, e.T1)
-				if _, closed := e.Curve.(geom.Circle); !closed && (t < lo-1e-9 || t > hi+1e-9) {
+				// on its curve and within its range (an arc of a circle
+				// is not the whole circle)
+				if !c.onEdge(e, q) {
 					ok = false
 					break
 				}

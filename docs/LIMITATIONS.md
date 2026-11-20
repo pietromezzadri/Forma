@@ -6,17 +6,19 @@ new ones as features land.
 
 ## Kernel and booleans (`brep/`)
 
-- **K1 Coplanar faces aren't merged.** After a join, two faces on one plane
-  stay two faces with an edge between them (two boxes side by side keep a
-  line across their shared top). Needs a merge pass after sewing: faces on
-  the same surface sharing an edge become one, the edge and any vertex left
-  with two edges go.
-- **K2 Intersection curves are polylines.** Where a plane meets a cylinder
-  square on (a boss's root, a hole's rim) the edge is a polyline, not a
-  circle. Fine for display and booleans; STEP export fits circles and lines
-  to them (E4), but the kernel should make them exact itself: recognise
-  plane–cylinder, plane–cone, plane–sphere and coaxial cases and make
-  lines, circles and ellipses (also sharpens mass properties, I2).
+- ~~K1 Coplanar faces aren't merged~~ (M8: `brep.MergeFaces` after every
+  boolean). Still: **K1b curved faces aren't merged** — two pieces of one
+  cylinder (a hole drilled into each of two blocks before joining them, a
+  round split by a cut) stay two faces with a line between them, and arcs
+  meeting such a line stay two arcs. Merging them needs the loops sorted
+  into outer and holes in a periodic parameter space.
+- ~~K2 Intersection curves are polylines~~ (M8: lines, circles and
+  ellipses where the surfaces meet in one, `geom.ExactCurve`). Still:
+  **K2b other curves stay polylines** — a plane cutting a cone at a slant
+  (an ellipse, parabola or hyperbola), a plane along a cone's apex, a
+  sphere off a cylinder's axis, two crossing cylinders. The faces are
+  split along the contoured polyline even where the edge is exact, so
+  regions match the exact edge only to the contour tolerance.
 - **K3 Speed.** A boolean takes up to about a quarter of a second, so
   dragging an extrude's arrow or the move gizmo on a joined body stutters,
   and a long history regenerates slowly. Ideas: bounding-box culling per
@@ -143,17 +145,18 @@ new ones as features land.
 - **E2 STEP import reads analytic solids only:** faces on planes, cylinders,
   cones, spheres and tori. B-spline surfaces, surfaces of revolution or
   extrusion and offset surfaces are refused (the solid is left out, with the
-  reason); so are open shells and surface models. Ellipse and B-spline edges
-  become polylines pulled onto both faces (fine for booleans; not exact).
+  reason); so are open shells and surface models. Lines, circles and
+  ellipses come in exact; B-spline edges become polylines pulled onto both
+  faces (fine for booleans; not exact).
 - **E3 STEP import flattens assemblies:** placements (`NEXT_ASSEMBLY_USAGE_OCCURRENCE`
   transforms, at any depth, a part used many times) are applied, but the
   solids come in as bodies of one Import feature, not as components;
   `MAPPED_ITEM` instancing, colours, layers and names of faces aren't read.
 - **E4 STEP export** writes components as an assembly (a part per distinct
   design, an occurrence per component) but no colours or names of faces.
-  Intersection edges are written as circles or lines when their points lie
-  on one (within 1e-5 mm), else as degree-1 B-splines through the points;
-  ellipses (a plane cutting a cylinder at a slant) aren't recognised.
+  Lines, circles and ellipses are written as such; the polyline edges left
+  (K2b) as lines or circles when their points lie on one (within 1e-5 mm),
+  else as degree-1 B-splines through the points.
 - **E5 STL import is a reference mesh only:** shown flat-shaded with its size,
   area and volume, but not pickable in the view, not measurable against other
   things, and never turned into a solid for booleans.

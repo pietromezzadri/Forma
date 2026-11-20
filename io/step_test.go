@@ -63,6 +63,13 @@ func stepParts(t *testing.T) map[string]*brep.Body {
 	out["ball"] = ball
 
 	rx := geom.Frame{O: geom.V3(-15, 0, 0), X: geom.YAxis, Y: geom.ZAxis, Z: geom.XAxis}
+	// a slanted cut through a cylinder: ellipse edges
+	tilt, err := brep.Transform(box(-50, -50, -100, 50, 50, 0), geom.Rotate(geom.Vec3{}, geom.XAxis, math.Pi/5), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out["slant"] = boolean(t, mk(ops.Cylinder(at(0, 0, -20), 4, 40)), tilt, brep.Subtract)
+
 	out["steinmetz"] = boolean(t, mk(ops.Cylinder(at(0, 0, -15), 5, 30)), mk(ops.Cylinder(rx, 4, 30)), brep.Union)
 
 	sink, err := ops.HoleTool(geom.V3(-8, 5, 8), geom.ZAxis.Neg(), geom.XAxis,
@@ -221,6 +228,17 @@ func TestSTEPImportOCC(t *testing.T) {
 			}
 			if v := volume(b); math.Abs(v-want) > 5e-4*want {
 				t.Errorf("volume %.5f, OpenCASCADE's %.5f", v, want)
+			}
+			if name == "occ_oblique_hole" {
+				n := 0
+				for _, e := range b.Edges() {
+					if _, ok := e.Curve.(geom.Ellipse); ok {
+						n++
+					}
+				}
+				if n == 0 {
+					t.Error("the hole's rims didn't come in as ellipses")
+				}
 			}
 		})
 	}

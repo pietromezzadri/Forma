@@ -280,6 +280,9 @@ func (s *stepWriter) edge(e *brep.Edge) (int, error) {
 	case geom.Circle:
 		curve = s.add("CIRCLE('',#%d,%s)", s.axis(k.F.O, k.F.X.Cross(k.F.Y), k.F.X), real(k.R))
 		sense = e.T1 >= e.T0
+	case geom.Ellipse:
+		curve = s.add("ELLIPSE('',#%d,%s,%s)", s.axis(k.F.O, k.F.X.Cross(k.F.Y), k.F.X), real(k.A), real(k.B))
+		sense = e.T1 >= e.T0
 	default:
 		curve = s.fitted(e)
 	}

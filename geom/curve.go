@@ -59,6 +59,16 @@ func SampleParams(c Curve, t0, t1, chordTol, maxLen float64) []float64 {
 		if full := math.Abs(t1-t0) > math.Pi*1.999; full && n < 8 {
 			n = 8
 		}
+	case Ellipse:
+		// the tightest bend has radius B²/A (A ≥ B) or A²/B
+		rmin := math.Min(k.B*k.B/math.Max(k.A, 1e-300), k.A*k.A/math.Max(k.B, 1e-300))
+		n = int(math.Ceil(math.Abs(t1-t0) / ArcStep(rmin, chordTol)))
+		if m := int(math.Ceil(math.Abs(t1-t0) * math.Max(k.A, k.B) / maxLen)); m > n {
+			n = m
+		}
+		if full := math.Abs(t1-t0) > math.Pi*1.999; full && n < 8 {
+			n = 8
+		}
 	case *Polyline:
 		lo, hi := math.Min(t0, t1), math.Max(t0, t1)
 		ts := []float64{lo}

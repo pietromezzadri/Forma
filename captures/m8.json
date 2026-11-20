@@ -1,0 +1,20 @@
+{
+  "width": 1600, "height": 900, "out": "out/m8",
+  "shots": [
+    {"name": "a_joined", "frames": 8, "do": [
+      "create.box:X=0,Y=0,Z=0,Width=20,Depth=20,Height=10",
+      "create.box:X=20,Y=0,Z=0,Width=20,Depth=20,Height=10,Operation=Join",
+      "create.box:X=0,Y=20,Z=0,Width=20,Depth=15,Height=10,Operation=Join",
+      "view.iso:now", "view.fit", "wait:10", "move:w:30,10,10@4", "wait:6"
+    ]},
+    {"name": "b_drilled", "frames": 8, "do": [
+      "create.cylinder:X=20,Y=10,Z=-1,Radius=4,Height=12,Operation=Cut",
+      "create.cylinder:X=10,Y=20,Z=-1,Radius=3,Height=12,Operation=Cut",
+      "wait:10", "move:w:23.5,12.5,10@4", "wait:6"
+    ]},
+    {"name": "c_sphere", "frames": 8, "do": [
+      "create.sphere:X=10,Y=30,Z=10,Radius=6,Operation=Join",
+      "wait:10", "move:w:10,30,16@4", "wait:6"
+    ]}
+  ]
+}

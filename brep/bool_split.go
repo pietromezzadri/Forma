@@ -663,6 +663,8 @@ func (c *bctx) sew(rs []*region, op BoolOp, name string) (*Body, error) {
 		var e *Edge
 		if pc.key.kind == 0 {
 			e = b.Edge(va, vb, pc.edge.Curve, pc.ta, pc.tb)
+		} else if ex, ok := c.exactEdge(b, va, vb, pc); ok {
+			e = ex
 		} else {
 			pts := append([]geom.Vec3(nil), pc.pts...)
 			pts[0], pts[len(pts)-1] = va.P, vb.P

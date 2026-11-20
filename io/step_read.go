@@ -584,16 +584,7 @@ func (r *stepReader) curve(c *p21Ent, v0, v1 *brep.Vertex, sense bool) (*stepEdg
 		if err != nil {
 			return nil, err
 		}
-		c := geom.Circle{F: f, R: rad * r.scale}
-		t0, t1 := c.Project(v0.P), c.Project(v1.P)
-		if sense {
-			if t1 <= t0+1e-12 && (closed || t1 < t0-1e-12) {
-				t1 += 2 * math.Pi
-			}
-		} else if t1 >= t0-1e-12 && (closed || t1 > t0+1e-12) {
-			t1 -= 2 * math.Pi
-		}
-		return &stepEdge{e: r.b.Edge(v0, v1, c, t0, t1)}, nil
+		return r.arc(geom.Circle{F: f, R: rad * r.scale}, v0, v1, sense, closed), nil
 	case "ELLIPSE":
 		f, err := r.frame(arg(a, 1))
 		if err != nil {
@@ -604,15 +595,7 @@ func (r *stepReader) curve(c *p21Ent, v0, v1 *brep.Vertex, sense bool) (*stepEdg
 		if err1 != nil || err2 != nil {
 			return nil, fmt.Errorf("ellipse #%d: bad radii", c.ID)
 		}
-		ra, rb = ra*r.scale, rb*r.scale
-		ev := func(t float64) geom.Vec3 {
-			return f.O.Add(f.X.Scale(ra * math.Cos(t))).Add(f.Y.Scale(rb * math.Sin(t)))
-		}
-		par := func(p geom.Vec3) float64 {
-			l := f.ToLocal(p)
-			return geom.WrapAngle(math.Atan2(l.Y/rb, l.X/ra))
-		}
-		return r.sampled(ev, 0, 2*math.Pi, true, par(v0.P), par(v1.P), v0, v1, sense)
+		return r.arc(geom.Ellipse{F: f, A: ra * r.scale, B: rb * r.scale}, v0, v1, sense, closed), nil
 	case "POLYLINE":
 		var pts []geom.Vec3
 		for _, pv := range arg(a, 1).List {
@@ -842,4 +825,12 @@ func (s *stepSpline) project(q geom.Vec3) float64 {
 		}
 	}
 	return (a + b) / 2
+}
+
+// arc is an edge from v0 to v1 along a circle or an ellipse (against its
+// direction when !sense), re-framed to run over [0, t1] as the kernel's arcs
+// do.
+func (r *stepReader) arc(c geom.Curve, v0, v1 *brep.Vertex, sense, closed bool) *stepEdge {
+	a := geom.StartAt(c, v0.P, !sense)
+	return &stepEdge{e: r.b.Edge(v0, v1, a, 0, geom.ArcEnd(a, v1.P, closed || v0 == v1))}
 }

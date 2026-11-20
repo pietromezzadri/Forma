@@ -17,7 +17,7 @@ func (c *bctx) onEdge(e *Edge, q geom.Vec3) bool {
 	if e.Curve.Eval(t).Dist(q) > c.weldLoose {
 		return false
 	}
-	if _, circ := e.Curve.(geom.Circle); circ {
+	if geom.CurvePeriod(e.Curve) > 0 {
 		lo, hi := math.Min(e.T0, e.T1), math.Max(e.T0, e.T1)
 		if hi-lo > 2*math.Pi-1e-9 {
 			return true
@@ -37,7 +37,7 @@ func (c *bctx) onEdge(e *Edge, q geom.Vec3) bool {
 // paramOn is q's parameter on e, in e's own range.
 func paramOn(e *Edge, q geom.Vec3) float64 {
 	t := e.Curve.Project(q)
-	if _, circ := e.Curve.(geom.Circle); circ {
+	if geom.CurvePeriod(e.Curve) > 0 {
 		lo, hi := math.Min(e.T0, e.T1), math.Max(e.T0, e.T1)
 		for t < lo-1e-9 {
 			t += 2 * math.Pi
@@ -191,7 +191,7 @@ func (c *bctx) boundaryEvent(F *bface, q geom.Vec2, p geom.Vec3) *bevent {
 	s := F.segs[best]
 	e := s.e
 	t := clampT(e, e.Curve.Project(p))
-	if _, circ := e.Curve.(geom.Circle); circ {
+	if geom.CurvePeriod(e.Curve) > 0 {
 		t = s.ta + (s.tb-s.ta)*br
 		t = paramOn(e, e.Curve.Eval(t))
 		t = clampT(e, t+wrapNear(e.Curve.Project(p)-t))
