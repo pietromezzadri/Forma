@@ -80,6 +80,11 @@ interference checks.</td>
   slider and cylindrical joints with motion and limits; grounding;
   interference checks; a bill of materials (CSV) and an exploded view.
 - **Inspect.** Measuring, mass properties and section views.
+- **Stress analysis.** A part meshed with 10-node tetrahedra, faces held
+  fixed or loaded by a force or a pressure, a material from a list, and
+  the von Mises stress or displacement painted on the deformed part with
+  the maximum stress and the safety factor (checked against beam theory
+  and a plate with a hole).
 - **Exchange.**
   - STEP AP214: export of solids and assemblies, and import of
     AP203/AP214/AP242 solids on analytic surfaces.
@@ -163,6 +168,7 @@ PNGs to `captures/out/`. The images above come from that script. See
 | `geom/` | float64 vectors, frames, curves (line, circle, ellipse, polyline), surfaces, transforms |
 | `brep/` | half-edge B-rep, builder and Euler operators, validity check, tessellation, booleans, face merging, mass properties |
 | `ops/` | primitives, extrude, revolve, fillet and chamfer, holes, shell |
+| `fea/` | static stress analysis: volume mesher, 10-node tetrahedra, solver |
 | `sketch/` | sketch entities, constraints, solver, region detection |
 | `expr/` | expressions with units |
 | `doc/` | the design: parameters, feature history, regeneration, references, assemblies, `.forma` files |
@@ -189,8 +195,18 @@ PNGs to `captures/out/`. The images above come from that script. See
   speed ([K3](docs/LIMITATIONS.md)).
 - **M13 assembly** (done): a bill of materials, exploded views,
   grounding, joint limits. Left: rigid groups, contact, motion studies.
-- **M14 simulation:** static stress analysis (volume mesh, loads and supports
-  on faces, materials, stress and displacement plots).
+- **M14 simulation** (done): static stress analysis — a part filled with
+  quadratic tetrahedra, faces held fixed and loaded (force or pressure),
+  materials, von Mises stress and displacement plotted on the deformed
+  part, the safety factor. Left: a faster solver, contact, assemblies,
+  thermal and modal studies.
+- **M15 electronics and behaviour** (proposed, see
+  [docs/ELECTRONICS.md](docs/ELECTRONICS.md)): a library of electronic
+  parts as components (Arduino, servos, motors, batteries, drivers); the
+  real Arduino firmware run on an emulated ATmega328P, wired to simple
+  battery, driver, motor and servo models that drive the assembly's
+  joints over time (a code-driven motion study: an RC car's steering and
+  wheels). Circuit-level SPICE simulation is left to KiCad / LTspice.
 - Later: corner patches where three fillets meet
   ([F2](docs/LIMITATIONS.md)), 2D drawings to SVG / PDF, scripted parts in
   Starlark.

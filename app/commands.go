@@ -280,6 +280,7 @@ func (a *App) registerCommands() *Commands {
 	a.registerTextCommands(c)
 	a.registerOffsetCommands(c)
 	a.registerM13Commands(c)
+	a.registerSimCommands(c)
 	return c
 }
 

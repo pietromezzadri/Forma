@@ -421,3 +421,39 @@ What each milestone added, in the order they were built. The current gaps are in
   move; a slider held at its limit; the BOM with a copy, the same file
   again and a body of the design's own, and its CSV; the explode
   directions). Capture `captures/m13.json`.
+
+## M14: static stress analysis
+
+- **Volume mesh** (`fea/mesh.go`, `geom/delaunay3.go`): points on the
+  part's faces (the surface mesher at the element size, with points
+  inside flat faces too, `brep.MeshOptions.Interior`), a jittered
+  body-centred lattice inside kept half an element clear of the surface
+  triangles, and a sparser layer outside so the part's surface is never
+  the hull; their 3D Delaunay tetrahedralisation (Bowyer–Watson with
+  neighbour links, points in Morton order); the tetrahedra whose centre
+  is inside the part (`brep.Winding`) kept and made quadratic, the middle
+  of each boundary edge lying on a face moved onto its surface (and back,
+  should that turn an element inside out). Boundary triangles know the
+  B-rep face they lie on, which is how supports and loads find the mesh.
+- **Solver** (`fea/elem.go`, `fea/solve.go`): 10-node tetrahedra with a
+  4-point rule, linear isotropic elasticity, the stiffness in 3 × 3 node
+  blocks, conjugate gradients with block-Jacobi preconditioning on all
+  the cores; nodes on fixed faces held, a force spread over the loaded
+  faces by area or a pressure along their normals (a 6-node triangle's
+  share on its edge mids); von Mises stress worked out at every element's
+  nodes and averaged, the maximum stress and displacement, and the safety
+  factor against the material's yield (`fea.Materials`: steels,
+  aluminium, brass, printed PLA / PETG / ABS, nylon, oak).
+- **In the app** (Inspect → Stress, `app/simulate_ui.go`): select faces
+  and hold them fixed or load them (a force in N or a pressure in MPa),
+  pick a material and an element size (auto by default), Run (on a
+  goroutine, with a progress bar); the part is drawn as its boundary,
+  moved by the displacement (5 % of its size at ×1, a slider scales it)
+  and coloured by von Mises stress or displacement with a legend
+  (`render.ColorMesh`, `DrawColored`); the numbers and the safety factor
+  beside it.
+- Checks (`fea/fea_test.go`): a bar in tension (the stretch within 0.3 %
+  of FL/EA, the stress 10 MPa away from the ends), a cantilever (tip
+  deflection 0.19052 mm against beam theory's 0.19048, the bending stress
+  at mid-span), a cylinder's mesh volume, a plate with a hole (3.1 × the
+  nominal stress beside the hole, Kirsch's 3). Capture `captures/m14.json`.

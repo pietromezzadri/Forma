@@ -216,6 +216,35 @@ new ones as features land.
   steps, trails or saved views, and measuring, the section view and
   exports see the parts assembled.
 
+## Stress analysis (`fea/`, `app/simulate_ui.go`)
+
+- **FE1 Linear and static only:** small displacements, linear elastic
+  isotropic materials, no plasticity (stress past the yield is reported,
+  not followed), no buckling, contact, thermal, modal or fatigue studies.
+- **FE2 One part:** a study takes one body; no assemblies, bolts or contact
+  between parts, and no symmetry or remote supports — a face is either
+  held fixed in all three directions or free.
+- **FE3 Loads:** a force spread evenly over faces by area, or a uniform
+  pressure; no point loads, bearing loads, moments, gravity or
+  acceleration, and no loads varying over a face.
+- **FE4 Mesh:** one element size over the whole part (no refinement near
+  holes and fillets), set by hand or a quarter of the thinnest extent;
+  the stress at sharp inside corners and at the edges of held faces grows
+  without end as the mesh is refined (a real singularity: read stress a
+  little away from them). Features much thinner than the element size
+  may be lost; the mesher keeps tetrahedra by their centre, so a slot or
+  gap narrower than an element can be bridged.
+- **FE5 Speed:** the solver is conjugate gradients with a block-Jacobi
+  preconditioner (a symmetric Gauss–Seidel one took 60 % fewer
+  iterations but its sweeps don't run in parallel, so it was slower):
+  5,000 elements take 1–4 s, 20,000 about 15 s. A multigrid or
+  incomplete-Cholesky preconditioner, or a direct sparse solver, would
+  make big studies practical.
+- **FE6 Results:** von Mises and displacement only (no principal stresses,
+  components, reaction forces or probes); the plot shows the outside of
+  the part (no section through the result), and a study isn't saved
+  with the design.
+
 ## Exchange (`io/`)
 
 - ~~E1 STL only~~ (M6: STEP in and out, OBJ out, STL in as a reference mesh).

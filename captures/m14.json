@@ -1,0 +1,17 @@
+{
+  "width": 1600, "height": 900, "out": "out/m14",
+  "shots": [
+    {"name": "a_setup", "frames": 8, "do": [
+      "create.box:X=0,Y=0,Z=0,Width=100,Depth=10,Height=10", "wait:6", "edit.clear",
+      "view.left:now", "view.fit", "wait:8", "move:w:0,5,5@4", "wait:3", "click", "wait:3", "log", "simulate.fix",
+      "view.iso:now", "view.fit", "wait:8", "move:w:60,5,10@4", "wait:3", "click", "wait:3", "log", "simulate.load:p=0.5",
+      "move:vp:0.98,0.98@2", "wait:6"
+    ]},
+    {"name": "b_stress", "frames": 8, "do": [
+      "simulate.run:now", "wait:10", "view.fit", "wait:6", "log"
+    ]},
+    {"name": "c_displacement", "frames": 8, "do": [
+      "simulate.show:displacement", "wait:6"
+    ]}
+  ]
+}

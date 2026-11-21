@@ -178,3 +178,7 @@ func selectNth(run []int32, k int, key func(int32) float64) {
 		}
 	}
 }
+
+// Winding is a closed mesh's winding number about a point (about 1 inside,
+// 0 outside), worked out by the fast tree.
+func Winding(m *Mesh) func(geom.Vec3) float64 { return newWindTree(m).at }

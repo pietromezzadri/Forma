@@ -365,7 +365,7 @@ func (a *App) renderScene() {
 	r.BeginColor(colBgTop, colBgBottom)
 	inSketch := a.sk != nil
 	for _, b := range a.doc.Bodies {
-		if !b.Visible {
+		if !b.Visible || a.simHides(b.ID) {
 			continue
 		}
 		g := b.upload()
@@ -414,6 +414,7 @@ func (a *App) renderScene() {
 
 	a.drawMeshes(v, inSketch)
 	a.drawClashes(v)
+	a.drawSimulation(v)
 
 	if a.showGrid {
 		r.DrawGrid(v, a.gridSpec(wpp))

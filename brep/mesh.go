@@ -31,6 +31,9 @@ type VertexPoint struct {
 type MeshOptions struct {
 	ChordTol float64 // max distance from the true surface (mm)
 	MaxEdge  float64 // max boundary segment length (mm)
+	// Interior, when set, puts points every that far inside every face, flat
+	// ones too (a volume mesh grows from them)
+	Interior float64
 }
 
 // DefaultMeshOptions scales the tolerances to the body's size.
@@ -127,6 +130,9 @@ func meshFace(m *Mesh, f *Face, samples map[*Edge]*edgeSamples, opt MeshOptions)
 		if h > opt.MaxEdge {
 			h = opt.MaxEdge
 		}
+	}
+	if opt.Interior > 0 && (h == 0 || h > opt.Interior) {
+		h = opt.Interior
 	}
 
 	// close gaps (poles) in parameter space, then gather points and segments

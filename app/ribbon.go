@@ -241,6 +241,7 @@ func (a *App) partRibbon(r *ribbon) {
 	r.group()
 	r.cmd("view.section", icSection, "Section", a.section.on)
 	r.cmd("inspect.mass", 0xf5cd, "Mass", false)
+	r.cmd("simulate.open", icStress, "Stress", a.sim.open)
 	r.cmd("view.params", 0xf1de, "Params", a.showParams)
 	r.end("Inspect")
 
