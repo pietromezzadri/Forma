@@ -39,6 +39,8 @@ func kindIcon(k string) rune {
 		return icHole
 	case doc.KShell:
 		return icShell
+	case doc.KEmboss:
+		return icEmboss
 	case doc.KImport:
 		return icImport
 	case doc.KMesh:

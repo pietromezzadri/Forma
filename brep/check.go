@@ -91,10 +91,10 @@ func checkGeom(b *Body) error {
 			return fmt.Errorf("edge %d has no curve", e.ID)
 		}
 		if d := e.Curve.Eval(e.T0).Dist(e.Verts[0].P); d > 1e-6 {
-			return fmt.Errorf("edge %d: start %.3g mm from its vertex", e.ID, d)
+			return fmt.Errorf("edge %d (a %s, %.4v to %.4v): start %.3g mm from its vertex", e.ID, e.Curve.Kind(), e.Verts[0].P, e.Verts[1].P, d)
 		}
 		if d := e.Curve.Eval(e.T1).Dist(e.Verts[1].P); d > 1e-6 {
-			return fmt.Errorf("edge %d: end %.3g mm from its vertex", e.ID, d)
+			return fmt.Errorf("edge %d (a %s): end %.3g mm from its vertex", e.ID, e.Curve.Kind(), d)
 		}
 		tol := 1e-6
 		if tc, ok := e.Curve.(geom.Toleranced); ok {
@@ -104,7 +104,7 @@ func checkGeom(b *Body) error {
 			p := e.Curve.Eval(e.T0 + (e.T1-e.T0)*float64(i)/8)
 			for _, h := range e.HE {
 				if d := geom.SurfaceDist(h.Loop.Face.Surf, p); d > tol {
-					return fmt.Errorf("edge %d leaves face %q's surface by %.3g mm", e.ID, h.Loop.Face.Name, d)
+					return fmt.Errorf("edge %d (a %s) leaves face %q's surface by %.3g mm", e.ID, e.Curve.Kind(), h.Loop.Face.Name, d)
 				}
 			}
 		}

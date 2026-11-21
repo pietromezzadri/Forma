@@ -356,8 +356,11 @@ func (s *Sketch) Regions() []Region {
 	}
 	var regions []Region
 	idx := map[int]int{}
+	// loops of next to no area (two pieces on top of each other, as an
+	// offset outline can leave) are no region or hole
+	minArea := math.Max(tol*tol*100, 1e-7*box.Diagonal()*box.Diagonal())
 	for ci, c := range cycles {
-		if c.area > tol*tol*100 {
+		if c.area > minArea {
 			idx[ci] = len(regions)
 			regions = append(regions, Region{Outer: c.segs, Area: c.area, Poly: c.poly})
 		}
@@ -365,7 +368,7 @@ func (s *Sketch) Regions() []Region {
 	// a negative cycle is a component's outline: a hole of the smallest
 	// region containing it
 	for _, c := range cycles {
-		if c.area >= -tol*tol*100 {
+		if c.area >= -minArea {
 			continue
 		}
 		best, bestArea := -1, math.Inf(1)

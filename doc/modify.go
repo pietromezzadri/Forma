@@ -114,7 +114,7 @@ func fmtNum(x float64) string {
 // adding tool bodies of their own.
 func (f *Feature) modifies() bool {
 	switch f.Kind {
-	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint:
+	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss:
 		return true
 	}
 	return false
@@ -552,6 +552,8 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 
 	case KJoint:
 		return d.joint(f, out)
+	case KEmboss:
+		return d.emboss(f, out)
 	}
 	return nil, fmt.Errorf("unknown feature kind %q", f.Kind)
 }

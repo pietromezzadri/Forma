@@ -68,6 +68,8 @@ type triangulation struct {
 	tris []cdtTri
 	// edge (a, b) → triangle holding the directed edge a→b
 	edges map[[2]int]int
+	// vt[i] is a triangle holding vertex i (the last one made with it)
+	vt []int
 }
 
 func newTriangulation(pts []Vec2) *triangulation {
@@ -79,7 +81,7 @@ func newTriangulation(pts []Vec2) *triangulation {
 	r := math.Max(box.Max.X-box.Min.X, box.Max.Y-box.Min.Y)*20 + 1
 	all := append(append([]Vec2(nil), pts...),
 		Vec2{c.X - r, c.Y - r}, Vec2{c.X + r, c.Y - r}, Vec2{c.X, c.Y + r})
-	t := &triangulation{pts: all, edges: map[[2]int]int{}}
+	t := &triangulation{pts: all, edges: map[[2]int]int{}, vt: make([]int, len(all))}
 	n := len(pts)
 	t.add([3]int{n, n + 1, n + 2})
 	return t
@@ -93,6 +95,7 @@ func (t *triangulation) add(v [3]int) int {
 	t.tris = append(t.tris, cdtTri{v: v})
 	for i := 0; i < 3; i++ {
 		t.edges[[2]int{v[i], v[(i+1)%3]}] = id
+		t.vt[v[i]] = id
 	}
 	return id
 }
@@ -215,8 +218,138 @@ func segsCross(a, b, c, d Vec2) bool {
 	return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
 }
 
-// enforce makes a–b an edge by flipping the edges that cross it (Sloan).
-func (t *triangulation) enforce(a, b int) {
+// enforce makes a–b an edge by flipping the edges that cross it (Sloan):
+// the crossing edges found by walking along a–b from a, flipped until none
+// crosses. A point lying on a–b splits it in two.
+func (t *triangulation) enforce(a, b int) { t.enforceDepth(a, b, 0) }
+
+func (t *triangulation) enforceDepth(a, b, depth int) {
+	if _, ok := t.edges[[2]int{a, b}]; ok {
+		return
+	}
+	if _, ok := t.edges[[2]int{b, a}]; ok {
+		return
+	}
+	cross, mid, ok := t.walk(a, b)
+	if !ok {
+		t.enforceScan(a, b)
+		return
+	}
+	if mid >= 0 {
+		if depth > 64 {
+			CDTStats.Unrecovered++
+			return
+		}
+		t.enforceDepth(a, mid, depth+1)
+		t.enforceDepth(mid, b, depth+1)
+		return
+	}
+	pa, pb := t.pts[a], t.pts[b]
+	queue := cross
+	for guard := 0; len(queue) > 0; guard++ {
+		if guard > 64*len(cross)+1000 {
+			t.enforceScan(a, b)
+			return
+		}
+		k := queue[0]
+		queue = queue[1:]
+		t1, ok1 := t.edges[k]
+		t2, ok2 := t.edges[[2]int{k[1], k[0]}]
+		if !ok1 || !ok2 || !segsCross(pa, pb, t.pts[k[0]], t.pts[k[1]]) {
+			continue
+		}
+		p := third(t.tris[t1].v, k[0], k[1])
+		q := third(t.tris[t2].v, k[1], k[0])
+		if !t.flip(k[0], k[1]) {
+			queue = append(queue, k) // not convex yet: later
+			continue
+		}
+		if segsCross(pa, pb, t.pts[p], t.pts[q]) {
+			queue = append(queue, [2]int{p, q})
+		}
+	}
+}
+
+// walk lists the edges crossing a–b, from a's triangles across to b; mid is
+// a point lying on a–b on the way (the list then stops there), -1 if none.
+// ok is false if the walk got lost.
+func (t *triangulation) walk(a, b int) (cross [][2]int, mid int, ok bool) {
+	pa, pb := t.pts[a], t.pts[b]
+	start := t.vt[a]
+	if start < 0 || start >= len(t.tris) || t.tris[start].dead || !holds(t.tris[start].v, a) {
+		return nil, -1, false
+	}
+	l2 := pa.Sub(pb).Dot(pa.Sub(pb))
+	on := func(x int) bool {
+		px := t.pts[x]
+		if math.Abs(orient(pa, pb, px)) > 1e-12*l2 {
+			return false
+		}
+		s := px.Sub(pa).Dot(pb.Sub(pa)) / l2
+		return s > 0 && s < 1
+	}
+	// round a to the triangle whose far edge a–b goes through
+	var x, y int
+	found := false
+	id := start
+	for n := 0; n < len(t.tris)+3; n++ {
+		v := t.tris[id].v
+		k := 0
+		for v[k] != a {
+			k++
+		}
+		x, y = v[(k+1)%3], v[(k+2)%3]
+		if x == b || y == b {
+			return nil, -1, true
+		}
+		if on(x) {
+			return nil, x, true
+		}
+		if segsCross(pa, pb, t.pts[x], t.pts[y]) {
+			found = true
+			break
+		}
+		nb, has := t.edges[[2]int{a, y}]
+		if !has || nb == start {
+			break
+		}
+		id = nb
+	}
+	if !found {
+		return nil, -1, false
+	}
+	// across x→y and on toward b
+	for n := 0; n < len(t.tris)+3; n++ {
+		cross = append(cross, [2]int{x, y})
+		nb, has := t.edges[[2]int{y, x}]
+		if !has {
+			return nil, -1, false
+		}
+		z := third(t.tris[nb].v, y, x)
+		if z == b {
+			return cross, -1, true
+		}
+		if on(z) {
+			return nil, z, true
+		}
+		// the triangle runs y → x → z: on across x→z or z→y
+		switch {
+		case segsCross(pa, pb, t.pts[x], t.pts[z]):
+			y = z
+		case segsCross(pa, pb, t.pts[z], t.pts[y]):
+			x = z
+		default:
+			return nil, -1, false
+		}
+	}
+	return nil, -1, false
+}
+
+func holds(v [3]int, a int) bool { return v[0] == a || v[1] == a || v[2] == a }
+
+// enforceScan is enforce scanning every edge for the crossing ones (when
+// the walk gets lost).
+func (t *triangulation) enforceScan(a, b int) {
 	if _, ok := t.edges[[2]int{a, b}]; ok {
 		return
 	}

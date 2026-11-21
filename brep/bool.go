@@ -409,8 +409,24 @@ func (c *bctx) ssi(x, y *bface) error {
 		if _, ok2 := x.s.(geom.Plane); !ok2 {
 			D, O = y, x
 		}
+	} else if _, ok := x.s.(geom.Plane); !ok {
+		// two curved faces, one much smaller: the grid on it, so its cells
+		// are fine enough for it (a letter's wall against a big drum)
+		ext := func(f *bface) float64 { return (f.hi.X - f.lo.X) * (f.hi.Y - f.lo.Y) }
+		if ext(y)*10 < ext(x) {
+			D, O = y, x
+		} else if ext(x)*10 < ext(y) {
+			D, O = x, y
+		}
 	}
 	h := math.Min(D.h, O.h)
+	// steps finer than the narrower face is wide (a letter's short segment
+	// makes a wall a hair wide): the curve's points must fall on it
+	for _, f := range []*bface{D, O} {
+		if w := math.Min(f.hi.X-f.lo.X, f.hi.Y-f.lo.Y) / 3; w < h {
+			h = math.Max(w, 1e-4*math.Max(1, c.scale)/100)
+		}
+	}
 	lo, hi := D.lo, D.hi
 	if _, ok := D.s.(geom.Plane); ok {
 		// only where the other face is
@@ -460,7 +476,7 @@ func (c *bctx) ssi(x, y *bface) error {
 		closed := len(l) > 2 && l[0].Dist(l[len(l)-1]) < 1e-12
 		pts := make([]geom.Vec3, 0, len(l))
 		for _, q := range l {
-			p, _ := geom.OntoBoth(D.s, O.s, D.at(q), c.tolOn)
+			p, _ := geom.OntoBoth(D.s, O.s, D.at(q), c.tolOn*0.01)
 			pts = append(pts, p)
 		}
 		if closed {
@@ -495,7 +511,10 @@ func (c *bctx) addCut(D, O *bface, pts []geom.Vec3, closed, both bool) {
 			if c.alongEdge(p2.pts, D.f, O.f) {
 				continue // an existing edge (imprinted instead)
 			}
-			if polyLen(p2.pts) < c.weldLoose*2 && !p2.closed {
+			// a scrap of contour is dropped, but not a short cut from one
+			// edge of a face to another (a letter's short segment)
+			if polyLen(p2.pts) < c.weldLoose*2 && !p2.closed &&
+				!(p2.start.e != nil && p2.end.e != nil && p2.start.e != p2.end.e && p2.start.p.Dist(p2.end.p) > c.weldExact*4) {
 				continue
 			}
 			c.addEvent(p2.start)
@@ -568,6 +587,11 @@ func (c *bctx) alongEdge(pts []geom.Vec3, fs ...*Face) bool {
 		probe = []geom.Vec3{pts[0].Lerp(pts[1], 0.5)}
 	}
 	probe = append(probe, pts[0].Lerp(pts[1], 0.5))
+	// a short cut also by its ends: one across a narrow face, from one edge
+	// to the next, has its middle near both
+	if polyLen(pts) < 4*c.weldLoose {
+		probe = append(probe, pts[0], pts[len(pts)-1])
+	}
 	for _, f := range fs {
 		for _, e := range faceEdges(f) {
 			ok := true
@@ -645,7 +669,7 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 		b := F.wrapNear(F.uvRaw(pts[i]), a)
 		uv[i] = b
 		xs := F.crossings(a, b)
-		for _, x := range xs {
+		for xi, x := range xs {
 			if onB && pts[i-1].Lerp(pts[i], x.s).Dist(pts[0]) < c.weldLoose {
 				continue
 			}
@@ -655,11 +679,17 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 			// at the segment's end, on the boundary: a touch if the curve
 			// stays on the same side either way
 			if xp := pts[i-1].Lerp(pts[i], x.s); i+1 < n && xp.Dist(pts[i]) < c.weldLoose {
-				side := func(p, q geom.Vec3, ref geom.Vec2) bool {
-					m := F.wrapNear(F.uvRaw(p.Lerp(q, 0.5)), ref)
+				side := func(p, q geom.Vec3, f float64, ref geom.Vec2) bool {
+					m := F.wrapNear(F.uvRaw(p.Lerp(q, f)), ref)
 					return F.inside(m)
 				}
-				if side(pts[i-1], pts[i], a) == side(pts[i], pts[i+1], b) {
+				// the side before judged after any other crossing on this
+				// segment (a narrow face can lie wholly within one)
+				fb := 0.5
+				if xi > 0 && pts[i-1].Lerp(pts[i], xs[xi-1].s).Dist(xp) > c.weldLoose {
+					fb = (xs[xi-1].s + x.s) / 2
+				}
+				if side(pts[i-1], pts[i], fb, a) == side(pts[i], pts[i+1], 0.5, b) {
 					p := pts[i]
 					touch = &p
 					continue

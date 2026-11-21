@@ -50,6 +50,7 @@ const (
 	KMesh      = "mesh"      // a reference mesh read from an STL file
 	KComponent = "component" // another design inserted and placed
 	KJoint     = "joint"     // moves a component onto another
+	KEmboss    = "emboss"    // profiles raised, engraved or inlaid on a face
 )
 
 // KeysPerFeature: a body's key is its feature's ID × KeysPerFeature + its
@@ -209,7 +210,7 @@ func (d *Document) uniqueName(base string) string {
 
 var kindLabel = map[string]string{KBox: "Box", KCylinder: "Cylinder", KCone: "Cone", KSphere: "Sphere",
 	KTorus: "Torus", KSketch: "Sketch", KExtrude: "Extrude", KRevolve: "Revolve", KMove: "Move",
-	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell",
+	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell", KEmboss: "Emboss",
 	KImport: "Import", KMesh: "Mesh", KComponent: "Component", KJoint: "Joint"}
 
 // KindLabel names a kind for the UI.

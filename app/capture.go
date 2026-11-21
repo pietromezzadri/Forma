@@ -180,7 +180,8 @@ func (c *captureRun) do(act string) {
 	case "nohover":
 		a.vp.virtual = nil
 		return
-	case "click":
+	case "addclick":
+		// add what is under the cursor to the selection (a Ctrl-click)
 		a.toggleSelect(a.hover, true)
 		return
 	case "camto":

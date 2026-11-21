@@ -297,3 +297,43 @@ What each milestone added, in the order they were built. The current gaps are in
 - Tests: `doc/text_test.go` (a name parameter carried through an extrude,
   counters as holes), `doc/project_test.go` (a box's edge and a cylinder's
   rim followed through edits).
+
+## M11: emboss and inlay
+
+- **Emboss feature** (`doc/emboss.go`, `ops/emboss.go`; ribbon Modify →
+  Emboss with a text, or its sketch picked in the browser, and one face):
+  the profiles are projected along the sketch's normal onto the face
+  (where the line through a point meets it on the normal's side; "Land on
+  the far side" for the other) and **raised** from it, **engraved** into
+  it, or **inlaid**: a pocket per letter grown by the clearance, the depth
+  deep, and the letters as bodies of their own sitting flush in it, the
+  clearance under them too (a name inlaid in a bowl and printed in another
+  colour). Depths are along the face's normal. With a text parameter, a
+  new name rebuilds pockets and letters.
+- **Extrude between surfaces** (`ops/extrude_to.go`): a region swept along
+  its normal from one surface to another, built face by face (the caps'
+  edges are the outline projected onto them), so a letter is made without
+  a boolean; the caps are the face's surface moved along its normal
+  (exact for planes and the conics, the offset of the stretch of a
+  revolved Bézier the letter covers).
+- **Outline offset** (`sketch/offset.go`): segments moved sideways
+  (Béziers to within 1 µm), corners rounded where the pieces part and
+  chorded where they overlap, the region by the non-zero winding rule;
+  a text's `Grow`.
+- **Kernel fixes found on the way:** the triangulator recovers its
+  constrained edges by walking along them (it scanned every edge per
+  flip: meshing a face with a letter cut in took 24 s, now 0.2 s, and it
+  left cracks); a recognised line or conic must lie on both surfaces,
+  not only fit the cut's points (a cone cut by a plane is a hyperbola,
+  nearly straight); a two-point cut is a straight edge only if its chord
+  lies on both surfaces; a hole is never put in the region its own loop
+  bounds the other way round; a region is classified at the triangle
+  centre deepest inside it; a short cut across a narrow face (a letter's
+  short segment) is kept; the intersection grid goes on the much smaller
+  of two curved faces, and its step is finer than the narrower face;
+  split pieces of an edge end where their welded vertices lie.
+- Tests: `sketch/offset_test.go` (squares, arcs, text grown and shrunk),
+  `ops/emboss_test.go` (a name cut into, raised on and inlaid in a
+  cylinder; inlaid in the dog bowl's slanted side; a letter at five
+  places round a cone), `doc/emboss_test.go` (the name parameter
+  followed, the far side, Cooper Black in all three modes).

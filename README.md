@@ -174,9 +174,10 @@ PNGs to `captures/out/`. The images above come from that script. See
 - **M10 text and projection** (done): text in sketches from system fonts,
   with the text itself a design parameter so everything built on it follows
   an edit; body edges projected into a sketch and kept linked.
-- **M11 emboss and inlay:** sketches wrapped onto curved faces, raised or
-  cut, and an inlay mode giving the pocket with a clearance and the inlay as
-  its own body (a name inlaid into a bowl, printed in two colours).
+- **M11 emboss and inlay** (done): texts projected onto curved faces,
+  raised, engraved or inlaid (the pocket with a clearance, the letters as
+  bodies of their own: a name inlaid into a bowl, printed in two colours).
+  Left: wrapping by arc length, letters over several faces.
 - **M12 ribbed forms:** a sketch offset tool, many fins patterned round a
   revolved body, and much faster booleans ([K3](docs/LIMITATIONS.md)).
 - **M13 assembly:** a bill of materials, exploded views, grounding, joint

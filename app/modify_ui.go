@@ -23,6 +23,7 @@ const (
 	icChamfer = 0xf0c8
 	icHole    = 0xf192
 	icShell   = 0xf466
+	icEmboss  = 0xf031
 	icMeasure = 0xf545
 	icSection = 0xf0c4
 )
@@ -185,7 +186,7 @@ func (a *App) toolFeature() *doc.Feature {
 		return nil
 	}
 	switch f.Kind {
-	case doc.KSketch, doc.KMove, doc.KMirror, doc.KPattern, doc.KFillet, doc.KChamfer, doc.KShell:
+	case doc.KSketch, doc.KMove, doc.KMirror, doc.KPattern, doc.KFillet, doc.KChamfer, doc.KShell, doc.KEmboss:
 		return nil
 	}
 	return f
@@ -267,6 +268,25 @@ func (a *App) registerModifyCommands(c *Commands) {
 				body = bs[0]
 			}
 			a.newFeature(doc.NewShell(body, faces), arg)
+		}})
+	c.add(&Command{ID: "feature.emboss", Label: "Emboss: raise, engrave or inlay a text on a face", Group: "Modify", Icon: icEmboss,
+		Enabled: func() bool {
+			body, faces := a.selectedFaces()
+			return notSketch() && len(a.embossProfiles()) > 0 && body != 0 && len(faces) == 1
+		},
+		Run: func(arg string) {
+			body, faces := a.selectedFaces()
+			profiles := a.embossProfiles()
+			if body == 0 || len(faces) != 1 || len(profiles) == 0 {
+				a.notify("Emboss: pick a text (or its sketch in the browser) and one face of a body")
+				return
+			}
+			for _, p := range profiles {
+				if s := a.doc.D.Feature(p.Sketch); s != nil {
+					s.Hidden = true
+				}
+			}
+			a.newFeature(doc.NewEmboss(profiles, body, faces[0]), arg)
 		}})
 	c.add(&Command{ID: "feature.set", Label: "Set an input of the selected feature", Group: "Design",
 		Enabled: func() bool { return a.selFeature() != nil },
@@ -484,6 +504,31 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 		if f.Inputs["Extent"] != "Through all" {
 			a.exprField(f, "Depth", " mm")
 			comboIn("Bottom", "Bottom", doc.HoleBottoms)
+		}
+	case doc.KEmboss:
+		targets()
+		if len(f.Faces) == 1 {
+			imgui.TextWrapped("On face " + shortFace(f.Faces[0].Face))
+		}
+		if _, faces := a.selectedFaces(); len(faces) == 1 && (len(f.Faces) != 1 || faces[0].Face != f.Faces[0].Face) {
+			if imgui.SmallButton("Use the selected face") {
+				f.Faces = faces
+				a.sel = a.sel[:0]
+				a.doc.Commit()
+			}
+		}
+		comboIn("Type", "Type", doc.EmbossTypes)
+		a.exprField(f, "Depth", " mm")
+		if f.Inputs["Type"] == "Raise" {
+			imgui.TextDisabled("How far the letters stand out")
+		}
+		if f.Inputs["Type"] == "Inlay" {
+			a.exprField(f, "Clearance", " mm")
+			imgui.TextDisabled("Round the letters' sides and under them")
+		}
+		flip := f.Inputs["Flip"] == "1"
+		if imgui.Checkbox("Land on the far side", &flip) {
+			set("Flip", map[bool]string{true: "1", false: "0"}[flip])
 		}
 	case doc.KShell:
 		targets()
@@ -870,4 +915,23 @@ func (a *App) registerInspectCommands(c *Commands) {
 				}
 			}
 		}})
+}
+
+// embossProfiles are the selected profiles, else every text of the sketch
+// picked in the browser.
+func (a *App) embossProfiles() []doc.ProfileRef {
+	if p := a.selectedProfiles(); len(p) > 0 {
+		return p
+	}
+	f := a.selFeature()
+	if f == nil || f.Kind != doc.KSketch || f.Sketch == nil {
+		return nil
+	}
+	var out []doc.ProfileRef
+	for _, e := range f.Sketch.Ents {
+		if e.Kind == sketch.Text {
+			out = append(out, doc.ProfileRef{Sketch: f.ID, Outer: []int{e.ID}, Text: e.ID})
+		}
+	}
+	return out
 }

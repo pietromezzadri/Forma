@@ -1,0 +1,24 @@
+{
+  "width": 1600, "height": 900, "out": "out/emboss",
+  "shots": [
+    {"name": "a_inlaid", "frames": 8, "do": [
+      "param.add:name=\"Luna\"",
+      "create.cylinder:X=0,Y=0,Radius=40,Height=30", "wait:6",
+      "sketch.xz", "wait:15",
+      "move:btn:tool.text@4", "click", "move:sk:-16,11@6", "wait:3", "click", "wait:6",
+      "text.set:=name", "text.font:COOPBL", "text.size:10", "wait:6",
+      "move:btn:sketch.finish@4", "click", "wait:8",
+      "view.front:now", "view.fit", "wait:10",
+      "move:item:Sketch 1@4", "click", "wait:4",
+      "move:w:0,-40,26@6", "wait:4", "log", "addclick", "wait:4", "log",
+      "move:btn:feature.emboss@4", "click", "wait:40", "log",
+      "view.iso:now", "view.fit", "edit.clear", "move:vp:0.98,0.98@2", "wait:10", "log"
+    ]},
+    {"name": "b_lilly", "frames": 8, "do": [
+      "param.set:name=\"Lilly\"", "wait:40", "view.fit", "wait:10", "log"
+    ]},
+    {"name": "c_letters", "frames": 8, "do": [
+      "view.front:now", "view.fit", "wait:10"
+    ]}
+  ]
+}

@@ -414,9 +414,31 @@ func (c *bctx) splitFace(F *bface) ([]*region, error) {
 		if cy.area >= -1e-14 {
 			continue
 		}
+		// the hole goes in the smallest region round it, never the region
+		// its own half-edges bound the other way (their areas can differ
+		// by more than rounding allows for: summed in another order)
+		twin := map[int]bool{}
+		for _, h := range cy.hs {
+			twin[h^1] = true
+		}
+		isTwin := func(c cycle) bool {
+			if len(c.hs) != len(cy.hs) {
+				return false
+			}
+			for _, h := range c.hs {
+				if !twin[h] {
+					return false
+				}
+			}
+			return true
+		}
 		best, ba := -1, math.Inf(1)
 		for ri := range regs {
-			a := cycles[holesOf[ri][0]].area
+			outer := cycles[holesOf[ri][0]]
+			a := outer.area
+			if isTwin(outer) {
+				continue
+			}
 			if a > -cy.area*(1+1e-9)+1e-12 && a < ba && pointInPoly2(cy.poly[0].Lerp(cy.poly[len(cy.poly)/2], 1e-3), polys[ri]) {
 				best, ba = ri, a
 			}
@@ -441,12 +463,26 @@ func (c *bctx) splitFace(F *bface) ([]*region, error) {
 		}
 		pts, segs = dedupePts(pts, segs)
 		tris := geom.Triangulate(pts, segs)
-		bestA, best := 0.0, geom.Vec2{}
+		// the point is the triangle centre deepest inside the region (the
+		// biggest triangle's can lie a hair from its edge in a thin curved
+		// region, and a probe stepping off a slanted face there leaves it)
+		bestA, best, deep := 0.0, geom.Vec2{}, -1.0
 		for _, t := range tris {
 			a := math.Abs(pts[t[1]].Sub(pts[t[0]]).Cross(pts[t[2]].Sub(pts[t[0]])))
-			if a > bestA {
-				bestA = a
-				best = pts[t[0]].Add(pts[t[1]]).Add(pts[t[2]]).Scale(1.0 / 3)
+			if a <= 1e-18 {
+				continue
+			}
+			bestA = math.Max(bestA, a)
+			cen := pts[t[0]].Add(pts[t[1]]).Add(pts[t[2]]).Scale(1.0 / 3)
+			d := math.Inf(1)
+			for _, s := range segs {
+				d = math.Min(d, segDist2(cen, pts[s[0]], pts[s[1]]))
+				if d <= deep {
+					break
+				}
+			}
+			if d > deep {
+				deep, best = d, cen
 			}
 		}
 		if bestA == 0 {
@@ -691,13 +727,42 @@ func (c *bctx) sew(rs []*region, op BoolOp, name string) (*Body, error) {
 		va, vb := vert(pc.va), vert(pc.vb)
 		var e *Edge
 		if pc.key.kind == 0 {
-			e = b.Edge(va, vb, pc.edge.Curve, pc.ta, pc.tb)
+			// the ends where the welded vertices lie (two splits a hair apart
+			// weld to one vertex at one of them)
+			cv := pc.edge.Curve
+			ta, tb := paramAt(cv, pc.ta, va.P), paramAt(cv, pc.tb, vb.P)
+			if da, db := cv.Eval(ta).Dist(va.P), cv.Eval(tb).Dist(vb.P); da <= 1e-7 && db <= 1e-7 {
+				e = b.Edge(va, vb, cv, ta, tb)
+			} else {
+				// a vertex welded off the curve (a point of another edge a
+				// hair away): the piece as a polyline through its samples,
+				// toleranced by how far its ends moved
+				pts := append([]geom.Vec3(nil), pc.pts...)
+				if len(pts) < 2 {
+					pts = []geom.Vec3{va.P, vb.P}
+				}
+				pts[0], pts[len(pts)-1] = va.P, vb.P
+				pl := geom.NewPolyline(pts, math.Max(c.ctol, 2*math.Max(da, db)))
+				e = b.Edge(va, vb, pl, 0, pl.Length())
+			}
 		} else if ex, ok := c.exactEdge(b, va, vb, pc); ok {
 			e = ex
 		} else {
 			pts := append([]geom.Vec3(nil), pc.pts...)
 			pts[0], pts[len(pts)-1] = va.P, vb.P
-			if len(pts) == 2 {
+			// two points are a straight edge only if the chord lies on both
+			// surfaces (a short piece of a curve is not, though it sags less
+			// than the cut's points are spaced for)
+			straight := len(pts) == 2
+			if straight && pc.cut != nil {
+				for _, f := range []float64{0.25, 0.5, 0.75} {
+					m := pts[0].Lerp(pts[1], f)
+					if geom.SurfaceDist(pc.cut.faces[0].s, m) > 4e-7 || geom.SurfaceDist(pc.cut.faces[1].s, m) > 4e-7 {
+						straight = false
+					}
+				}
+			}
+			if straight {
 				e = b.LineEdge(va, vb)
 			} else {
 				tol := c.ctol
@@ -760,4 +825,32 @@ func reverseUses(l []Use) []Use {
 		out[len(l)-1-i] = Use{E: u.E, Fwd: !u.Fwd}
 	}
 	return out
+}
+
+// paramAt is the parameter near t of curve c's point nearest p, when that
+// is nearer p than t's point (a vertex welded a hair along the curve).
+func paramAt(c geom.Curve, t float64, p geom.Vec3) float64 {
+	d := c.Eval(t).Dist(p)
+	if d < 1e-10 {
+		return t
+	}
+	u := c.Project(p)
+	if per := geom.CurvePeriod(c); per > 0 {
+		u = t + math.Remainder(u-t, per)
+	}
+	if math.Abs(u-t) < 1e-3*(1+math.Abs(t)) && c.Eval(u).Dist(p) < d {
+		return u
+	}
+	return t
+}
+
+// segDist2 is the distance from p to segment a–b.
+func segDist2(p, a, b geom.Vec2) float64 {
+	d := b.Sub(a)
+	l := d.Dot(d)
+	if l < 1e-300 {
+		return p.Dist(a)
+	}
+	t := math.Max(0, math.Min(1, p.Sub(a).Dot(d)/l))
+	return p.Dist(a.Add(d.Scale(t)))
 }

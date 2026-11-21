@@ -23,6 +23,17 @@ func (c *bctx) exactCurve(k *bcut) geom.Curve {
 		pts = pts[:len(pts)-1]
 	}
 	if cv, ok := geom.ExactCurve(k.faces[0].s, k.faces[1].s, pts, k.closed, c.exactTol()); ok {
+		// the points fit it, but it must lie on both surfaces too (a cone cut
+		// by a plane is a hyperbola, nearly straight over a short piece)
+		on := func(p geom.Vec3) bool {
+			q := cv.Eval(cv.Project(p))
+			return geom.SurfaceDist(k.faces[0].s, q) <= 4e-7 && geom.SurfaceDist(k.faces[1].s, q) <= 4e-7
+		}
+		for i, p := range pts {
+			if !on(p) || i > 0 && !on(pts[i-1].Lerp(p, 0.5)) {
+				return nil
+			}
+		}
 		k.exact = cv
 	}
 	return k.exact

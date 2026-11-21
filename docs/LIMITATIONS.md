@@ -79,6 +79,31 @@ new ones as features land.
 - **S4 Spline faces aren't offset:** a body with revolved or extruded spline
   faces can't be shelled (an offset spline isn't a spline; it needs fitting).
 
+## Emboss and inlay (`ops/emboss.go`, `doc/emboss.go`)
+
+- **EM1 Projected, not wrapped:** letters are projected along the sketch's
+  normal, so on a curved face they spread a little toward its sides (a
+  name 30 mm wide on a 40 mm radius is 3–4 % wider at its ends) and their
+  walls lean against the face's normal there. No wrapping by arc length yet.
+- **EM2 One face:** the letters must land on the one face picked; a name
+  running over the edge between two faces (a bowl's side and its foot)
+  fails ("the letters run off the face").
+- **EM3 Faces it works on:** planes, cylinders, cones, spheres, tori and
+  revolved one-span Bézier profiles (not extruded spline faces, nor
+  revolved profiles of several spans).
+- **EM4 Clearance needs text:** an inlay's clearance grows the outline of a
+  text; other profiles can only be inlaid with no clearance (no general
+  sketch offset yet, M12).
+- **EM5 Speed:** each letter is a boolean on the body (1–3 s apiece for a
+  heavy font on a cylinder, more as the face fills with pockets): a name
+  of five letters takes 5–15 s to rebuild (K3).
+- **EM6 Boolean robustness:** the cuts between the letters' walls and a
+  curved face are traced on a grid, and a cut landing just so on its points
+  can still fail; the letter is then tried again reaching a little further
+  past the surface (up to four times). Very tight letter curves (a heavy
+  font's small counter grown by more than its own radius) are offset
+  roughly where the offset folds over.
+
 ## Holes, patterns, mirror, move
 
 - **H1 Holes:** no threads (cosmetic or modelled), the countersink is always

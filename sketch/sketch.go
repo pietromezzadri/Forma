@@ -45,6 +45,9 @@ type Entity struct {
 	Size  float64 `json:",omitempty"`
 	Rot   float64 `json:",omitempty"`
 	Align int     `json:",omitempty"`
+	// Grow moves a text's outline out from its ink by that much (in when
+	// negative): the letters made bolder, or a clearance round them
+	Grow float64 `json:",omitempty"`
 	// Shown is what a parameter text resolved to (set by the design)
 	Shown string `json:"-"`
 	// Proj, when set, is the reference of the body edge this entity was

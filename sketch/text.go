@@ -267,7 +267,7 @@ func (s *Sketch) TextContours(e *Entity) [][]Seg {
 			closeLoop()
 		}
 	}
-	return out
+	return OffsetContours(out, e.Grow)
 }
 
 // SegPoints2 samples a loop of segments as one polyline (the closing point

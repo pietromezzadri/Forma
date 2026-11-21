@@ -219,6 +219,7 @@ func (a *App) partRibbon(r *ribbon) {
 	r.cmd("feature.fillet", 0xf1ce, "Fillet", false)
 	r.cmd("feature.chamfer", 0xf5cb, "Chamfer", false)
 	r.cmd("feature.shell", 0xf49e, "Shell", false)
+	r.cmd("feature.emboss", icEmboss, "Emboss", false)
 	r.cmd("feature.move", icMove, "Move", false)
 	r.end("Modify")
 
