@@ -1,0 +1,22 @@
+{
+  "width": 1400, "height": 860, "out": "out/gizmo2",
+  "shots": [
+    {"name": "a_click", "frames": 6, "do": [
+      "create.box:X=0,Y=0,Z=0,Width=40,Depth=30,Height=20", "wait:4",
+      "create.cylinder:X=45,Y=15,Z=0,Radius=10,Height=30,Operation=Join", "wait:4",
+      "create.sphere:X=-40,Y=15,Z=10,Radius=10", "wait:4",
+      "view.iso:now", "view.fit", "edit.clear", "wait:6",
+      "move:w:20,15,20@6", "wait:4", "click", "wait:4", "inputs", "log"
+    ]},
+    {"name": "b_move", "frames": 6, "do": [
+      "move:btn:mode.move@4", "click", "wait:6", "inputs",
+      "move:gz:z,0.8@8", "wait:4", "drag:gz:z,1.6@16", "wait:6", "inputs"
+    ]},
+    {"name": "c_whole", "frames": 6, "do": [
+      "edit.clear", "wait:3", "move:w:20,15,40@6", "wait:4", "dclick", "wait:6", "log"
+    ]},
+    {"name": "d_exploded", "frames": 6, "do": [
+      "edit.clear", "assemble.explode:0.4", "wait:4", "view.fit", "wait:40", "move:vp:0.98,0.98@2", "wait:6"
+    ]}
+  ]
+}

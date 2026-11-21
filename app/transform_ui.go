@@ -150,8 +150,9 @@ func (a *App) pickMode(f *doc.Feature, m gizmoMode) {
 		a.notify("Nothing to resize: the moved body's own feature is gone")
 		return
 	case f.Kind == doc.KMove || f.Kind == doc.KComponent:
-	case isPrimitive(f) && m != modeRotate:
-		// a primitive moves and scales by its own inputs
+	case a.primMovable(f) && m != modeRotate:
+		// a primitive moves and scales by its own inputs (not one whose body
+		// has since been joined to or changed: that body moves as a whole)
 	case m != modeResize:
 		// a move feature after it, on its bodies
 		var keys []int
@@ -186,7 +187,7 @@ func (a *App) moveGizmo(dl *imgui.DrawList) {
 		a.scale.on = false
 		return
 	}
-	prim := isPrimitive(f)
+	prim := a.primMovable(f)
 	if !prim && f.Kind != doc.KMove && f.Kind != doc.KComponent {
 		vp.gizmoDrag = false
 		return
@@ -240,8 +241,11 @@ func (a *App) moveGizmo(dl *imgui.DrawList) {
 		float32(at.X), float32(at.Y), float32(at.Z), 1,
 	}
 	before := m
-	view, proj := vp.view.View, vp.view.Proj
+	view, proj := vp.view.View, a.cam.GizmoProj(a.aspect())
 	imguizmo.SetOrthographic(a.cam.Ortho)
+	// the arrows point along +X, +Y, +Z whichever way the view looks (ImGuizmo
+	// turns them toward the camera otherwise, so they swap ends as it orbits)
+	imguizmo.AllowAxisFlip(false)
 	imguizmo.SetGizmoSizeClipSpace(0.17)
 	imguizmo.SetDrawlistV(dl)
 	imguizmo.SetRect(vp.pos.X, vp.pos.Y, vp.size.X, vp.size.Y)
@@ -341,4 +345,21 @@ func (a *App) moveGizmo(dl *imgui.DrawList) {
 		a.scale.on = false
 		a.doc.Commit()
 	}
+}
+
+// primMovable: a primitive that the gizmo moves and scales by its own
+// inputs — its body is as it made it, or has gone into another (moving it
+// then moves it within that one). A primitive whose body later features
+// joined others into or changed is moved as a whole body by a move
+// feature instead: moving its inputs pulled the joined shape apart.
+func (a *App) primMovable(f *doc.Feature) bool {
+	if !isPrimitive(f) {
+		return false
+	}
+	for k, own := range f.Bodies {
+		if b := a.doc.Body(bodyKey(f.ID, k)); b != nil && b.Body != own {
+			return false
+		}
+	}
+	return true
 }

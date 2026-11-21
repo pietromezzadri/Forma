@@ -1,0 +1,17 @@
+{
+  "width": 1400, "height": 860, "out": "out/gizmo",
+  "shots": [
+    {"name": "a_parts", "frames": 6, "do": [
+      "create.box:X=0,Y=0,Z=0,Width=40,Depth=30,Height=20", "wait:4",
+      "create.cylinder:X=50,Y=15,Z=0,Radius=10,Height=30", "wait:4",
+      "view.iso:now", "view.fit", "wait:6",
+      "move:step:Cylinder 1@4", "click", "wait:4", "move:btn:mode.move@4", "click", "wait:4", "inputs"
+    ]},
+    {"name": "b_45", "frames": 6, "do": ["cam:45,-25", "wait:4", "move:gz:x,0.8@8", "wait:4", "drag:gz:x,1.6@16", "wait:6", "inputs"]},
+    {"name": "c_135", "frames": 6, "do": ["cam:135,-25", "wait:4", "move:gz:x,0.8@8", "wait:4", "drag:gz:x,1.6@16", "wait:6", "inputs"]},
+    {"name": "d_225", "frames": 6, "do": ["cam:225,-25", "wait:4", "move:gz:y,0.8@8", "wait:4", "drag:gz:y,1.6@16", "wait:6", "inputs"]},
+    {"name": "e_315", "frames": 6, "do": ["cam:315,-25", "wait:4", "move:gz:y,0.8@8", "wait:4", "drag:gz:y,1.6@16", "wait:6", "inputs"]},
+    {"name": "f_below", "frames": 6, "do": ["cam:60,25", "wait:4", "move:gz:x,0.8@8", "wait:4", "drag:gz:x,1.6@16", "wait:6", "inputs"]},
+    {"name": "g_z", "frames": 6, "do": ["cam:60,-25", "wait:4", "move:gz:z,0.8@8", "wait:4", "drag:gz:z,1.6@16", "wait:6", "inputs"]}
+  ]
+}

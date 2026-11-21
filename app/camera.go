@@ -261,3 +261,18 @@ func (c *Camera) LookAlong(dir, up, target geom.Vec3) {
 }
 
 func v32(p geom.Vec3) mgl32.Vec3 { return mgl32.Vec3{float32(p.X), float32(p.Y), float32(p.Z)} }
+
+// GizmoProj is the projection the gizmo works with: the view's, but with a
+// depth range about the target rather than round the whole scene. ImGuizmo
+// turns the mouse into a ray through the inverse of view × projection in
+// float32, and a near plane a hundred-thousandth of the far one (the
+// scene's sphere round the camera) made that ray wrong by an amount that
+// changed with the view: drags moved the wrong way, or along two axes.
+func (c *Camera) GizmoProj(aspect float64) mgl32.Mat4 {
+	if c.Ortho {
+		h := c.OrthoHalfHeight()
+		w := h * aspect
+		return mgl32.Ortho(float32(-w), float32(w), float32(-h), float32(h), float32(-c.Dist*20), float32(c.Dist*20))
+	}
+	return mgl32.Perspective(float32(c.FovY), float32(aspect), float32(c.Dist*0.02), float32(c.Dist*50))
+}

@@ -3,10 +3,10 @@ package doc
 // Exploded views: every component pushed away from what it is joined to,
 // along the joint's axis, so a stack of parts comes apart the way it goes
 // together; a component joined to nothing moves out from the assembly's
-// middle, and a grounded one stays. A joint's moving component also takes
-// the push of the one it is joined to (a pin in a wheel on an axle moves
-// out with the wheel, and further). Nothing in the design changes: these
-// are offsets for drawing.
+// middle (and so does a body of the design's own), and a grounded one
+// stays. A joint's moving component also takes the push of the one it is
+// joined to (a pin in a wheel on an axle moves out with the wheel, and
+// further). Nothing in the design changes: these are offsets for drawing.
 
 import (
 	"math"
@@ -14,8 +14,10 @@ import (
 	"forma/geom"
 )
 
-// Explode is how far each component moves at amount (0: assembled; 1: by
-// the assembly's size per step away from its ground), by component ID.
+// Explode is how far each part moves at amount (0: assembled; 1: by the
+// assembly's size per step away from its ground), by ExplodeGroup: a
+// component (all its bodies together) or a body of the design's own,
+// which moves out from the middle like a loose component.
 func (d *Document) Explode(amount float64) map[int]geom.Vec3 {
 	out := map[int]geom.Vec3{}
 	if amount == 0 {
@@ -25,14 +27,12 @@ func (d *Document) Explode(amount float64) map[int]geom.Vec3 {
 	var all geom.Box
 	var order []int
 	for _, r := range d.Bodies {
-		if r.Comp == 0 {
-			continue
-		}
-		b := boxes[r.Comp]
+		g := ExplodeGroup(r.Comp, r.Key)
+		b := boxes[g]
 		if b == nil {
 			b = &geom.Box{}
-			boxes[r.Comp] = b
-			order = append(order, r.Comp)
+			boxes[g] = b
+			order = append(order, g)
 		}
 		b.Union(r.Body.Bounds())
 		all.Union(r.Body.Bounds())
@@ -95,4 +95,13 @@ func (d *Document) Explode(amount float64) map[int]geom.Vec3 {
 		place(c, 0)
 	}
 	return out
+}
+
+// ExplodeGroup is what moves together in an exploded view: a component, or
+// a body of the design's own (by its key, negated).
+func ExplodeGroup(comp, key int) int {
+	if comp != 0 {
+		return comp
+	}
+	return -key
 }

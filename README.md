@@ -125,6 +125,8 @@ dialogs on macOS and Linux go through zenity and haven't been tried.
 | Right drag (or Shift + middle drag) | Orbit about the point under the cursor |
 | Middle drag | Pan |
 | Wheel | Zoom toward the cursor |
+| Click a body | Select that face and the body (its Move · Turn · Scale gizmo comes up) |
+| Double-click a body | Select the whole body |
 | F | Fit the view |
 | Numpad | Standard views |
 | Ctrl+K | Command palette |

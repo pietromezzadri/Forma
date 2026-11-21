@@ -162,3 +162,19 @@ func TestExplode(t *testing.T) {
 		t.Fatalf("the loose pin (at x −60) moved %v, not outward", l)
 	}
 }
+
+// Bodies of the design's own (no components) come apart too.
+func TestExplodeBodies(t *testing.T) {
+	d := New()
+	a := d.Insert(NewPrim(KBox))
+	a.Inputs["Width"], a.Inputs["Depth"], a.Inputs["Height"] = "20", "20", "20"
+	c := d.Insert(NewPrim(KCylinder))
+	c.Inputs["X"], c.Inputs["Radius"], c.Inputs["Height"] = "40", "5", "20"
+	d.Regenerate()
+	mustOK(t, a, c)
+	off := d.Explode(0.5)
+	oa, oc := off[ExplodeGroup(0, BodyKey(a.ID, 0))], off[ExplodeGroup(0, BodyKey(c.ID, 0))]
+	if oa.X >= 0 || oc.X <= 0 {
+		t.Fatalf("box moved %v, cylinder %v: they should part along X", oa, oc)
+	}
+}

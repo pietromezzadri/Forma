@@ -177,6 +177,14 @@ func (c *captureRun) do(act string) {
 		}
 		log.Printf("capture: hover %s, %d selected", a.describe(a.hover), len(a.sel))
 		return
+	case "inputs":
+		// the selected feature's inputs
+		if f := a.selFeature(); f != nil {
+			log.Printf("capture: %s (%s) %v", f.Name, f.Kind, f.Inputs)
+		} else {
+			log.Printf("capture: nothing selected")
+		}
+		return
 	case "nohover":
 		a.vp.virtual = nil
 		return

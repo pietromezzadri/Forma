@@ -7,6 +7,7 @@ import (
 	"github.com/AllenDang/cimgui-go/imguizmo"
 	"github.com/go-gl/mathgl/mgl32"
 
+	"forma/doc"
 	"forma/geom"
 	"forma/render"
 	"forma/sketch"
@@ -48,6 +49,7 @@ type viewport struct {
 	pivot     geom.Vec3
 	leftDown  imgui.Vec2
 	leftHeld  bool
+	wholeBody bool // a double click picked a whole body: its release keeps that
 
 	cubeHot   bool
 	gizmoHot  bool // the cursor is on the move gizmo
@@ -305,13 +307,45 @@ func (a *App) leftRelease(moved bool) {
 	if moved {
 		return
 	}
+	if a.vp.wholeBody {
+		a.vp.wholeBody = false
+		return
+	}
 	io := imgui.CurrentIO()
-	a.toggleSelect(a.hover, io.KeyCtrl() || io.KeyShift())
+	add := io.KeyCtrl() || io.KeyShift()
+	a.toggleSelect(a.hover, add)
+	if a.sk == nil && !add {
+		// a click on a body picks the body too, so its gizmo comes up; a click
+		// on nothing lets it go
+		switch a.hover.Kind {
+		case KindFace, KindEdge, KindVertex:
+			if a.doc.Body(a.hover.Item) != nil {
+				a.browserSel = a.hover.Item
+			}
+		case KindNone:
+			if a.doc.Body(a.browserSel) != nil {
+				a.browserSel = 0
+			}
+		}
+	}
 }
 
 func (a *App) doubleClick() {
 	if a.sk != nil {
 		a.sk.doubleClick(a)
+		return
+	}
+	// a double click on a body selects the whole of it: every face
+	switch a.hover.Kind {
+	case KindFace, KindEdge, KindVertex:
+		if b := a.doc.Body(a.hover.Item); b != nil {
+			a.sel = a.sel[:0]
+			for _, f := range b.Body.Faces() {
+				a.sel = append(a.sel, Ref{Kind: KindFace, Item: b.ID, Local: f.ID})
+			}
+			a.browserSel = b.ID
+			a.vp.wholeBody = true
+		}
 	}
 }
 
@@ -335,7 +369,7 @@ func (a *App) renderScene() {
 			continue
 		}
 		g := b.upload()
-		off := a.explodeOffset(b.Comp)
+		off := a.explodeOffset(doc.ExplodeGroup(b.Comp, b.ID))
 		if g == nil {
 			continue
 		}
@@ -406,7 +440,7 @@ func (a *App) renderScene() {
 				continue
 			}
 			slot := vp.slots.slot(b.ID)
-			off := a.explodeOffset(b.Comp)
+			off := a.explodeOffset(doc.ExplodeGroup(b.Comp, b.ID))
 			r.DrawFaces(v, b.gpu.faces, render.Paint{Offset: off, IDBase: idBase(KindFace, slot)}, true)
 			r.DrawLines(v, b.gpu.edges, render.Paint{Offset: off, IDBase: idBase(KindEdge, slot), Width: 7 * px, DepthBias: 1e-5}, true)
 			r.DrawPoints(v, b.gpu.verts, render.Paint{Offset: off, IDBase: idBase(KindVertex, slot), Width: 12 * px, DepthBias: 2e-5}, true)

@@ -256,10 +256,10 @@ func (a *App) explodeWindow() {
 	}
 }
 
-// explodeOffset is where a body is drawn from where it is: its
-// component's exploded offset.
+// explodeOffset is where a body is drawn from where it is: its part's
+// exploded offset (group: doc.ExplodeGroup).
 func (a *App) explodeOffset(comp int) mgl32.Vec3 {
-	if a.m13.explode == 0 || comp == 0 {
+	if a.m13.explode == 0 {
 		return mgl32.Vec3{}
 	}
 	if a.m13.offsets == nil || a.m13.offsetsGen != a.doc.D.Gen() || a.m13.offsetsDoc != a.doc.D || a.m13.offsetsAt != a.m13.explode {
@@ -289,13 +289,14 @@ func (a *App) fitBounds() geom.Box {
 		return b
 	}
 	for _, it := range a.doc.Bodies {
-		if it.Comp == 0 || !it.Visible {
+		if !it.Visible {
 			continue
 		}
-		o := a.explodeOffset(it.Comp)
+		o := a.explodeOffset(doc.ExplodeGroup(it.Comp, it.ID))
 		bb := it.Body.Bounds()
 		d := geom.V3(float64(o[0]), float64(o[1]), float64(o[2]))
-		b.Union(geom.Box{Min: bb.Min.Add(d), Max: bb.Max.Add(d)})
+		b.Add(bb.Min.Add(d))
+		b.Add(bb.Max.Add(d))
 	}
 	return b
 }
