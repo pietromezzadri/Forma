@@ -1,5 +1,9 @@
 # Electronics in Forma: what is possible (research note, Nov 2026)
 
+*Built in M15 (route 2, with the parts library of route 1): see
+[MILESTONES.md](MILESTONES.md) and the Electronics section of
+[LIMITATIONS.md](LIMITATIONS.md). The note below is as it was written.*
+
 The question: can Forma help build something like an RC car or a project
 with an Arduino in it — not only the plastic parts, but the electronics
 and how the whole thing behaves?

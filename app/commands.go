@@ -281,6 +281,7 @@ func (a *App) registerCommands() *Commands {
 	a.registerOffsetCommands(c)
 	a.registerM13Commands(c)
 	a.registerSimCommands(c)
+	a.registerElecCommands(c)
 	return c
 }
 

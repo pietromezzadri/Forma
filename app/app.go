@@ -52,6 +52,7 @@ type App struct {
 	asm        assemblyState
 	m13        m13State
 	sim        simState
+	elec       elecState
 	postQueue
 	showParams bool
 
@@ -215,6 +216,7 @@ func (a *App) frame() {
 // buildUI lays out every window of the frame.
 func (a *App) buildUI() {
 	a.animateJoint()
+	a.elecTick()
 	a.mainMenu()
 	a.toolbar()
 	a.statusBar()
@@ -232,6 +234,7 @@ func (a *App) buildUI() {
 	a.bomWindow()
 	a.explodeWindow()
 	a.simWindow()
+	a.elecWindow()
 	a.files.draw()
 	a.paramsWindow()
 	a.helpWindow()

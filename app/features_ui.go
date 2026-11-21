@@ -47,6 +47,8 @@ func kindIcon(k string) rune {
 		return icMesh
 	case doc.KComponent:
 		return icComponent
+	case doc.KCircuit:
+		return icCircuit
 	case doc.KJoint:
 		return icJoint
 	}
@@ -337,6 +339,9 @@ func (a *App) featureProperties(f *doc.Feature) {
 		a.exprField(f, "Angle", "°")
 		a.opCombo(f)
 	default:
+		if a.circuitProperties(f) {
+			return
+		}
 		if a.assemblyProperties(f) {
 			return
 		}

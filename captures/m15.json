@@ -1,0 +1,29 @@
+{
+  "width": 1600, "height": 900, "out": "out/m15",
+  "shots": [
+    {"name": "a_assembly", "frames": 8, "do": [
+      "file.open:captures/data/arm_and_wheel.forma", "view.iso:now", "view.fit", "wait:10", "log"
+    ]},
+    {"name": "b_circuit", "frames": 8, "do": [
+      "electronics.add", "electronics.firmware:avr/testdata/sweep_drive.hex",
+      "electronics.part:sg90=arm servo", "electronics.drive:arm servo=Arm",
+      "electronics.part:battery-4aa=battery", "electronics.part:tt-motor=motor",
+      "electronics.part:tb6612=driver",
+      "electronics.wire:driver.in1=D7", "electronics.wire:driver.in2=D8", "electronics.wire:driver.enable=D6",
+      "electronics.drive:motor=Turntable",
+      "electronics.part:pot=speed", "electronics.part:button=reverse", "electronics.wire:reverse.pin=D2",
+      "electronics.part:led=led", "electronics.wire:led.pin=D13",
+      "wait:8", "log"
+    ]},
+    {"name": "c_running", "frames": 8, "do": [
+      "electronics.run", "wait:40", "log"
+    ]},
+    {"name": "d_faster", "frames": 8, "do": [
+      "electronics.set:speed.Value=1", "wait:30", "electronics.pause", "wait:4", "log"
+    ]},
+    {"name": "e_models", "frames": 8, "do": [
+      "electronics.reset", "electronics.open", "file.new", "edit.clear", "electronics.model:uno", "electronics.model:sg90", "electronics.model:tt-motor",
+      "electronics.model:battery-4aa", "electronics.model:tb6612", "view.iso:now", "view.fit", "wait:10", "log"
+    ]}
+  ]
+}

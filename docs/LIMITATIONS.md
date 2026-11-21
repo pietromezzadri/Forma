@@ -42,6 +42,13 @@ new ones as features land.
   move the loosest geometry when a dimension changes, so this no longer
   happens by itself, but a centre placed off the axis by hand still
   hits it.
+- **K4c Faces that only touch.** Found building the part models: joining a
+  box to a cylinder when the box's top lies in the cylinder's cap and its
+  edge crosses the cap (a horn's arm on its hub, both 3 mm tall: an edge
+  "leaves face's surface by 1e-6 mm"), a box whose face runs through a
+  cylinder's axis (the face "lost all of itself"), and two boxes meeting
+  face to face with their tops level ("edge used twice the same way") all
+  fail. Overlapping them by a fraction of a millimetre works.
 - **K5 Non-manifold results are refused.** Bodies meeting only along an edge
   or at a point make no solid; the boolean reports an error.
 - **K6 Equal crossing cylinders are a special case.** Two cylinders of one
@@ -244,6 +251,38 @@ new ones as features land.
   components, reaction forces or probes); the plot shows the outside of
   the part (no section through the result), and a study isn't saved
   with the design.
+
+## Electronics (`avr/`, `elec/`, `doc/circuit.go`; M15)
+
+- ~~EL1 Not in the design yet~~ (now a circuit feature in the `.forma`
+  file, a motion study and the Electronics window in the app).
+- **EL2 The chip:** an ATmega328P only (Uno, Nano). Not emulated: SPI,
+  I2C (TWI), the EEPROM, the watchdog, pin-change interrupts, timer input
+  capture, the analogue comparator, external clock sources, sleep modes
+  other than idle. Timer flags and PWM edges come up to 2 µs late (the
+  peripherals run in batches), and a 16-bit timer's compare registers take
+  a new value at once rather than at TOP.
+- ~~EL3 Not yet run on compiled sketches~~ (now five, compiled by
+  arduino-cli with the arduino:avr 1.8.8 core: the core's start-up,
+  `millis()`, `micros()`, `delay()`, `Serial`, the Servo library,
+  `analogWrite()` on all three timers, `analogRead()`, `INPUT_PULLUP`).
+  Still: libraries that talk SPI or I2C (displays, IMUs, drivers on a bus)
+  won't run (EL2).
+- **EL4 Parts are averages:** a motor sees its PWM's mean over a step (no
+  inductance, current limit or driver heating), a servo has no load or
+  overshoot, a battery is a voltage behind a resistance with no discharge.
+- **EL5 Speed:** about 3.7× real time for a busy sketch.
+- **EL6 The study is kinematic:** a shaft sets its joint, but the
+  mechanism puts nothing back on it — a motor's load and inertia are its
+  figures, not what it drives; a joint held at a limit doesn't stall the
+  motor or the servo; no gravity, contact or a car rolling on the floor.
+- **EL7 A study isn't kept:** no timeline of a run to scrub back through,
+  no plot of a part over time, no export of the motion; a study ends when
+  the circuit is edited, and the design's undo history sees the joints
+  only once something else is committed while one runs.
+- **EL8 Wiring is by name:** pins are picked per part, not drawn; no
+  wires, no breadboard view, no reading a Wokwi `diagram.json` or a KiCad
+  netlist; one board per circuit and an Uno only.
 
 ## Exchange (`io/`)
 

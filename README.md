@@ -35,12 +35,13 @@ drilled like any other body.</td>
 </tr>
 <tr>
 <td><img src="docs/images/assembly.png" alt="A pin jointed into a plate, with the clash shown in red"></td>
-<td></td>
+<td><img src="docs/images/electronics.png" alt="An Arduino sketch driving a servo arm and a turntable in a motion study"></td>
 </tr>
 <tr>
 <td><b>Assemblies.</b> Components from other files, joints between them, and
 interference checks.</td>
-<td></td>
+<td><b>Electronics.</b> An Arduino sketch runs on an emulated Uno, and its
+servo and motor move the assembly's joints.</td>
 </tr>
 </table>
 
@@ -85,6 +86,14 @@ interference checks.</td>
   the von Mises stress or displacement painted on the deformed part with
   the maximum stress and the safety factor (checked against beam theory
   and a plate with a hole).
+- **Electronics.** An Arduino Uno emulated in Go (the ATmega328P with its
+  timers, serial port and ADC) runs a real compiled sketch (a `.hex`, or an
+  `.ino` built with arduino-cli). Servos, gear motors, motor drivers,
+  batteries, pots, buttons and LEDs from a small library are wired to its
+  pins, and their shafts drive the assembly's joints in a motion study:
+  run it, turn a pot, press a button, read the serial monitor. The parts
+  also come as 3D models (Uno, SG90, TT motor, AA holder, driver boards)
+  to design round.
 - **Exchange.**
   - STEP AP214: export of solids and assemblies, and import of
     AP203/AP214/AP242 solids on analytic surfaces.
@@ -122,6 +131,9 @@ dialogs on macOS and Linux go through zenity and haven't been tried.
   (`tools/stepcheck`).
 - `go run ./tools/stlcheck part.stl` reports an STL's facets and volume, and
   whether it is closed and consistently oriented.
+- `avr/testdata/build.ps1` recompiles the Arduino sketches the emulator's
+  tests run, with arduino-cli and its `arduino:avr` core (the compiled
+  `.hex` files are kept, so the tests don't need it).
 
 ## Using it
 
@@ -169,6 +181,8 @@ PNGs to `captures/out/`. The images above come from that script. See
 | `brep/` | half-edge B-rep, builder and Euler operators, validity check, tessellation, booleans, face merging, mass properties |
 | `ops/` | primitives, extrude, revolve, fillet and chamfer, holes, shell |
 | `fea/` | static stress analysis: volume mesher, 10-node tetrahedra, solver |
+| `avr/` | an ATmega328P emulator (an Arduino Uno's chip): CPU, ports, timers, serial, ADC |
+| `elec/` | an Arduino sketch run against batteries, motor drivers, motors, servos, LEDs, buttons; the parts library |
 | `sketch/` | sketch entities, constraints, solver, region detection |
 | `expr/` | expressions with units |
 | `doc/` | the design: parameters, feature history, regeneration, references, assemblies, `.forma` files |
@@ -200,13 +214,14 @@ PNGs to `captures/out/`. The images above come from that script. See
   materials, von Mises stress and displacement plotted on the deformed
   part, the safety factor. Left: a faster solver, contact, assemblies,
   thermal and modal studies.
-- **M15 electronics and behaviour** (proposed, see
-  [docs/ELECTRONICS.md](docs/ELECTRONICS.md)): a library of electronic
-  parts as components (Arduino, servos, motors, batteries, drivers); the
-  real Arduino firmware run on an emulated ATmega328P, wired to simple
-  battery, driver, motor and servo models that drive the assembly's
-  joints over time (a code-driven motion study: an RC car's steering and
-  wheels). Circuit-level SPICE simulation is left to KiCad / LTspice.
+- **M15 electronics and behaviour** (done, see
+  [docs/ELECTRONICS.md](docs/ELECTRONICS.md)): the real Arduino firmware run
+  on an emulated ATmega328P, wired to battery, driver, motor and servo
+  models that drive the assembly's joints over time (a code-driven motion
+  study), and the parts as 3D components. Left: a car that drives on the
+  floor (dynamics, wheel contact), loads from the mechanism back on the
+  motors, SPI / I2C parts, reading a Wokwi diagram. Circuit-level SPICE
+  simulation is left to KiCad / LTspice.
 - Later: corner patches where three fillets meet
   ([F2](docs/LIMITATIONS.md)), 2D drawings to SVG / PDF, scripted parts in
   Starlark.

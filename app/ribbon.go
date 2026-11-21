@@ -236,6 +236,7 @@ func (a *App) partRibbon(r *ribbon) {
 	r.cmd("assemble.interference", icInterference, "Clash", a.asm.showClashes)
 	r.cmd("assemble.explode", icExplode, "Explode", a.m13.showExplode)
 	r.cmd("assemble.bom", icBOM, "BOM", a.m13.showBOM)
+	r.cmd("electronics.open", icCircuit, "Circuit", a.elec.open)
 	r.end("Assemble")
 
 	r.group()

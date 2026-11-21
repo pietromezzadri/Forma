@@ -457,3 +457,79 @@ What each milestone added, in the order they were built. The current gaps are in
   deflection 0.19052 mm against beam theory's 0.19048, the bending stress
   at mid-span), a cylinder's mesh volume, a plate with a hole (3.1 × the
   nominal stress beside the hole, Kirsch's 3). Capture `captures/m14.json`.
+
+## M15: electronics and behaviour
+
+- **An ATmega328P** (`avr/`, written from the datasheet and the AVR
+  instruction set manual after the design of avr8js): the whole AVRe+
+  instruction set with its cycle counts, interrupts (the instruction after
+  SEI or RETI first), the three ports with pull-ups and outside drive,
+  timers 0, 1 and 2 in every mode (normal, CTC, fast and phase-correct
+  PWM; their compare outputs on D3, D5, D6, D9, D10, D11; overflow and
+  compare interrupts — what `millis()`, `analogWrite()` and the Servo
+  library use; 16-bit registers through TEMP), the serial port (sends,
+  receives, its interrupts), the ADC (13 ADC clocks a conversion, left
+  adjust) and INT0 / INT1; Intel HEX firmware (`avr.LoadUno`), the Uno's
+  pin names (`avr.D`, `avr.A`). Peripherals are clocked in 2 µs batches,
+  caught up before any I/O register is touched, and interrupts are looked
+  for only after something they depend on changes: a busy sketch runs at
+  about 3.7× real time.
+- **Parts** (`elec/`): a sketch stepped with what it drives — a battery
+  (sagging over its resistance), an H-bridge (L298N / TB6612: the mean of
+  IN1 − IN2 times EN's PWM), DC gear motors (back-EMF and torque from the
+  rated voltage, no-load speed and stall torque; the speed solved exactly
+  over a step; the TT motor), hobby servos (the last pulse's width, 544–
+  2400 µs, as the angle, slewing at their speed; the SG90), LEDs, buttons
+  (pull-up, pressed low) and potentiometers on the ADC.
+- Tests: `avr/avr_test.go` (flags of ADD / SUB / 16-bit pairs / MUL /
+  ADIW / SBIW, a loop's 31 cycles, calls and the stack, Timer 0's
+  overflow rate, PWM duty, ports, serial, the ADC, HEX), `elec/elec_test.go`
+  (a servo on Timer 1's 50 Hz PWM, a TT motor at half PWM, a button lit
+  LED, a pot through the ADC) — programs encoded by hand — and compiled
+  sketches (`avr/testdata/sketches`, rebuilt by `avr/testdata/build.ps1`
+  with arduino-cli and the arduino:avr 1.8.8 core; the `.hex` files are
+  kept, so the tests need no compiler): `blink` (the core's start-up,
+  `millis()` 49 after `delay(50)` as on a board, `micros()`, `Serial`),
+  `servo` (the Servo library: an SG90 at 45°, then 135°), `motor`
+  (`analogWrite` on timer 0 into a TB6612: half speed, then full reverse)
+  and `pot_led` (`analogRead` onto timers 1 and 2's PWM, a button with
+  `INPUT_PULLUP`).
+- **In the design** (`doc/circuit.go`): a circuit feature ("Electronics")
+  holds the board, its firmware (the sketch's Intel HEX, kept in the
+  `.forma` file) and library parts with their pins, a driver's supply and
+  motor, and for a servo or motor the joint its shaft drives (a ratio and
+  the shaft's angle at the joint's zero; a slider takes mm per degree). It
+  makes no bodies; regenerating checks the wiring (unknown pins, a pot off
+  the analogue inputs, two parts on one pin, a gone or rigid joint, two
+  parts on one joint) and the joints it drives count as what it depends on.
+- **The parts library** (`elec/library.go`): SG90 and MG996R servos, TT and
+  N20 gear motors, TB6612 and L298N drivers, 4 × AA and 2S packs, a pot, a
+  button, an LED — each with its pins, its figures and their defaults; a
+  new part takes the usual free pin for its kind (servos and enables on
+  PWM pins, pots on A0…). **3D models** of them (`doc/partlib.go`): the
+  Uno's board with its holes, jacks, headers and chip, the servos with
+  their tabs and shafts, the gear motors, the AA holder, the 18650 pack,
+  the driver boards — built from primitives, inserted as components.
+- **Motion study** (`doc.Study`): the sketch on the emulated board with its
+  parts, run in whole 1 ms steps; after each run the driven joints take
+  their shafts' angles (a revolute one wrapped to ±180°) and the design
+  regenerates; Reset puts the joints back as they were.
+- **The app** (`app/electronics_ui.go`): the ribbon's Circuit button opens
+  the Electronics window — firmware (`.hex`, or `.ino` compiled with
+  arduino-cli on a goroutine without a console window), Run / Pause /
+  Reset and a speed, each part as it runs (servo angle, motor speed and
+  current, driver voltage, LED brightness), a slider for each pot and a
+  box for each button, the serial monitor, and the parts with their
+  wiring, joints and figures; the circuit's summary in Properties.
+  Commands `electronics.*` (add, firmware, part, wire, drive, set, model,
+  run, pause, reset) for the palette and captures.
+- Tests: `doc/circuit_test.go` (the servo sketch turning a pin in a plate
+  by −45°, then +45°; a TT motor behind a TB6612 turning it through a 2:1
+  ratio; the circuit saved and loaded; wiring errors), `doc/partlib_test.go`
+  (every model one valid solid of its module's size, the shafts where they
+  say), `elec/sketch_test.go` `sweep_drive` (an arm sweeping 20–160°, a
+  wheel whose speed is a pot and whose direction a button). The demo
+  assembly (`captures/data/arm_and_wheel.forma`) is written by
+  `TestElectronicsDemo` with `FORMA_WRITE_DEMO` set, with a wired copy
+  (`arm_and_wheel_wired.forma`) to open and run. Capture
+  `captures/m15.json`.

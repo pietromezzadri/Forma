@@ -86,7 +86,7 @@ type BodyRef struct {
 
 func (f *Feature) makesBodies() bool {
 	switch f.Kind {
-	case KSketch, KMesh:
+	case KSketch, KMesh, KCircuit:
 		return false
 	}
 	return true
@@ -309,6 +309,8 @@ func (d *Document) build(f *Feature) error {
 		return d.buildMesh(f)
 	case KComponent:
 		return d.buildComponent(f)
+	case KCircuit:
+		return d.buildCircuit(f)
 	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss:
 		return nil // they work on the bodies there are (modify)
 	default:
