@@ -29,18 +29,19 @@ const (
 	Radius                       // circle | arc
 	Diameter                     // circle | arc
 	ArcRadius                    // arc (internal: end on the start's radius)
+	Offset                       // curves (Value mm, signed): a locked copy of them that far to the side
 )
 
 var conNames = [...]string{"Coincident", "On line", "On circle", "Horizontal", "Vertical", "Parallel",
 	"Perpendicular", "Tangent", "Equal", "Concentric", "Midpoint", "Fix", "Distance", "Horizontal distance",
-	"Vertical distance", "Angle", "Radius", "Diameter", "Arc radius"}
+	"Vertical distance", "Angle", "Radius", "Diameter", "Arc radius", "Offset"}
 
 func (k ConKind) String() string { return conNames[k] }
 
 // Dimensional reports a constraint that carries a value (a dimension).
 func (k ConKind) Dimensional() bool {
 	switch k {
-	case Distance, HDistance, VDistance, Angle, Radius, Diameter:
+	case Distance, HDistance, VDistance, Angle, Radius, Diameter, Offset:
 		return true
 	}
 	return false
@@ -308,6 +309,9 @@ func (s *Sketch) residuals(c *Constraint, out []float64) []float64 {
 // Measure is what a dimensional constraint's value is now (mm or radians),
 // for a dimension being added at the current geometry.
 func (s *Sketch) Measure(c *Constraint) float64 {
+	if c.Kind == Offset {
+		return c.Value
+	}
 	saved := c.Value
 	c.Value = 0
 	r := s.residuals(c, nil)

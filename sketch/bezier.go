@@ -10,7 +10,8 @@ import (
 // ends), parameter t in [0, 1].
 
 func bezAt(c []geom.Vec2, t float64) geom.Vec2 {
-	w := append([]geom.Vec2(nil), c...)
+	var buf [8]geom.Vec2
+	w := append(buf[:0], c...)
 	for r := 1; r < len(w); r++ {
 		for j := 0; j < len(w)-r; j++ {
 			w[j] = w[j].Lerp(w[j+1], t)
@@ -32,7 +33,17 @@ func bezHodo(c []geom.Vec2) []geom.Vec2 {
 	return d
 }
 
-func bezDeriv(c []geom.Vec2, t float64) geom.Vec2 { return bezAt(bezHodo(c), t) }
+func bezDeriv(c []geom.Vec2, t float64) geom.Vec2 {
+	n := len(c) - 1
+	if n < 1 || n > 8 {
+		return bezAt(bezHodo(c), t)
+	}
+	var d [8]geom.Vec2
+	for i := 0; i < n; i++ {
+		d[i] = c[i+1].Sub(c[i]).Scale(float64(n))
+	}
+	return bezAt(d[:n], t)
+}
 
 // bezSplit cuts at t (de Casteljau): the control points of [0, t] and [t, 1].
 func bezSplit(c []geom.Vec2, t float64) ([]geom.Vec2, []geom.Vec2) {

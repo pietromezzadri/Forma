@@ -55,6 +55,9 @@ type Entity struct {
 	// it a line of a chain is
 	Proj  string `json:",omitempty"`
 	ProjK int    `json:",omitempty"`
+	// Off, when set, is the Offset constraint this entity is part of the
+	// copy of (the sketch keeps it up to date)
+	Off int `json:",omitempty"`
 }
 
 // Sketch is a set of entities and constraints on a plane.
@@ -219,6 +222,10 @@ func (s *Sketch) ArcAngles(e *Entity) (a0, sweep float64) {
 // Delete removes an entity, what depends on it (lines on a deleted point,
 // constraints on it) and points no longer used by anything.
 func (s *Sketch) Delete(id int) {
+	if c := s.OffsetOf(id); c != nil {
+		s.DeleteOffset(c)
+		return
+	}
 	dead := map[int]bool{id: true}
 	changed := true
 	for changed {

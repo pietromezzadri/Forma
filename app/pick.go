@@ -176,6 +176,8 @@ func dimText(c *sketch.Constraint) string {
 		return fmt.Sprintf("Ø%s", fmtLen(c.Value))
 	case sketch.Radius:
 		return fmt.Sprintf("R%s", fmtLen(c.Value))
+	case sketch.Offset:
+		return fmtLen(c.Value) // signed: the side it is on
 	}
 	return fmtLen(abs(c.Value))
 }

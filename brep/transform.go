@@ -58,3 +58,40 @@ func Copy(b *Body) *Body {
 	}
 	return c
 }
+
+// Gather makes one body of several (each keeping its shells): a tool of
+// many disjoint pieces for a single boolean. The bodies mustn't overlap.
+func Gather(name string, bodies ...*Body) (*Body, error) {
+	bd := NewBuilder(name)
+	for _, b := range bodies {
+		vmap := map[*Vertex]*Vertex{}
+		for _, v := range b.Vertices() {
+			vmap[v] = bd.Vertex(v.P)
+		}
+		emap := map[*Edge]*Edge{}
+		for _, e := range b.Edges() {
+			ne := &Edge{ID: bd.body.newID(), Curve: e.Curve, T0: e.T0, T1: e.T1,
+				Verts: [2]*Vertex{vmap[e.Verts[0]], vmap[e.Verts[1]]}}
+			bd.edges = append(bd.edges, ne)
+			emap[e] = ne
+		}
+		for _, f := range b.Faces() {
+			var loops [][]Use
+			for _, l := range f.Loops {
+				hs := l.HalfEdges()
+				uses := make([]Use, len(hs))
+				for i, h := range hs {
+					uses[i] = Use{emap[h.Edge], h.Fwd}
+				}
+				loops = append(loops, uses)
+			}
+			nf := bd.Face(f.Surf, f.Reversed, f.Name, loops...)
+			for i, l := range f.Loops {
+				if l.Lone != nil {
+					nf.Loops[i].Lone = vmap[l.Lone]
+				}
+			}
+		}
+	}
+	return bd.Finish()
+}

@@ -572,6 +572,8 @@ func (sm *sketchMode) openEdit(id int) {
 	sm.editOpen = true
 	if c.Expr != "" {
 		sm.editBuf = c.Expr
+	} else if c.Kind == sketch.Offset {
+		sm.editBuf = fmtLen(c.Value)
 	} else if c.Kind == sketch.Angle {
 		sm.editBuf = fmtLen(math.Abs(c.Value) * 180 / math.Pi)
 	} else {

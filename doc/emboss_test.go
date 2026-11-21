@@ -1,9 +1,11 @@
 package doc
 
 import (
+	"math"
 	"strings"
 	"testing"
 
+	"forma/brep"
 	"forma/geom"
 	"forma/sketch"
 )
@@ -105,5 +107,68 @@ func TestEmbossCooperBlack(t *testing.T) {
 		if em.Err != "" {
 			t.Fatalf("%s: %s", ty, em.Err)
 		}
+	}
+}
+
+// Any profile takes a clearance now: a plate with a round hole inlaid in
+// the side of a cylinder, the pocket its outline grown and its hole shrunk.
+func TestEmbossInlayShape(t *testing.T) {
+	d := New()
+	bowl := d.Insert(NewPrim(KCylinder))
+	bowl.Inputs["Radius"], bowl.Inputs["Height"] = "40", "30"
+	sk := d.Insert(NewSketch(PlaneRef{Std: "xz"}))
+	s := sk.Sketch
+	var ids []int
+	var pts []int
+	for _, p := range []geom.Vec2{{X: -10, Y: 11}, {X: 10, Y: 11}, {X: 10, Y: 19}, {X: -10, Y: 19}} {
+		pts = append(pts, s.AddPoint(p).ID)
+	}
+	for i := range pts {
+		ids = append(ids, s.AddLine(pts[i], pts[(i+1)%4]).ID)
+	}
+	hole := s.AddCircle(s.AddPoint(geom.V2(0, 15)).ID, 2)
+	d.Regenerate()
+	var side string
+	for _, fc := range bowl.Bodies[0].Faces() {
+		if strings.HasSuffix(fc.Name, "side") {
+			side = fc.Name
+		}
+	}
+	orig := bowl.Bodies[0]
+	em := d.Insert(NewEmboss([]ProfileRef{{Sketch: sk.ID, Outer: ids, Holes: [][]int{{hole.ID}}}}, BodyKey(bowl.ID, 0),
+		FaceRef{Feature: bowl.ID, Face: side}))
+	em.Inputs["Depth"], em.Inputs["Clearance"] = "2", "0.3"
+	d.Regenerate()
+	if em.Err != "" {
+		t.Fatal(em.Err)
+	}
+	var piece, body *brep.Body
+	for _, b := range d.Bodies {
+		if b.Owner == em.ID {
+			piece = b.Body
+		} else {
+			body = b.Body
+		}
+	}
+	if piece == nil || body == nil {
+		t.Fatal("no inlay")
+	}
+	cut, err := brep.Boolean(orig, body, brep.Subtract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pocket := brep.Mass(cut, 1e-5).Volume
+	grown := 20.6*8.6 - math.Pi*1.7*1.7
+	area := 160 - math.Pi*4
+	vin := brep.Mass(piece, 1e-5).Volume
+	// projected onto a cylinder of radius 40 the areas are a little bigger
+	if pocket < grown*2 || pocket > grown*2*1.06 {
+		t.Fatalf("pocket %.1f mm³, want about %.1f", pocket, grown*2)
+	}
+	if vin < area*1.7 || vin > area*1.7*1.06 {
+		t.Fatalf("inlay %.1f mm³, want about %.1f", vin, area*1.7)
+	}
+	if x, err := brep.Boolean(body, piece, brep.Intersect); err == nil && x != nil && brep.Mass(x, 1e-4).Volume > 1e-3 {
+		t.Fatalf("the inlay overlaps the body by %.4f mm³", brep.Mass(x, 1e-4).Volume)
 	}
 }

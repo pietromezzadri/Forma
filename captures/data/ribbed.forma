@@ -1,0 +1,345 @@
+{
+ "version": 1,
+ "params": null,
+ "features": [
+  {
+   "id": 1,
+   "name": "Sketch 1",
+   "kind": "sketch",
+   "sketch": {
+    "name": "Sketch 1",
+    "plane": {
+     "O": {
+      "X": 0,
+      "Y": 0,
+      "Z": 0
+     },
+     "X": {
+      "X": 1,
+      "Y": 0,
+      "Z": 0
+     },
+     "Y": {
+      "X": 0,
+      "Y": 0,
+      "Z": 1
+     },
+     "Z": {
+      "X": -0,
+      "Y": -1,
+      "Z": -0
+     }
+    },
+    "params": [
+     0,
+     0,
+     60,
+     0,
+     75,
+     45,
+     71,
+     45,
+     57,
+     4,
+     0,
+     4
+    ],
+    "ents": [
+     {
+      "ID": 1,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 2,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 2,
+      "Construction": false
+     },
+     {
+      "ID": 3,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 4,
+      "Construction": false
+     },
+     {
+      "ID": 4,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 6,
+      "Construction": false
+     },
+     {
+      "ID": 5,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 8,
+      "Construction": false
+     },
+     {
+      "ID": 6,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 10,
+      "Construction": false
+     },
+     {
+      "ID": 7,
+      "Kind": 1,
+      "Pts": [
+       1,
+       2
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 8,
+      "Kind": 1,
+      "Pts": [
+       2,
+       3
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 9,
+      "Kind": 1,
+      "Pts": [
+       3,
+       4
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 10,
+      "Kind": 1,
+      "Pts": [
+       4,
+       5
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 11,
+      "Kind": 1,
+      "Pts": [
+       5,
+       6
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 12,
+      "Kind": 1,
+      "Pts": [
+       6,
+       1
+      ],
+      "Par": 0,
+      "Construction": false
+     }
+    ],
+    "cons": null,
+    "next": 12
+   },
+   "plane": {
+    "std": "xz"
+   }
+  },
+  {
+   "id": 2,
+   "name": "Revolve 1",
+   "kind": "revolve",
+   "inputs": {
+    "Angle": "360"
+   },
+   "profiles": [
+    {
+     "sketch": 1,
+     "outer": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+     ]
+    }
+   ],
+   "axis": {
+    "kind": "y"
+   }
+  },
+  {
+   "id": 3,
+   "name": "Sketch 2",
+   "kind": "sketch",
+   "sketch": {
+    "name": "Sketch 2",
+    "plane": {
+     "O": {
+      "X": 0,
+      "Y": 0,
+      "Z": 0
+     },
+     "X": {
+      "X": 1,
+      "Y": 0,
+      "Z": 0
+     },
+     "Y": {
+      "X": 0,
+      "Y": 0,
+      "Z": 1
+     },
+     "Z": {
+      "X": -0,
+      "Y": -1,
+      "Z": -0
+     }
+    },
+    "params": [
+     60.166666666666664,
+     2,
+     73.5,
+     42,
+     77.5,
+     42,
+     64.16666666666666,
+     2
+    ],
+    "ents": [
+     {
+      "ID": 1,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 2,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 2,
+      "Construction": false
+     },
+     {
+      "ID": 3,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 4,
+      "Construction": false
+     },
+     {
+      "ID": 4,
+      "Kind": 0,
+      "Pts": null,
+      "Par": 6,
+      "Construction": false
+     },
+     {
+      "ID": 5,
+      "Kind": 1,
+      "Pts": [
+       1,
+       2
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 6,
+      "Kind": 1,
+      "Pts": [
+       2,
+       3
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 7,
+      "Kind": 1,
+      "Pts": [
+       3,
+       4
+      ],
+      "Par": 0,
+      "Construction": false
+     },
+     {
+      "ID": 8,
+      "Kind": 1,
+      "Pts": [
+       4,
+       1
+      ],
+      "Par": 0,
+      "Construction": false
+     }
+    ],
+    "cons": null,
+    "next": 8
+   },
+   "plane": {
+    "std": "xz"
+   }
+  },
+  {
+   "id": 4,
+   "name": "Extrude 1",
+   "kind": "extrude",
+   "inputs": {
+    "Direction": "Symmetric",
+    "Distance": "2",
+    "Distance 2": "10",
+    "Operation": "Join"
+   },
+   "profiles": [
+    {
+     "sketch": 3,
+     "outer": [
+      5,
+      6,
+      7,
+      8
+     ]
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Pattern 1",
+   "kind": "pattern",
+   "inputs": {
+    "Angle": "360",
+    "Axis": "Z",
+    "Center X": "0",
+    "Center Y": "0",
+    "Center Z": "0",
+    "Count": "24",
+    "Count 2": "1",
+    "Direction": "X",
+    "Direction 2": "None",
+    "Operation": "Join",
+    "Spacing": "20",
+    "Spacing 2": "20",
+    "Type": "Circular"
+   },
+   "sources": [
+    4
+   ]
+  }
+ ],
+ "rollback": -1,
+ "next": 5
+}

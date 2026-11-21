@@ -273,6 +273,7 @@ func (a *App) sketchRibbon(r *ribbon) {
 		{"dim", toolDim, ui.FaRuler, "Dimension"}} {
 		r.cmd("tool."+t.id, t.icon, t.name, tool == t.t)
 	}
+	r.cmd("sketch.offset", icOffset, "Offset", false)
 	r.end("Draw")
 
 	// constraints: two rows of compact buttons

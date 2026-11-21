@@ -388,20 +388,19 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 			if src.modifies() || len(src.Bodies) == 0 {
 				return nil, fmt.Errorf("%s isn't a feature that adds or cuts a shape", src.Name)
 			}
+			copies := make([][]*brep.Body, len(xs))
 			for k, x := range xs {
-				var tools []*brep.Body
 				for _, t := range src.Bodies {
 					c, err := brep.Transform(t, x, func(n string) string { return tag(k) + n })
 					if err != nil {
 						return nil, err
 					}
-					tools = append(tools, c)
+					copies[k] = append(copies[k], c)
 				}
-				var err error
-				out, err = d.applyOp(opOf(src), tools, out, makeRef)
-				if err != nil {
-					return nil, err
-				}
+			}
+			var err error
+			if out, err = d.applyCopies(opOf(src), copies, out, makeRef); err != nil {
+				return nil, err
 			}
 		}
 		// bodies: copies joined to them or as bodies of their own
@@ -734,4 +733,83 @@ func (d *Document) scaleRef(out []*BodyRef, i int, f *Feature) error {
 	// a scaled component's body is no longer its design's: plain from here
 	out[i] = &BodyRef{Key: r.Key, Name: r.Name, Body: b, Owner: r.Owner, Gen: d.nextGen()}
 	return nil
+}
+
+// applyCopies puts a pattern's (or mirror's) copies of a feature's tools in
+// with op. Copies standing apart from each other that each touch a body go
+// in together, a single boolean for a group (a ring of fins in two or three
+// instead of one each); a group that fails goes in again one by one.
+func (d *Document) applyCopies(op string, copies [][]*brep.Body, out []*BodyRef, fresh func(*brep.Body) *BodyRef) ([]*BodyRef, error) {
+	var tools []*brep.Body
+	for _, c := range copies {
+		tools = append(tools, c...)
+	}
+	one := func(ts []*brep.Body, out []*BodyRef) ([]*BodyRef, error) {
+		for _, t := range ts {
+			var err error
+			if out, err = d.applyOp(op, []*brep.Body{t}, out, fresh); err != nil {
+				return nil, err
+			}
+		}
+		return out, nil
+	}
+	if op == "New body" || len(tools) < 3 {
+		return one(tools, out)
+	}
+	touches := func(t *brep.Body) bool {
+		for _, r := range out {
+			if overlaps(t.Bounds(), r.Body.Bounds()) {
+				return true
+			}
+		}
+		return false
+	}
+	var alone []*brep.Body
+	var groups [][]*brep.Body
+	var boxes [][]geom.Box
+next:
+	for _, t := range tools {
+		if !touches(t) {
+			alone = append(alone, t)
+			continue
+		}
+		b := t.Bounds()
+		gap := 1e-3 * (1 + b.Diagonal())
+		for gi := range groups {
+			clear := true
+			for _, o := range boxes[gi] {
+				if overlaps(grow(b, gap), o) {
+					clear = false
+					break
+				}
+			}
+			if clear {
+				groups[gi] = append(groups[gi], t)
+				boxes[gi] = append(boxes[gi], b)
+				continue next
+			}
+		}
+		groups = append(groups, []*brep.Body{t})
+		boxes = append(boxes, []geom.Box{b})
+	}
+	for _, g := range groups {
+		if len(g) > 1 {
+			if all, err := brep.Gather(g[0].Name, g...); err == nil {
+				if res, err := d.applyOp(op, []*brep.Body{all}, out, fresh); err == nil {
+					out = res
+					continue
+				}
+			}
+		}
+		var err error
+		if out, err = one(g, out); err != nil {
+			return nil, err
+		}
+	}
+	return one(alone, out)
+}
+
+func grow(b geom.Box, m float64) geom.Box {
+	d := geom.V3(m, m, m)
+	return geom.Box{Min: b.Min.Sub(d), Max: b.Max.Add(d)}
 }

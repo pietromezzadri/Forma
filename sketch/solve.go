@@ -95,9 +95,16 @@ func maxAbs(r []float64) float64 {
 	return t
 }
 
-// lm runs Levenberg–Marquardt over the free parameters (those not locked).
-// It returns whether the hard equations reached solveTol.
+// lm solves (lmSolve), then brings the offsets' copies up to date.
 func (s *Sketch) lm(locked map[int]bool, softs []soft, maxIter int) (bool, int, float64) {
+	ok, it, res := s.lmSolve(locked, softs, maxIter)
+	s.updateOffsets()
+	return ok, it, res
+}
+
+// lmSolve runs Levenberg–Marquardt over the free parameters (those not
+// locked). It returns whether the hard equations reached solveTol.
+func (s *Sketch) lmSolve(locked map[int]bool, softs []soft, maxIter int) (bool, int, float64) {
 	bs, m := s.blocks()
 	col := map[int]int{}
 	var free []int
@@ -462,6 +469,9 @@ func (s *Sketch) SetValue(id int, v float64, expr string) error {
 	}
 	if !c.Kind.Dimensional() {
 		return fmt.Errorf("%s has no value", c.Kind)
+	}
+	if c.Kind == Offset && v == 0 {
+		return fmt.Errorf("the offset can't be 0")
 	}
 	if (c.Kind == Distance || c.Kind == Radius || c.Kind == Diameter) && v <= 0 {
 		return fmt.Errorf("must be more than 0")

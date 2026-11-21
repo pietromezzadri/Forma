@@ -86,7 +86,7 @@ func (d *Document) emboss(f *Feature, out []*BodyRef) ([]*BodyRef, error) {
 
 // embossProfiles are the regions an emboss's profiles pick (every letter of
 // a text) on one sketch, and the same grown by clearance for an inlay's
-// pockets (texts only: their outlines can be offset).
+// pockets.
 func (d *Document) embossProfiles(f *Feature, clearance float64) ([]sketch.Region, []sketch.Region, geom.Frame, error) {
 	if len(f.Profiles) == 0 {
 		return nil, nil, geom.Frame{}, fmt.Errorf("no profile")
@@ -126,10 +126,14 @@ func (d *Document) embossProfiles(f *Feature, clearance float64) ([]sketch.Regio
 		if !ok {
 			return nil, nil, plane, fmt.Errorf("profile %d of %s is gone (is the loop still closed?)", i+1, sk.Name)
 		}
-		if clearance > 0 {
-			return nil, nil, plane, fmt.Errorf("an inlay's clearance needs a text profile (other outlines can't be offset yet)")
-		}
 		regs = append(regs, sk.Regions[ri])
+		if clearance > 0 {
+			g, err := sketch.GrowRegion(sk.Regions[ri], clearance)
+			if err != nil {
+				return nil, nil, plane, fmt.Errorf("profile %d of %s: %v", i+1, sk.Name, err)
+			}
+			grown = append(grown, g)
+		}
 	}
 	return regs, grown, plane, nil
 }

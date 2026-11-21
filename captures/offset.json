@@ -1,0 +1,18 @@
+{
+  "width": 1400, "height": 860, "out": "out/offset",
+  "shots": [
+    {"name": "a_offset", "frames": 8, "do": [
+      "sketch.xy", "wait:15",
+      "move:btn:tool.rect@4", "click", "move:sk:-30,-15@6", "click", "move:sk:30,15@6", "click", "wait:4",
+      "move:btn:tool.circle@4", "click", "move:sk:0,0@6", "click", "move:sk:6,0@6", "click", "wait:4",
+      "move:btn:tool.select@4", "click",
+      "move:sk:0,-15@6", "click", "move:sk:30,0@6", "addclick", "move:sk:0,15@6", "addclick", "move:sk:-30,0@6", "addclick", "wait:4", "log",
+      "move:btn:sketch.offset@4", "click", "wait:6", "type:4", "key:enter", "wait:6",
+      "move:sk:6,0@6", "click", "sketch.offset", "wait:4", "type:-2", "key:enter", "wait:6",
+      "edit.clear", "view.fit", "move:vp:0.98,0.98@2", "wait:10", "log"
+    ]},
+    {"name": "b_profiles", "frames": 8, "do": [
+      "move:btn:sketch.finish@4", "click", "wait:8", "view.iso:now", "view.fit", "move:w:32,0,0@6", "wait:10", "log"
+    ]}
+  ]
+}

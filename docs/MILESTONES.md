@@ -337,3 +337,57 @@ What each milestone added, in the order they were built. The current gaps are in
   cylinder; inlaid in the dog bowl's slanted side; a letter at five
   places round a cone), `doc/emboss_test.go` (the name parameter
   followed, the far side, Cooper Black in all three modes).
+
+## M12: ribbed forms, sketch offset, faster booleans
+
+- **Faster booleans** (K3): the triangulator keeps each triangle's
+  neighbours instead of a hash map of edges, links a new fan in one pass
+  and tests inside / outside against the segments bucketed in bands; the
+  winding numbers that classify regions come from a tree of triangles,
+  far clusters taken as one dipole (Barill et al., fast winding
+  numbers); a region's sample point is searched biggest triangle first;
+  the grown text's sketch tests only the curve pairs whose boxes meet.
+  A plate drilled by a cylinder: 51 → 17 ms; the test suites 2–3× faster
+  (ops 71 → 27 s); a name in Cooper Black inlaid in a cylinder 15 → 2.1 s,
+  raised or engraved 2.6 → 0.8 s.
+- **Many tools in one boolean** (`brep.Gather`): letters that stand apart
+  are cut or raised together (two booleans for a name, not one a letter),
+  and a pattern's copies that stand apart and touch a body go in together
+  (`Document.applyCopies`), each group falling back to one by one if it
+  fails. 24 fins round a bowl: 1 s → 0.09 s.
+- **Sketch offset** (`sketch/offset_sketch.go`, `sketch/offset_chain.go`;
+  Sketch ribbon → Offset, or O): the selected lines, arcs and splines
+  (a chain in any order, or a closed loop) or a circle copied a distance
+  to the side — out from a loop, left of a chain, the other side for a
+  negative distance. The copy is driven by an Offset constraint (a
+  dimension, so it takes an expression) and follows its sources after
+  every solve; its points are locked. Corners: lines meet at a mitre (an
+  arc round the corner past four distances), any other outside corner is
+  rounded, inside corners trimmed back to where the pieces cross.
+  Deleting a curve of the copy deletes the offset; deleting a source lets
+  the copy go free.
+- **Clearance on any inlay:** a non-text profile's pocket is its region
+  grown the same way (`sketch.GrowRegion`: outline out, holes in).
+- **Ribbed bowl:** a fin sketched against a revolved bowl's wall, extruded
+  symmetrically and joined, patterned round the axis
+  (`captures/ribbed.json`, `captures/data/ribbed.forma`); on a cone wall
+  24 fins take 0.09 s, on a revolved spline wall 1.7 s (its cuts are
+  traced, K2b).
+- **Kernel fixes found on the way:** a cut starting exactly on a seam goes
+  into the face from the seam's other copy when that is where it heads,
+  and so does one passing through a point right on a seam (a sphere
+  centred in a cylinder's seam plane; a fin on a revolved wall's seam
+  failed); a crossing of a face's edge that falls exactly on a point of
+  the cut is counted once (a fin at 180° failed); a closed cut starting on
+  the face's boundary is started where it is clear of it instead (on a
+  spline-walled bowl every second fin failed: the circle its bottom cuts
+  round the wall started along the first fin's edge on that circle); a
+  hole goes in the smallest region round it by the area inside its
+  outline (holes taken off as they were found made a ring look smaller
+  than the region inside it).
+- Tests: `brep/winding_test.go` (the tree against the exact sum, a
+  sphere on a cylinder's seam, benchmarks), `sketch/offset_sketch_test.go`
+  (rectangle out and in following a dimension, a slot past its radius, an
+  open L, a circle, a spline, nested holes), `doc/ribbed_test.go` (24
+  fins on a cone wall and on a spline wall, one fin every 22.5°),
+  `doc/emboss_test.go` (a plate with a hole inlaid with clearance).

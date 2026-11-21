@@ -80,7 +80,43 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 		dir = -1
 	}
 	out := b
+	// letters far enough apart go in together, one boolean a group; a group
+	// that fails goes again letter by letter
+	gap := 0.5 + sp.Depth
+	var done []bool
+	for _, g := range letterGroups(src, gap) {
+		if len(g) < 2 {
+			continue
+		}
+		d0, d1 := span(0.3*sp.Depth + 0.2)
+		var tools []*brep.Body
+		for _, i := range g {
+			t, err := letterOn(fc, src[i], plane, d0, d1, reach, dir, fmt.Sprintf("letter%d", i+1))
+			if err != nil {
+				return nil, nil, fmt.Errorf("letter %d: %v", i+1, err)
+			}
+			tools = append(tools, t)
+		}
+		all, err := brep.Gather("letters", tools...)
+		if err != nil {
+			continue
+		}
+		res, err := brep.Boolean(out, all, op)
+		if err != nil || brep.Check(res) != nil {
+			continue
+		}
+		out = res
+		if done == nil {
+			done = make([]bool, len(src))
+		}
+		for _, i := range g {
+			done[i] = true
+		}
+	}
 	for i, r := range src {
+		if done != nil && done[i] {
+			continue
+		}
 		// a boolean can still trip where a cut happens to fall on the
 		// points its curves are traced at; a tool reaching a little further
 		// past the surface moves those points
@@ -179,6 +215,44 @@ func nameFaces(b *brep.Body, name string) {
 }
 
 // footprint is a few dozen points round a region's outline.
+// letterGroups sorts the regions into groups whose boxes stay gap apart
+// (first fit, in order), so each group's tools never touch each other.
+func letterGroups(rs []sketch.Region, gap float64) [][]int {
+	boxes := make([]geom.Box, len(rs))
+	for i, r := range rs {
+		poly := r.Poly
+		if len(poly) == 0 {
+			poly = sketch.SegPoints2(r.Outer, 1e-2)
+		}
+		for _, p := range poly {
+			boxes[i].Add(geom.V3(p.X, p.Y, 0))
+		}
+	}
+	var groups [][]int
+next:
+	for i := range rs {
+		for gi, g := range groups {
+			clear := true
+			for _, j := range g {
+				if boxesNear(boxes[i], boxes[j], gap) {
+					clear = false
+					break
+				}
+			}
+			if clear {
+				groups[gi] = append(g, i)
+				continue next
+			}
+		}
+		groups = append(groups, []int{i})
+	}
+	return groups
+}
+
+func boxesNear(a, b geom.Box, gap float64) bool {
+	return a.Min.X-gap < b.Max.X && b.Min.X-gap < a.Max.X && a.Min.Y-gap < b.Max.Y && b.Min.Y-gap < a.Max.Y
+}
+
 func footprint(r sketch.Region) []geom.Vec2 {
 	poly := r.Poly
 	if len(poly) == 0 {

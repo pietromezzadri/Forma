@@ -465,24 +465,33 @@ func (c *bctx) splitFace(F *bface) ([]*region, error) {
 		tris := geom.Triangulate(pts, segs)
 		// the point is the triangle centre deepest inside the region (the
 		// biggest triangle's can lie a hair from its edge in a thin curved
-		// region, and a probe stepping off a slanted face there leaves it)
-		bestA, best, deep := 0.0, geom.Vec2{}, -1.0
+		// region, and a probe stepping off a slanted face there leaves it);
+		// big triangles first, so the search stops early on most of the rest
+		type ctri struct {
+			a   float64
+			cen geom.Vec2
+		}
+		cand := make([]ctri, 0, len(tris))
 		for _, t := range tris {
 			a := math.Abs(pts[t[1]].Sub(pts[t[0]]).Cross(pts[t[2]].Sub(pts[t[0]])))
 			if a <= 1e-18 {
 				continue
 			}
-			bestA = math.Max(bestA, a)
-			cen := pts[t[0]].Add(pts[t[1]]).Add(pts[t[2]]).Scale(1.0 / 3)
+			cand = append(cand, ctri{a, pts[t[0]].Add(pts[t[1]]).Add(pts[t[2]]).Scale(1.0 / 3)})
+		}
+		sort.SliceStable(cand, func(i, j int) bool { return cand[i].a > cand[j].a })
+		bestA, best, deep := 0.0, geom.Vec2{}, -1.0
+		for _, ct := range cand {
+			bestA = math.Max(bestA, ct.a)
 			d := math.Inf(1)
 			for _, s := range segs {
-				d = math.Min(d, segDist2(cen, pts[s[0]], pts[s[1]]))
+				d = math.Min(d, segSq(ct.cen, pts[s[0]], pts[s[1]]))
 				if d <= deep {
 					break
 				}
 			}
 			if d > deep {
-				deep, best = d, cen
+				deep, best = d, ct.cen
 			}
 		}
 		if bestA == 0 {
@@ -675,10 +684,10 @@ func (c *bctx) probeStep(r *region) float64 {
 // classify says where each region is relative to the other body.
 func (c *bctx) classify(rs []*region) {
 	for _, r := range rs {
-		m := c.meshes[1-r.f.body]
+		m := c.wind[1-r.f.body]
 		eps := c.probeStep(r)
-		in1 := windingNumber(m, r.p.Add(r.n.Scale(eps))) > 0.5
-		in0 := windingNumber(m, r.p.Sub(r.n.Scale(eps))) > 0.5
+		in1 := m.at(r.p.Add(r.n.Scale(eps))) > 0.5
+		in0 := m.at(r.p.Sub(r.n.Scale(eps))) > 0.5
 		switch {
 		case in0 && in1:
 			r.cls = classIn
@@ -844,13 +853,15 @@ func paramAt(c geom.Curve, t float64, p geom.Vec3) float64 {
 	return t
 }
 
-// segDist2 is the distance from p to segment a–b.
-func segDist2(p, a, b geom.Vec2) float64 {
+// segSq is the squared distance from p to segment a–b.
+func segSq(p, a, b geom.Vec2) float64 {
 	d := b.Sub(a)
 	l := d.Dot(d)
 	if l < 1e-300 {
-		return p.Dist(a)
+		q := p.Sub(a)
+		return q.Dot(q)
 	}
 	t := math.Max(0, math.Min(1, p.Sub(a).Dot(d)/l))
-	return p.Dist(a.Add(d.Scale(t)))
+	q := p.Sub(a.Add(d.Scale(t)))
+	return q.Dot(q)
 }

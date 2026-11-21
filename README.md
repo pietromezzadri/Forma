@@ -55,6 +55,8 @@ interference checks.</td>
   - A Levenberg–Marquardt solver counts the degrees of freedom and refuses
     constraints that are redundant or conflicting.
   - Profiles, holes included, are found automatically.
+  - An offset tool copies a chain of curves to one side, mitring its
+    corners, and the copy follows the curves and its distance.
 - **Features and history.** Extrude and revolve, primitives, holes (simple,
   counterbored, countersunk), fillet and chamfer, shell, mirror, linear and
   circular patterns, and moving bodies with a gizmo.
@@ -178,8 +180,10 @@ PNGs to `captures/out/`. The images above come from that script. See
   raised, engraved or inlaid (the pocket with a clearance, the letters as
   bodies of their own: a name inlaid into a bowl, printed in two colours).
   Left: wrapping by arc length, letters over several faces.
-- **M12 ribbed forms:** a sketch offset tool, many fins patterned round a
-  revolved body, and much faster booleans ([K3](docs/LIMITATIONS.md)).
+- **M12 ribbed forms** (done): a sketch offset tool, fins patterned round
+  a revolved body (a pattern's copies that stand apart go in as one
+  boolean), clearance on any inlay, and booleans 2–3× faster. Left: more
+  speed ([K3](docs/LIMITATIONS.md)).
 - **M13 assembly:** a bill of materials, exploded views, grounding, joint
   limits.
 - **M14 simulation:** static stress analysis (volume mesh, loads and supports

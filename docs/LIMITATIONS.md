@@ -22,11 +22,12 @@ new ones as features land.
   contoured). The faces are
   split along the contoured polyline even where the edge is exact, so
   regions match the exact edge only to the contour tolerance.
-- **K3 Speed.** A boolean takes up to about a quarter of a second, so
-  dragging an extrude's arrow or the move gizmo on a joined body stutters,
-  and a long history regenerates slowly. Ideas: bounding-box culling per
-  face pair before contouring, coarser contour grids refined near the curve,
-  caching tessellations, regenerating on release while dragging.
+- **K3 Speed** (M12: 2–3× faster, see MILESTONES). Still: an everyday
+  boolean takes 15–60 ms, a body with many faces more, and every boolean
+  meshes both bodies again from scratch, so a long history regenerates
+  slowly. Ideas: caching face meshes between booleans, bounding-box
+  culling per face pair before contouring, regenerating on release while
+  dragging.
 - **K4 Tangent contact.** Surfaces touching along a line or curve (a cylinder
   lying on a plane, a sphere in a cylinder of its radius) only work where the
   touching curve is also an edge. A general case is likely to fail.
@@ -91,12 +92,11 @@ new ones as features land.
 - **EM3 Faces it works on:** planes, cylinders, cones, spheres, tori and
   revolved one-span Bézier profiles (not extruded spline faces, nor
   revolved profiles of several spans).
-- **EM4 Clearance needs text:** an inlay's clearance grows the outline of a
-  text; other profiles can only be inlaid with no clearance (no general
-  sketch offset yet, M12).
-- **EM5 Speed:** each letter is a boolean on the body (1–3 s apiece for a
-  heavy font on a cylinder, more as the face fills with pockets): a name
-  of five letters takes 5–15 s to rebuild (K3).
+- ~~EM4 Clearance needs text~~ (M12: any profile, grown by the sketch
+  offset).
+- **EM5 Speed** (M12: letters apart from each other go in together, two
+  booleans a name): a Cooper Black name inlaid in a cylinder rebuilds in
+  about 2 s; a face with many letters is still slower (K3).
 - **EM6 Boolean robustness:** the cuts between the letters' walls and a
   curved face are traced on a grid, and a cut landing just so on its points
   can still fail; the letter is then tried again reaching a little further
@@ -132,8 +132,8 @@ new ones as features land.
 
 ## Sketcher (`sketch/`)
 
-- **SK1 Few tools:** no ellipses, slots, polygons, offset, trim, extend or
-  sketch fillets. Splines (M9)
+- **SK1 Few tools:** no ellipses, slots, polygons, trim, extend or sketch
+  fillets (offset: M12). Splines (M9)
   are single Bézier curves (quadratic or cubic) chained with tangency: no
   fit-point splines, no point-on-spline constraint, no dimensions on a
   spline's length or curvature.
@@ -154,6 +154,13 @@ new ones as features land.
   that isn't a line or a circle square to the sketch comes in as 24 lines;
   a projected circle that later becomes another kind of curve stops
   following (reported on the sketch).
+- **SK6 Offset:** the copy is locked geometry worked out after each solve,
+  not solved with the sketch (constraints can be put on it, but it can't
+  be dragged); where an offset wider than a short piece swallows it the
+  corner is joined by a chord, so the copy can cross itself; a copy whose
+  make-up changes (a mitre turning into an arc, a piece vanishing) is made
+  anew and loses the constraints on its old curves; no offsetting a text
+  (texts have Grow) or a mix of a circle and other curves.
 
 ## Design history and references (`doc/`)
 

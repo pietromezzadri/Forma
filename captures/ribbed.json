@@ -1,0 +1,15 @@
+{
+  "width": 1400, "height": 860, "out": "out/ribbed",
+  "shots": [
+    {"name": "a_ribbed", "frames": 8, "do": [
+      "file.open:captures/data/ribbed.forma", "wait:30",
+      "view.iso:now", "view.fit", "edit.clear", "move:vp:0.98,0.98@2", "wait:10", "log"
+    ]},
+    {"name": "b_count", "frames": 8, "do": [
+      "move:step:Pattern 1@4", "click", "wait:4", "feature.set:Count=36", "wait:30", "log"
+    ]},
+    {"name": "c_close", "frames": 8, "do": [
+      "edit.clear", "camto:200,-15", "wait:30", "move:vp:0.5,0.55@2", "wheel:3@8", "wait:8", "move:vp:0.98,0.98@2", "wait:6"
+    ]}
+  ]
+}

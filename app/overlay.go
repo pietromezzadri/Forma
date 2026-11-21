@@ -228,6 +228,19 @@ func (a *App) drawDim(dl *imgui.DrawList, s *sketch.Sketch, c *sketch.Constraint
 		}
 		d := vnorm(vsub(P, C))
 		return vadd(P, vscale(d, 26)), true
+	case sketch.Offset:
+		p, q, ok := s.OffsetAnchor(c)
+		if !ok {
+			return imgui.Vec2{}, false
+		}
+		A, B := a.skScreen(s, p), a.skScreen(s, q)
+		dir := vsub(B, A)
+		if vlen(dir) < 2 {
+			return A, true
+		}
+		dl.AddLineArgs(A, B, col, 1.2)
+		arrow(B, dir)
+		return vadd(B, vscale(vnorm(dir), 22)), true
 	case sketch.Angle:
 		l1, l2 := s.Ent(c.E[0]), s.Ent(c.E[1])
 		a0, a1 := s.P(l1.Pts[0]), s.P(l1.Pts[1])

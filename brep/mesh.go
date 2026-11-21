@@ -175,6 +175,7 @@ func meshFace(m *Mesh, f *Face, samples map[*Edge]*edgeSamples, opt MeshOptions)
 		}
 		keep := 0.45 * h
 		idx := newSegIndex(pts, segs, keep)
+		inside := geom.NewSegBands(pts[:nBoundary], segs)
 		// poles and apexes: the parameter grid crowds there, so keep interior
 		// points a spacing away from them in space
 		var poles []geom.Vec3
@@ -202,7 +203,7 @@ func meshFace(m *Mesh, f *Face, samples map[*Edge]*edgeSamples, opt MeshOptions)
 				x := x0 + h*0.08*hashUnit(row, col, 1)
 				y := y0 + h*0.08*hashUnit(row, col, 2)
 				q := geom.Vec2{X: x, Y: y}
-				if !pointInSegs(q, pts[:nBoundary], segs) {
+				if !inside.Inside(q) {
 					continue
 				}
 				if idx.near(q, pts, keep) {
@@ -246,19 +247,6 @@ func hashUnit(a, b, c int) float64 {
 	h *= 0x5bd1e995
 	h ^= h >> 15
 	return float64(h%20001)/10000 - 1
-}
-
-func pointInSegs(p geom.Vec2, pts []geom.Vec2, segs [][2]int) bool {
-	in := false
-	for _, s := range segs {
-		a, b := pts[s[0]], pts[s[1]]
-		if (a.Y > p.Y) != (b.Y > p.Y) {
-			if x := a.X + (p.Y-a.Y)*(b.X-a.X)/(b.Y-a.Y); x > p.X {
-				in = !in
-			}
-		}
-	}
-	return in
 }
 
 func nearSegs(p geom.Vec2, pts []geom.Vec2, segs [][2]int, d float64) bool {

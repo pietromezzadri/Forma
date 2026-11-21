@@ -115,6 +115,26 @@ type gcurve struct {
 	ts   []float64 // split parameters in [0, 1]
 }
 
+// bounds is a box round the curve (min x, min y, max x, max y) grown by pad:
+// a spline's control points, an arc's circle.
+func (g *gcurve) bounds(pad float64) [4]float64 {
+	var pts []geom.Vec2
+	switch {
+	case g.bez != nil:
+		pts = g.bez
+	case g.arc:
+		pts = []geom.Vec2{g.c.Sub(geom.Vec2{X: g.r, Y: g.r}), g.c.Add(geom.Vec2{X: g.r, Y: g.r})}
+	default:
+		pts = []geom.Vec2{g.a, g.b}
+	}
+	b := [4]float64{math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)}
+	for _, p := range pts {
+		b[0], b[1] = math.Min(b[0], p.X), math.Min(b[1], p.Y)
+		b[2], b[3] = math.Max(b[2], p.X), math.Max(b[3], p.Y)
+	}
+	return [4]float64{b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad}
+}
+
 func (g *gcurve) at(t float64) geom.Vec2 {
 	if g.bez != nil {
 		return bezAt(g.bez, t)
@@ -199,11 +219,17 @@ func (s *Sketch) Regions() []Region {
 	}
 	tol := 1e-7 * (box.Diagonal() + 1)
 
-	for _, g := range cs {
+	boxes := make([][4]float64, len(cs))
+	for i, g := range cs {
 		g.ts = []float64{0, 1}
+		boxes[i] = g.bounds(tol * 200)
 	}
 	for i := 0; i < len(cs); i++ {
 		for j := i + 1; j < len(cs); j++ {
+			bi, bj := boxes[i], boxes[j]
+			if bi[0] > bj[2] || bj[0] > bi[2] || bi[1] > bj[3] || bj[1] > bi[3] {
+				continue
+			}
 			for _, p := range intersect(cs[i], cs[j], tol) {
 				cs[i].ts = append(cs[i].ts, p[0])
 				cs[j].ts = append(cs[j].ts, p[1])
@@ -367,6 +393,12 @@ func (s *Sketch) Regions() []Region {
 	}
 	// a negative cycle is a component's outline: a hole of the smallest
 	// region containing it
+	// (by the area inside its outline: holes taken off as they are found
+	// mustn't make a ring look smaller than a region within it)
+	gross := make([]float64, len(regions))
+	for ri, r := range regions {
+		gross[ri] = r.Area
+	}
 	for _, c := range cycles {
 		if c.area >= -minArea {
 			continue
@@ -374,8 +406,8 @@ func (s *Sketch) Regions() []Region {
 		best, bestArea := -1, math.Inf(1)
 		probe := c.poly[0].Lerp(c.poly[len(c.poly)/2], 1e-3)
 		for ri, r := range regions {
-			if r.Area > -c.area+tol && r.Area < bestArea && pointInPoly(c.poly[0], r.Poly) && pointInPoly(probe, r.Poly) && !samePoly(c.poly, r.Poly) {
-				best, bestArea = ri, r.Area
+			if gross[ri] > -c.area+tol && gross[ri] < bestArea && pointInPoly(c.poly[0], r.Poly) && pointInPoly(probe, r.Poly) && !samePoly(c.poly, r.Poly) {
+				best, bestArea = ri, gross[ri]
 			}
 		}
 		if best >= 0 {

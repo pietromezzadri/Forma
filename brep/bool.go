@@ -58,6 +58,7 @@ type bctx struct {
 	faces                   []*bface
 	samples                 map[*Edge]*edgeSamples
 	meshes                  [2]*Mesh
+	wind                    [2]*windTree
 	verts                   []wvert
 	vgrid                   map[[3]int64][]int
 	splits                  map[*Edge][]float64
@@ -140,6 +141,7 @@ func newBoolCtx(a, b *Body) *bctx {
 		}
 		// a coarser mesh is enough for face boxes and the winding numbers
 		c.meshes[bi] = Tessellate(body, MeshOptions{ChordTol: c.ctol * 2, MaxEdge: c.scale / 8})
+		c.wind[bi] = newWindTree(c.meshes[bi])
 	}
 	for bi, body := range []*Body{a, b} {
 		m := c.meshes[bi]
@@ -631,6 +633,18 @@ type bpiece struct {
 // (along), onto that edge.
 func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, along *Edge) []bpiece {
 	n := len(pts)
+	if closed && n > 3 && pts[0].Dist(pts[n-1]) < c.weldExact && c.onBoundary(F, pts[0]) {
+		// a closed curve starting on the face's boundary (perhaps running
+		// along an edge already there, a circle round a wall a cut has
+		// already followed for a stretch): start it where it is clear of
+		// the boundary instead, so which side it starts on is plain
+		for k := 1; k+1 < n-1; k++ {
+			if !c.onBoundary(F, pts[k]) && !c.onBoundary(F, pts[k+1]) {
+				pts = append(append([]geom.Vec3{}, pts[k:n-1]...), pts[:k+1]...)
+				break
+			}
+		}
+	}
 	uv := make([]geom.Vec2, n)
 	uv[0], _ = F.place(F.uvRaw(pts[0]))
 	in := F.inside(uv[0])
@@ -638,6 +652,11 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 	var cur *bpiece
 	onB := false // started on the boundary: crossings right there are that start
 	var touch *geom.Vec3
+	// the last crossing taken, and the polyline point it fell on (if it did):
+	// a point of the curve right on the boundary is crossed once, not again
+	// at the start of the next segment
+	var lastX *geom.Vec3
+	lastAt := -1
 	// starting on the boundary (an edge from a vertex on it): in if it
 	// heads inside, with that point as its start
 	if n >= 2 && c.onBoundary(F, pts[0]) {
@@ -657,6 +676,14 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 			}
 		}
 		in = F.inside(q)
+		if !in && (F.pu > 0 || F.pv > 0) {
+			// starting on a seam: it may head into the face from the
+			// seam's other copy
+			if q2, ok := F.place(q); ok {
+				uv[0] = uv[0].Add(q2.Sub(q))
+				in = true
+			}
+		}
 		if in {
 			cur = &bpiece{pts: []geom.Vec3{pts[0]}, start: c.boundaryEvent(F, uv[0], pts[0])}
 		}
@@ -666,6 +693,19 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 	}
 	for i := 1; i < n; i++ {
 		a := uv[i-1]
+		if !in && i > 1 && (F.pu > 0 || F.pv > 0) && c.onBoundary(F, pts[i-1]) {
+			// a point right on a seam (a closed curve's start, joined up):
+			// the curve may go on into the face from the seam's other copy
+			mid := F.wrapNear(F.uvRaw(pts[i-1].Lerp(pts[i], 0.5)), a)
+			if !F.inside(mid) {
+				if q, ok := F.place(mid); ok {
+					a = a.Add(q.Sub(mid))
+					uv[i-1] = a
+					cur = &bpiece{pts: []geom.Vec3{pts[i-1]}, start: c.boundaryEvent(F, a, pts[i-1])}
+					in = true
+				}
+			}
+		}
 		b := F.wrapNear(F.uvRaw(pts[i]), a)
 		uv[i] = b
 		xs := F.crossings(a, b)
@@ -674,6 +714,9 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 				continue
 			}
 			if touch != nil && pts[i-1].Lerp(pts[i], x.s).Dist(*touch) < c.weldLoose {
+				continue
+			}
+			if lastX != nil && lastAt == i-1 && pts[i-1].Lerp(pts[i], x.s).Dist(*lastX) < c.weldExact {
 				continue
 			}
 			// at the segment's end, on the boundary: a touch if the curve
@@ -694,6 +737,9 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 					touch = &p
 					continue
 				}
+			}
+			if xp := pts[i-1].Lerp(pts[i], x.s); xp.Dist(pts[i]) < c.weldExact {
+				lastX, lastAt = &xp, i
 			}
 			ev := c.refineCrossing(F, x, pts[i-1].Lerp(pts[i], x.s), other, along)
 			if in {

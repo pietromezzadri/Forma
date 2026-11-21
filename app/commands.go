@@ -278,6 +278,7 @@ func (a *App) registerCommands() *Commands {
 	a.registerInspectCommands(c)
 	a.registerSnapCommands(c)
 	a.registerTextCommands(c)
+	a.registerOffsetCommands(c)
 	return c
 }
 
