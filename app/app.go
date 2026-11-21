@@ -102,6 +102,7 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("window: %w", err)
 	}
+	setWindowIcon(win)
 	win.MakeContextCurrent()
 	if err := gl.Init(); err != nil {
 		return fmt.Errorf("gl: %w", err)
