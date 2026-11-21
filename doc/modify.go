@@ -344,6 +344,9 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 			if err != nil {
 				return nil, err
 			}
+			if c := d.Feature(out[i].Comp); out[i].Comp != 0 && Grounded(c) {
+				return nil, fmt.Errorf("%s is grounded", c.Name)
+			}
 			if err := d.scaleRef(out, i, f); err != nil {
 				return nil, err
 			}

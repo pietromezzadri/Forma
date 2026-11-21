@@ -391,3 +391,33 @@ What each milestone added, in the order they were built. The current gaps are in
   open L, a circle, a spline, nested holes), `doc/ribbed_test.go` (24
   fins on a cone wall and on a spline wall, one fin every 22.5°),
   `doc/emboss_test.go` (a plate with a hole inlaid with clearance).
+
+## M13: assembly
+
+- **Grounding** (Properties → Grounded, or the command palette): a
+  grounded component stays where it is placed. A joint whose moving end is
+  on it moves the other end instead, a Move of it is refused, and the
+  gizmo is off; a joint between two grounded components is an error. The
+  first component inserted is grounded (as Fusion does), shown with a pin
+  in the browser.
+- **Joint limits** (Properties → Motion → Limits): a range for the motion
+  input (a revolute joint's angle, a slider's distance; a cylindrical
+  joint's angle). The joint holds its input within it and says so
+  ("Distance held at its limit, 10 mm"); the motion slider runs over the
+  range and Play swings back and forth between the limits.
+- **Bill of materials** (Assemble → BOM; `doc.BOM`, `doc.WriteBOM`): a
+  row per part, components counted by their file and design (copies, and
+  the same file inserted again, are one line), then the design's own
+  bodies; quantity, bodies, volume, area, and mass each and in all at the
+  density set there. Export CSV writes it.
+- **Exploded view** (Assemble → Explode; `doc.Explode`): a spread slider
+  pulls the assembly apart for drawing only — each component along the
+  axis of the joint that places it, away from what it is joined to (and
+  further with that part), loose ones out from the middle, grounded ones
+  staying. Picking still works on the parts where they are drawn, and Fit
+  frames them. The renderer takes an offset per draw (`render.Paint.Offset`,
+  `uOffset` in the vertex shaders).
+- Tests: `doc/assembly_m13_test.go` (grounding swaps a joint and refuses a
+  move; a slider held at its limit; the BOM with a copy, the same file
+  again and a body of the design's own, and its CSV; the explode
+  directions). Capture `captures/m13.json`.

@@ -19,7 +19,7 @@ import (
 
 var (
 	// ComponentInputs: the source file's name and the placement (as Move's).
-	ComponentInputs = append([][2]string{{"File", ""}}, MoveInputs...)
+	ComponentInputs = append([][2]string{{"File", ""}, {"Grounded", "0"}}, MoveInputs...)
 	JointInputs     = [][2]string{{"Type", "Rigid"}, {"Angle", "0"}, {"Distance", "0"}, {"Flip", "0"}}
 	JointTypes      = []string{"Rigid", "Revolute", "Slider", "Cylindrical"}
 )
@@ -214,6 +214,13 @@ func (d *Document) joint(f *Feature, out []*BodyRef) ([]*BodyRef, error) {
 		return nil, fmt.Errorf("pick a face, edge or vertex on each of two components")
 	}
 	a, b := f.Joint[0], f.Joint[1]
+	// a grounded component stays put: the other end moves instead
+	if d.groundedRef(out, b) {
+		if d.groundedRef(out, a) {
+			return nil, fmt.Errorf("both components are grounded: unground one")
+		}
+		a, b = b, a
+	}
 	moving := refBodies(out, b)
 	if len(moving) == 0 {
 		return nil, fmt.Errorf("the moving component is gone")
@@ -233,11 +240,12 @@ func (d *Document) joint(f *Feature, out []*BodyRef) ([]*BodyRef, error) {
 	if err != nil {
 		return nil, fmt.Errorf("second end: %w", err)
 	}
-	ang, err := d.input(f, "Angle")
+	f.Warn = ""
+	ang, err := d.limited(f, "Angle")
 	if err != nil {
 		return nil, err
 	}
-	dist, err := d.input(f, "Distance")
+	dist, err := d.limited(f, "Distance")
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +253,66 @@ func (d *Document) joint(f *Feature, out []*BodyRef) ([]*BodyRef, error) {
 	if err := d.moveRefs(out, moving, x); err != nil {
 		return nil, err
 	}
+	f.Moved, f.JointAxis = b.Feature, fa
 	return out, nil
+}
+
+// Grounded reports a component fixed where it is: joints move the other
+// end, and nothing moves it.
+func Grounded(f *Feature) bool {
+	return f != nil && f.Kind == KComponent && f.Inputs["Grounded"] == "1"
+}
+
+// groundedRef: a joint end lies on a grounded component.
+func (d *Document) groundedRef(state []*BodyRef, j JointRef) bool {
+	for _, i := range refBodies(state, j) {
+		if c := state[i].Comp; c != 0 && Grounded(d.Feature(c)) {
+			return true
+		}
+	}
+	return false
+}
+
+// Limits are the range a joint's motion input ("Angle" or "Distance") may
+// take (its "<input> min" and "<input> max"); ok is false when it has none.
+func (d *Document) Limits(f *Feature, input string) (lo, hi float64, ok bool) {
+	lo, hi = math.Inf(-1), math.Inf(1)
+	if s := f.Inputs[input+" min"]; s != "" {
+		if v, err := d.Eval(s); err == nil {
+			lo, ok = v, true
+		}
+	}
+	if s := f.Inputs[input+" max"]; s != "" {
+		if v, err := d.Eval(s); err == nil {
+			hi, ok = v, true
+		}
+	}
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	return lo, hi, ok
+}
+
+// limited is a joint input held within its limits (noted in Warn when
+// it had to be).
+func (d *Document) limited(f *Feature, input string) (float64, error) {
+	v, err := d.input(f, input)
+	if err != nil {
+		return 0, err
+	}
+	lo, hi, ok := d.Limits(f, input)
+	if !ok {
+		return v, nil
+	}
+	c := math.Max(lo, math.Min(hi, v))
+	if c != v {
+		unit := " mm"
+		if input == "Angle" {
+			unit = "°"
+		}
+		f.Warn = fmt.Sprintf("%s held at its limit, %g%s", input, c, unit)
+	}
+	return c, nil
 }
 
 // JointXform moves frame b onto frame a, facing it (Z against Z) unless

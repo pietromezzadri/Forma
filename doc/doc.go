@@ -128,14 +128,18 @@ type Feature struct {
 	Bodies  []*brep.Body    `json:"-"`
 	Regions []sketch.Region `json:"-"`
 	Err     string          `json:"-"`
-	Warn    string          `json:"-"` // what an import left out
+	Warn    string          `json:"-"` // what an import left out (a joint: held at a limit)
 	RefMesh *brep.Mesh      `json:"-"` // a mesh feature's triangles
 	Local   []*brep.Body    `json:"-"` // a component's bodies in its own frame
 	Place   geom.Xform      `json:"-"` // and where it put them
 	Active  bool            `json:"-"` // before the rollback marker and not suppressed
 	After   []*BodyRef      `json:"-"` // the design's bodies after it
 	Gen     int             `json:"-"` // bumped whenever the results change
-	sig     uint64
+	// a joint: the component (or body's feature) it moved, and its axis
+	// (where the ends met, and the fixed end's Z) in the design
+	Moved     int        `json:"-"`
+	JointAxis geom.Frame `json:"-"`
+	sig       uint64
 }
 
 // Document is a design.

@@ -104,6 +104,9 @@ func stateSig(s []*BodyRef) uint64 {
 
 func (d *Document) nextGen() int { d.gen++; return d.gen }
 
+// Gen changes whenever any body of the design does.
+func (d *Document) Gen() int { return d.gen }
+
 // Operations a body-making feature can do (input "Operation").
 var Operations = []string{"New body", "Join", "Cut", "Intersect"}
 

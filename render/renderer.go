@@ -26,10 +26,11 @@ type Paint struct {
 	HoverColor mgl32.Vec4
 	Hover      uint32 // local ID drawn in HoverColor (0: none)
 	Width      float32
-	Dash       float32 // world units per dash period, 0 = solid
-	DepthBias  float32 // clip-space z pulled toward the camera
-	IDBase     uint32  // OR'ed into IDs in the pick pass
-	OnTop      bool    // faces: drawn over everything (no depth test)
+	Dash       float32    // world units per dash period, 0 = solid
+	DepthBias  float32    // clip-space z pulled toward the camera
+	IDBase     uint32     // OR'ed into IDs in the pick pass
+	OnTop      bool       // faces: drawn over everything (no depth test)
+	Offset     mgl32.Vec3 // moves what is drawn (a component in an exploded view)
 }
 
 type Renderer struct {
@@ -140,6 +141,7 @@ func (r *Renderer) common(s *Shader, v View, p Paint, pick bool) {
 		clip = mgl32.Vec4{0, 0, 0, 1}
 	}
 	s.Vec4("uClip", clip)
+	s.Vec3("uOffset", p.Offset)
 	if pick {
 		s.Uint("uIDBase", p.IDBase)
 		return

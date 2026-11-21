@@ -95,6 +95,14 @@ func (a *App) insertComponent(path string) {
 	}
 	f := doc.NewComponent(path, data)
 	f.Inputs["Path"] = path
+	// the first component is grounded: the rest are joined to it
+	first := true
+	for _, g := range a.doc.D.Features {
+		first = first && g.Kind != doc.KComponent
+	}
+	if first {
+		f.Inputs["Grounded"] = "1"
+	}
 	a.placeNew(f)
 	a.notify("Inserted %s as a component", filepath.Base(path))
 }
@@ -273,6 +281,7 @@ func (a *App) assemblyProperties(f *doc.Feature) bool {
 			src = "A copy of " + a.featName(f.Ref)
 		}
 		imgui.TextDisabled(src)
+		a.groundedProperty(f)
 		if j := a.jointedBy(f.ID); j != 0 {
 			imgui.TextWrapped(fmt.Sprintf("Placed by %s (its placement here comes first).", a.featName(j)))
 		}
@@ -327,6 +336,7 @@ func (a *App) assemblyProperties(f *doc.Feature) bool {
 		}
 		if motion != "" {
 			imgui.SeparatorText("Motion")
+			a.limitProperties(f, motion)
 			a.motionSlider(f, motion)
 		}
 		return true
@@ -339,11 +349,8 @@ func (a *App) assemblyProperties(f *doc.Feature) bool {
 func (a *App) motionSlider(f *doc.Feature, input string) {
 	v, _ := a.doc.D.Eval(f.Inputs[input])
 	x := float32(v)
-	lo, hi := float32(-180), float32(180)
-	if input == "Distance" {
-		r := float32(a.doc.Bounds().Diagonal())
-		lo, hi = -r, r
-	}
+	l, h := a.motionRange(f, input)
+	lo, hi := float32(l), float32(h)
 	imgui.SetNextItemWidth(-70)
 	if imgui.SliderFloatV("##motion", &x, lo, hi, "%.1f", 0) {
 		f.Inputs[input] = strconv.FormatFloat(math.Round(float64(x)*10)/10, 'f', -1, 64)
@@ -386,7 +393,18 @@ func (a *App) animateJoint() {
 	a.asm.animLast = now
 	in := doc.MotionInput(f)
 	v, _ := a.doc.D.Eval(f.Inputs[in])
-	if in == "Angle" {
+	if lo, hi, ok := a.doc.D.Limits(f, in); ok && !math.IsInf(lo, 0) && !math.IsInf(hi, 0) {
+		// back and forth between its limits
+		speed := 90.0
+		if in == "Distance" {
+			speed = math.Max(10, (hi-lo)/2)
+		}
+		v += a.asm.animDir * speed * dt
+		if v >= hi || v <= lo {
+			v = math.Max(lo, math.Min(hi, v))
+			a.asm.animDir = -a.asm.animDir
+		}
+	} else if in == "Angle" {
 		v = math.Mod(v+90*dt+180, 360) - 180
 	} else {
 		r := math.Max(10, a.doc.Bounds().Diagonal()/4)

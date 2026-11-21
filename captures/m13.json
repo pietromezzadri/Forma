@@ -1,0 +1,22 @@
+{
+  "width": 1600, "height": 900, "out": "out/m13",
+  "shots": [
+    {"name": "a_joint", "frames": 8, "do": [
+      "assemble.component:captures/data/plate.forma", "assemble.component:captures/data/pin.forma",
+      "assemble.component:captures/data/pin.forma",
+      "view.iso:now", "view.fit", "wait:10",
+      "edit.clear", "move:w:20,20,10@4", "wait:3", "click", "wait:3", "hold:shift",
+      "move:w:50.6,5.5,30@4", "wait:3", "click", "release:shift", "wait:6",
+      "assemble.joint:Slider", "view.fit", "wait:10", "log"
+    ]},
+    {"name": "b_limits", "frames": 8, "do": [
+      "feature.set:Distance min=-30", "feature.set:Distance max=10", "feature.set:Distance=40", "wait:10", "log"
+    ]},
+    {"name": "c_bom", "frames": 8, "do": [
+      "edit.clear", "assemble.bom", "wait:10", "assemble.bomcsv:captures/out/m13/bom.csv", "wait:4"
+    ]},
+    {"name": "d_exploded", "frames": 8, "do": [
+      "assemble.bom", "assemble.explode:0.45", "wait:4", "view.fit", "wait:12", "move:vp:0.98,0.98@2", "wait:6"
+    ]}
+  ]
+}

@@ -41,6 +41,7 @@ type BodyItem struct {
 	Visible bool
 	gen     int
 	gpu     *bodyGPU
+	Comp    int             // the component it belongs to (0: none)
 	mass    *brep.MassProps // worked out on request
 }
 
@@ -155,6 +156,7 @@ func (d *Document) sync() {
 			d.bodies[id] = it
 		}
 		it.F = f
+		it.Comp = r.Comp
 		it.Name = r.Name
 		it.Visible = !f.Hidden
 		bodies = append(bodies, it)

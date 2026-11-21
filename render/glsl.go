@@ -10,12 +10,13 @@ layout(location = 2) in uint aID;
 uniform mat4 uView;
 uniform mat4 uProj;
 uniform vec4 uClip; // a section: kept where dot(xyz, p) + w >= 0
+uniform vec3 uOffset; // moves the drawing (an exploded view)
 out vec3 vNrm;
 out vec3 vViewPos;
 flat out uint vID;
 void main() {
-	gl_ClipDistance[0] = dot(uClip.xyz, aPos) + uClip.w;
-	vec4 vp = uView * vec4(aPos, 1.0);
+	gl_ClipDistance[0] = dot(uClip.xyz, (aPos + uOffset)) + uClip.w;
+	vec4 vp = uView * vec4((aPos + uOffset), 1.0);
 	vViewPos = vp.xyz;
 	vNrm = mat3(uView) * aNrm;
 	vID = aID;
@@ -78,13 +79,14 @@ layout(location = 3) in float aDist;
 uniform mat4 uView;
 uniform mat4 uProj;
 uniform vec4 uClip;
+uniform vec3 uOffset;
 flat out uint gID;
 out float gDist;
 void main() {
 	gID = aID;
 	gDist = aDist;
-	gl_ClipDistance[0] = dot(uClip.xyz, aPos) + uClip.w;
-	gl_Position = uProj * uView * vec4(aPos, 1.0);
+	gl_ClipDistance[0] = dot(uClip.xyz, (aPos + uOffset)) + uClip.w;
+	gl_Position = uProj * uView * vec4((aPos + uOffset), 1.0);
 }`
 
 const lineGeom = `#version 410 core
@@ -276,11 +278,12 @@ layout(location = 2) in uint aID;
 uniform mat4 uView;
 uniform mat4 uProj;
 uniform vec4 uClip;
+uniform vec3 uOffset; // moves the drawing (an exploded view)
 flat out uint vID;
 void main() {
 	vID = aID;
-	gl_ClipDistance[0] = dot(uClip.xyz, aPos) + uClip.w;
-	gl_Position = uProj * uView * vec4(aPos, 1.0);
+	gl_ClipDistance[0] = dot(uClip.xyz, (aPos + uOffset)) + uClip.w;
+	gl_Position = uProj * uView * vec4((aPos + uOffset), 1.0);
 }`
 
 const flatFrag = `#version 410 core

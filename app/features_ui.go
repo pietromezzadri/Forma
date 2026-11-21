@@ -100,7 +100,7 @@ func (a *App) browserPanel() {
 				eye(b.F)
 			}
 			shown[b.F.ID] = true
-			if imgui.SelectableBoolV(fmt.Sprintf("%s##b%d", ui.Icon(kindIcon(b.F.Kind), b.Name), b.ID), a.browserSel == b.ID, 0, imgui.Vec2{}) {
+			if imgui.SelectableBoolV(fmt.Sprintf("%s##b%d", ui.Icon(bodyIcon(b.F), b.Name), b.ID), a.browserSel == b.ID, 0, imgui.Vec2{}) {
 				a.browserSel = b.ID
 			}
 			a.markItem("item:" + b.Name)

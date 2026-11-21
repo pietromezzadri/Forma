@@ -335,6 +335,7 @@ func (a *App) renderScene() {
 			continue
 		}
 		g := b.upload()
+		off := a.explodeOffset(b.Comp)
 		if g == nil {
 			continue
 		}
@@ -346,10 +347,10 @@ func (a *App) renderScene() {
 		if a.hover.Kind == KindFace && a.hover.Item == b.ID {
 			hoverFace = uint32(a.hover.Local)
 		}
-		r.DrawFaces(v, g.faces, render.Paint{Color: col, HoverColor: mgl32.Vec4{1, 0.65, 0.25, 0.45}, Hover: hoverFace}, false)
+		r.DrawFaces(v, g.faces, render.Paint{Offset: off, Color: col, HoverColor: mgl32.Vec4{1, 0.65, 0.25, 0.45}, Hover: hoverFace}, false)
 		for _, s := range a.sel {
 			if s.Kind == KindFace && s.Item == b.ID {
-				r.DrawFaceRange(v, g.faces, uint32(s.Local), render.Paint{Color: mgl32.Vec4{0.98, 0.55, 0.2, 1}})
+				r.DrawFaceRange(v, g.faces, uint32(s.Local), render.Paint{Offset: off, Color: mgl32.Vec4{0.98, 0.55, 0.2, 1}})
 			}
 		}
 		hoverEdge := uint32(0)
@@ -360,10 +361,10 @@ func (a *App) renderScene() {
 		if inSketch {
 			ec[3] = 0.35
 		}
-		r.DrawLines(v, g.edges, render.Paint{Color: ec, HoverColor: colHover, Hover: hoverEdge, Width: 1.6 * px, DepthBias: 1e-5}, false)
+		r.DrawLines(v, g.edges, render.Paint{Offset: off, Color: ec, HoverColor: colHover, Hover: hoverEdge, Width: 1.6 * px, DepthBias: 1e-5}, false)
 		for _, s := range a.sel {
 			if s.Kind == KindEdge && s.Item == b.ID {
-				r.DrawLineRange(v, g.edges, uint32(s.Local), render.Paint{Color: colSelect, Width: 3.2 * px, DepthBias: 2e-5})
+				r.DrawLineRange(v, g.edges, uint32(s.Local), render.Paint{Offset: off, Color: colSelect, Width: 3.2 * px, DepthBias: 2e-5})
 			}
 		}
 		for _, ref := range append([]Ref{a.hover}, a.sel...) {
@@ -372,7 +373,7 @@ func (a *App) renderScene() {
 				if ref == a.hover {
 					c = colHover
 				}
-				r.DrawPoint(v, g.verts, uint32(ref.Local), render.Paint{Color: c, Width: 9 * px, DepthBias: 3e-5})
+				r.DrawPoint(v, g.verts, uint32(ref.Local), render.Paint{Offset: off, Color: c, Width: 9 * px, DepthBias: 3e-5})
 			}
 		}
 	}
@@ -405,9 +406,10 @@ func (a *App) renderScene() {
 				continue
 			}
 			slot := vp.slots.slot(b.ID)
-			r.DrawFaces(v, b.gpu.faces, render.Paint{IDBase: idBase(KindFace, slot)}, true)
-			r.DrawLines(v, b.gpu.edges, render.Paint{IDBase: idBase(KindEdge, slot), Width: 7 * px, DepthBias: 1e-5}, true)
-			r.DrawPoints(v, b.gpu.verts, render.Paint{IDBase: idBase(KindVertex, slot), Width: 12 * px, DepthBias: 2e-5}, true)
+			off := a.explodeOffset(b.Comp)
+			r.DrawFaces(v, b.gpu.faces, render.Paint{Offset: off, IDBase: idBase(KindFace, slot)}, true)
+			r.DrawLines(v, b.gpu.edges, render.Paint{Offset: off, IDBase: idBase(KindEdge, slot), Width: 7 * px, DepthBias: 1e-5}, true)
+			r.DrawPoints(v, b.gpu.verts, render.Paint{Offset: off, IDBase: idBase(KindVertex, slot), Width: 12 * px, DepthBias: 2e-5}, true)
 		}
 	}
 	for _, s := range a.doc.Sketches {

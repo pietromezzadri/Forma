@@ -49,6 +49,7 @@ type App struct {
 	files      fileDialog
 	dialogOpen bool // a native file dialog is up
 	asm        assemblyState
+	m13        m13State
 	postQueue
 	showParams bool
 
@@ -226,6 +227,8 @@ func (a *App) buildUI() {
 	a.viewportWindow()
 	a.palette.draw(a)
 	a.clashWindow()
+	a.bomWindow()
+	a.explodeWindow()
 	a.files.draw()
 	a.paramsWindow()
 	a.helpWindow()

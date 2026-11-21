@@ -191,7 +191,8 @@ new ones as features land.
   Update from file, and its own history can't be edited in place (open its
   file, change it, save, Update).
 - **A2 Joints** are rigid, revolute, slider and cylindrical only (no ball,
-  planar or pin-in-slot); no motion limits, no contact, no motion study.
+  planar or pin-in-slot); limits (M13) only hold the motion input within
+  a range, they don't stop parts meeting; no contact, no motion study.
   Each joint moves its second component once, in timeline order: there is
   no solver, so loops (a four-bar linkage) can't be closed, and a component
   moved by two joints ends up where the later one puts it.
@@ -205,8 +206,15 @@ new ones as features land.
 - **A5 Interference** intersects the bodies pairwise: slow with many
   components, and a pin exactly the size of its hole (round faces lying on
   each other) may come back as "couldn't be checked" (K4).
-- **A6 Not there yet:** a bill of materials, exploded views, grounding a
-  component, rigid groups, nested-component editing.
+- ~~A6 No BOM, exploded views or grounding~~ (M13). Still: no rigid
+  groups, no nested-component editing; the BOM counts parts by their file
+  and design, so a part changed in one copy only is a separate line, and
+  it has no part numbers, materials or descriptions of its own (one
+  density for all).
+- **A7 Exploded views** are drawn only: one spread for the whole
+  assembly, each part along its joint's axis (or out from the middle), no
+  steps, trails or saved views, and measuring, the section view and
+  exports see the parts assembled.
 
 ## Exchange (`io/`)
 

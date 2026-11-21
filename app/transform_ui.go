@@ -66,7 +66,7 @@ func (a *App) transformable(f *doc.Feature) bool {
 	case doc.KMove:
 		return true
 	case doc.KComponent:
-		return a.jointedBy(f.ID) == 0
+		return a.jointedBy(f.ID) == 0 && !doc.Grounded(f)
 	case doc.KExtrude, doc.KRevolve, doc.KImport:
 		return len(f.Bodies) > 0
 	}

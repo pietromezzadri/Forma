@@ -258,7 +258,7 @@ func (a *App) registerCommands() *Commands {
 			}})
 	}
 	c.add(&Command{ID: "view.fit", Label: "Zoom to fit", Group: "View", Shortcut: "F", Icon: ui.FaExpand, Run: func(string) {
-		a.cam.Fit(a.doc.Bounds(), a.aspect(), a.animate())
+		a.cam.Fit(a.fitBounds(), a.aspect(), a.animate())
 	}})
 	c.add(&Command{ID: "view.layout", Label: "Reset panel layout", Group: "View",
 		Run: func(string) { a.layoutSet, a.layoutReset = false, true }})
@@ -279,6 +279,7 @@ func (a *App) registerCommands() *Commands {
 	a.registerSnapCommands(c)
 	a.registerTextCommands(c)
 	a.registerOffsetCommands(c)
+	a.registerM13Commands(c)
 	return c
 }
 

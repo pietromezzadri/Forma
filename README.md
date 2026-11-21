@@ -77,7 +77,8 @@ interference checks.</td>
   
   Fuzz tests check the results against volume identities.
 - **Assemblies.** Components from other `.forma` files; rigid, revolute,
-  slider and cylindrical joints with motion; interference checks.
+  slider and cylindrical joints with motion and limits; grounding;
+  interference checks; a bill of materials (CSV) and an exploded view.
 - **Inspect.** Measuring, mass properties and section views.
 - **Exchange.**
   - STEP AP214: export of solids and assemblies, and import of
@@ -184,8 +185,8 @@ PNGs to `captures/out/`. The images above come from that script. See
   a revolved body (a pattern's copies that stand apart go in as one
   boolean), clearance on any inlay, and booleans 2–3× faster. Left: more
   speed ([K3](docs/LIMITATIONS.md)).
-- **M13 assembly:** a bill of materials, exploded views, grounding, joint
-  limits.
+- **M13 assembly** (done): a bill of materials, exploded views,
+  grounding, joint limits. Left: rigid groups, contact, motion studies.
 - **M14 simulation:** static stress analysis (volume mesh, loads and supports
   on faces, materials, stress and displacement plots).
 - Later: corner patches where three fillets meet
