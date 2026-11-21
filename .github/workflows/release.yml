@@ -1,0 +1,79 @@
+# A release for every v* tag: the tests, then a self-contained Windows build
+# (tools/release/build.ps1) attached to the GitHub release with its checksum.
+# Tags with a hyphen (v0.2.0-beta.1) are marked as pre-releases.
+#
+#   git tag -a v0.1.0 -m "Forma 0.1.0" && git push origin v0.1.0
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (no release is made; the zip is kept as an artifact)"
+        required: true
+        default: "0.0.0-test"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-binutils
+
+      - name: Put MSYS2's gcc on the PATH
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH "${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Version
+        id: v
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { $v = $env:GITHUB_REF_NAME -replace '^v', '' } else { $v = '${{ inputs.version }}' }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "pre=$(if ($v -match '-') { 'true' } else { 'false' })" >> $env:GITHUB_OUTPUT
+
+      - name: Vet and test
+        shell: pwsh
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Build
+        shell: pwsh
+        run: tools/release/build.ps1 -Version ${{ steps.v.outputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forma-${{ steps.v.outputs.version }}-windows-x64
+          path: dist/*
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Forma ${{ steps.v.outputs.version }}
+          prerelease: ${{ steps.v.outputs.pre }}
+          generate_release_notes: true
+          files: |
+            dist/forma-${{ steps.v.outputs.version }}-windows-x64.zip
+            dist/SHA256SUMS.txt

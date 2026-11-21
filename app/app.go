@@ -17,8 +17,9 @@ import (
 	"forma/ui"
 )
 
-// Version shows in the title bar.
-const Version = "0.1.0-dev"
+// Version shows in the title bar. Release builds set it from the tag
+// (tools/release/build.ps1: -ldflags "-X forma/app.Version=…").
+var Version = "0.1.0-dev"
 
 type App struct {
 	win     *glfw.Window

@@ -3,3 +3,4 @@ captures/out/
 cap_*.txt
 run_*.txt
 *.forma.autosave
+dist/
