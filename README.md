@@ -43,6 +43,14 @@ interference checks.</td>
 <td><b>Electronics.</b> An Arduino sketch runs on an emulated Uno, and its
 servo and motor move the assembly's joints.</td>
 </tr>
+<tr>
+<td colspan="2"><img src="docs/images/drawing.png" alt="A drawing sheet of the part: front, top and isometric views, a section through two counterbored holes, dimensions and a title block"></td>
+</tr>
+<tr>
+<td colspan="2"><b>Drawings.</b> Views of the part with hidden lines and centre
+lines, a section, dimensions tied to its edges and a title block, exported
+as PDF, SVG or DXF.</td>
+</tr>
 </table>
 
 ## Features
@@ -94,6 +102,16 @@ servo and motor move the assembly's joints.</td>
   run it, turn a pot, press a button, read the serial monitor. The parts
   also come as 3D models (Uno, SG90, TT motor, AA holder, driver boards)
   to design round.
+- **Drawings.** Sheets from A4 to A0 (or ANSI A–E) with a title block, in
+  third or first angle projection.
+  - Front, top, side and isometric views, laid out and scaled to the sheet.
+  - Hidden lines, silhouettes of curved faces, and centre lines on holes
+    and bosses.
+  - Projected views and sections (cut by the kernel and hatched) that stay
+    lined up with the view they come from.
+  - Horizontal, vertical, aligned, radius, diameter and angle dimensions,
+    tied to the edges they measure, so they follow an edit. Notes.
+  - Exported as PDF, SVG or DXF R12. The sheets are saved in the design.
 - **Exchange.**
   - STEP AP214: export of solids and assemblies, and import of
     AP203/AP214/AP242 solids on analytic surfaces.
@@ -153,6 +171,7 @@ dialogs on macOS and Linux go through zenity and haven't been tried.
 | Ctrl+I / Ctrl+E | Import / export (STEP, STL, OBJ) |
 | G | Grid snap on / off (Ctrl held while dragging: free; Shift: fine) |
 | B (in a sketch) | Spline tool |
+| Drawing (File group) | The design's drawing sheet: wheel zooms, middle drag pans, drag a view, dimension or note to move it, Finish goes back |
 | F1 | Shortcuts |
 
 A typical part:
@@ -181,6 +200,7 @@ PNGs to `captures/out/`. The images above come from that script. See
 | `brep/` | half-edge B-rep, builder and Euler operators, validity check, tessellation, booleans, face merging, mass properties |
 | `ops/` | primitives, extrude, revolve, fillet and chamfer, holes, shell |
 | `fea/` | static stress analysis: volume mesher, 10-node tetrahedra, solver |
+| `drawing/` | drawings: views with hidden lines, sections, sheets, dimensions, SVG / PDF / DXF |
 | `avr/` | an ATmega328P emulator (an Arduino Uno's chip): CPU, ports, timers, serial, ADC |
 | `elec/` | an Arduino sketch run against batteries, motor drivers, motors, servos, LEDs, buttons; the parts library |
 | `sketch/` | sketch entities, constraints, solver, region detection |
@@ -222,9 +242,26 @@ PNGs to `captures/out/`. The images above come from that script. See
   floor (dynamics, wheel contact), loads from the mechanism back on the
   motors, SPI / I2C parts, reading a Wokwi diagram. Circuit-level SPICE
   simulation is left to KiCad / LTspice.
-- Later: corner patches where three fillets meet
-  ([F2](docs/LIMITATIONS.md)), 2D drawings to SVG / PDF, scripted parts in
-  Starlark.
+- **M16 drawings** (done): sheets with orthographic and isometric views,
+  hidden lines, sections, centre lines, dimensions that follow the model,
+  and a title block, exported as PDF, SVG or DXF. Left: detail and broken
+  views, a parts list with balloons, tolerances and GD&T
+  ([DW1–DW12](docs/LIMITATIONS.md)).
+- **M17 car dynamics** (planned): rigid-body dynamics and wheel contact, so
+  a car run by its Arduino sketch drives on the floor, and loads from the
+  mechanism back on its motors ([EL6](docs/LIMITATIONS.md)).
+- **M18 scripted parts** (planned): parts written in Starlark, with
+  parameters, as a step in the timeline like any feature.
+- **M19 fillet upgrades** (planned): corner patches where three fillets
+  meet, tangent chains followed, more kinds of edges, chamfers by two
+  distances ([F1–F5](docs/LIMITATIONS.md)).
+- **M20 screws and threaded holes** (planned): a fastener library of
+  screws (ISO metric to begin with: socket head, button head, countersunk,
+  hex) inserted as components; threaded holes made to fit them, plain,
+  counterbored or countersunk (the countersink's angle chosen), with the
+  thread modelled or shown as a cosmetic thread; a screw dropped into a
+  hole is placed and jointed in it, and shown on drawings as a hole
+  callout ([H1](docs/LIMITATIONS.md)).
 
 ## Stack
 

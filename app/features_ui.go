@@ -60,6 +60,11 @@ func (a *App) browserPanel() {
 		imgui.End()
 		return
 	}
+	if a.dw != nil && a.sk == nil {
+		a.drawingBrowser()
+		imgui.End()
+		return
+	}
 	eye := func(f *doc.Feature) {
 		label := ui.Icon(rune(ui.FaEye), "")
 		if f.Hidden {
@@ -190,6 +195,11 @@ func (a *App) featureMenu(f *doc.Feature) {
 
 func (a *App) propertiesPanel() {
 	if !imgui.Begin("Properties") {
+		imgui.End()
+		return
+	}
+	if a.sk == nil && a.dw != nil {
+		a.drawingProperties()
 		imgui.End()
 		return
 	}

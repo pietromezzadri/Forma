@@ -1,0 +1,41 @@
+{
+  "width": 1600, "height": 900, "out": "out/m16",
+  "shots": [
+    {"name": "a_part", "frames": 6, "do": [
+      "file.open:captures/data/plate.forma", "view.iso:now", "view.fit", "wait:10", "log"
+    ]},
+    {"name": "b_sheet", "frames": 6, "do": [
+      "move:btn:drawing.open@6", "click", "wait:10", "log"
+    ]},
+    {"name": "c_dims", "frames": 6, "do": [
+      "move:btn:drawing.dim.h@6", "click", "wait:2",
+      "move:dv:0:20,0,0@8", "wait:2", "click", "wait:2", "move:dv:0:20,0,0,0,-14@8", "wait:2", "click", "wait:2",
+      "move:btn:drawing.dim.v@6", "click", "wait:2",
+      "move:dv:0:40,0,5@8", "wait:2", "click", "wait:2", "move:dv:0:40,0,5,14,0@8", "wait:2", "click", "wait:2",
+      "move:btn:drawing.dim.d@6", "click", "wait:2",
+      "move:dv:1:25,15,10@8", "wait:2", "click", "wait:2", "move:dv:1:25,15,10,16,14@8", "wait:2", "click", "wait:2",
+      "move:btn:drawing.dim.h@6", "click", "wait:2",
+      "move:dv:1:20,15,10@8", "wait:2", "click", "wait:2", "move:dv:1:0,22,10@8", "wait:2", "click", "wait:2",
+      "move:dv:1:10,30,10,0,12@8", "wait:2", "click", "wait:2",
+      "move:btn:drawing.dim.v@6", "click", "wait:2",
+      "move:dv:1:20,15,10@8", "wait:2", "click", "wait:2", "move:dv:1:30,0,10@8", "wait:2", "click", "wait:2",
+      "move:dv:1:40,7,10,14,0@8", "wait:2", "click", "wait:2",
+      "key:escape", "wait:4", "log"
+    ]},
+    {"name": "d_section", "frames": 6, "do": [
+      "move:dv:1:5,5,10@8", "wait:2", "click", "wait:4",
+      "move:btn:drawing.section@6", "click", "wait:4", "move:btn:drawing.section.right@6", "click", "wait:10",
+      "drawing.note:40,62:ALL EDGES DEBURRED\\nGENERAL TOLERANCE ± 0.1",
+      "drawing.set:material=Aluminium 6061", "drawing.set:author=Forma", "drawing.set:number=FM-0016", "drawing.set:title=Base plate",
+      "key:escape", "wait:10", "log"
+    ]},
+    {"name": "e_drag", "frames": 6, "do": [
+      "move:dv:3:20,15,10@8", "wait:2", "drag:sh:330,175@20", "wait:10",
+      "move:sh:120,110@6", "wait:2", "wheel:3@8", "wait:10", "log"
+    ]},
+    {"name": "f_export", "frames": 4, "do": [
+      "view.fit", "wait:4",
+      "drawing.export:captures/out/m16/plate.pdf", "drawing.export:captures/out/m16/plate.svg", "drawing.export:captures/out/m16/plate.dxf", "wait:4", "log"
+    ]}
+  ]
+}

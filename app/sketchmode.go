@@ -721,6 +721,10 @@ func needs(k sketch.ConKind) string {
 
 // deleteSelection removes the selected sketch geometry and dimensions.
 func (a *App) deleteSelection() {
+	if a.dw != nil && a.sk == nil {
+		a.drawingDelete()
+		return
+	}
 	if a.sk != nil {
 		s := a.sk.item.S
 		for _, r := range a.sel {

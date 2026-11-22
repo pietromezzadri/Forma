@@ -174,7 +174,9 @@ func (a *App) toolbar() {
 	flags := imgui.WindowFlagsNoScrollbar | imgui.WindowFlagsNoSavedSettings | imgui.WindowFlagsNoTitleBar
 	imgui.PushStyleVarVec2(imgui.StyleVarItemSpacing, imgui.Vec2{X: 4, Y: 2})
 	if imgui.InternalBeginViewportSideBar("##toolbar", imgui.MainViewport(), imgui.DirUp, h, flags) {
-		if a.sk == nil {
+		if a.sk == nil && a.dw != nil {
+			a.drawingRibbon(r)
+		} else if a.sk == nil {
 			a.partRibbon(r)
 		} else {
 			a.sketchRibbon(r)
@@ -191,6 +193,7 @@ func (a *App) partRibbon(r *ribbon) {
 	r.cmd("file.save", ui.FaFloppy, "Save", false)
 	r.cmd("file.import", icImport, "Import", false)
 	r.cmd("file.export", ui.FaDownload, "Export", false)
+	r.cmd("drawing.open", icDrawing, "Drawing", false)
 	r.end("File")
 
 	r.group()

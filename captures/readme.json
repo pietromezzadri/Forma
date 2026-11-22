@@ -36,8 +36,23 @@
     {"name": "part_hero", "frames": 8, "do": [
       "edit.clear", "camto:135,-30", "wait:30", "view.fit", "wait:10", "move:vp:0.5,0.5@2", "wheel:1.6@10", "wait:6", "move:vp:0.98,0.98@2", "wait:10"
     ]},
+    {"name": "drawing", "frames": 8, "do": [
+      "drawing.open:A3", "wait:10",
+      "drawing.select:view:2", "edit.delete", "drawing.select:view:0", "drawing.section.right", "drawing.set:view.at=-30", "wait:6",
+      "drawing.adddim:0:h:-40,-17,6;40,-17,6:0,-42",
+      "drawing.adddim:0:v:0,-25,0;0,-8.5,26:-96,0",
+      "drawing.adddim:1:h:-30,15,12;30,15,12:0,64",
+      "drawing.adddim:1:v:30,15,12;30,-15,12:96,0",
+      "drawing.adddim:1:d:8.660,-5,24.5:-34,-34",
+      "drawing.adddim:1:r:37.657,-22.657,0:92,-62",
+      "drawing.adddim:1:d:34.5,15,12:96,56", "drawing.set:dim.text=4× Ø5 C'BORE Ø<> × 3",
+      "drawing.note:30,42:ALL EDGES DEBURRED\nTOP EDGES R2, BOSS CHAMFER 1.5 × 45°",
+      "drawing.set:title=Base with boss", "drawing.set:number=FM-0016-01", "drawing.set:material=Aluminium 6061-T6",
+      "drawing.set:finish=Anodised", "drawing.set:author=Forma", "drawing.set:revision=A",
+      "edit.clear", "move:vp:0.5,0.98@2", "view.fit", "wait:12"
+    ]},
     {"name": "part_section", "frames": 8, "do": [
-      "camto:135,40", "wait:40",
+      "drawing.close", "camto:135,40", "wait:40",
       "move:w:-20,-10,0@6", "wait:4", "click", "wait:6",
       "move:btn:feature.shell@6", "click", "wait:15",
       "move:prop:Thickness@6", "click", "wait:3", "key:ctrl+a", "type:1.5", "key:enter", "wait:30",

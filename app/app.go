@@ -38,6 +38,7 @@ type App struct {
 	toast   toast
 
 	sk         *sketchMode // the sketch being edited, nil outside sketch mode
+	dw         *drawMode   // the drawing sheet shown, nil outside drawing mode
 	browserSel int         // body or sketch picked in the browser
 
 	showGrid    bool

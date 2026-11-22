@@ -40,6 +40,10 @@ func (a *App) mainMenu() {
 		a.menuItem("file.import")
 		a.menuItem("file.export")
 		imgui.Separator()
+		a.menuItem("drawing.open")
+		a.menuItem("drawing.sheet")
+		a.menuItem("drawing.export")
+		imgui.Separator()
 		a.menuItem("file.quit")
 		imgui.EndMenu()
 	}
@@ -117,7 +121,9 @@ func (a *App) statusBar() {
 		imgui.TextUnformatted(hov)
 		imgui.SameLine()
 		right := fmt.Sprintf("%d selected   ·   mm   ·   %.0f fps", len(a.sel), imgui.CurrentIO().Framerate())
-		if a.vp.hasCursor {
+		if a.dw != nil && a.sk == nil {
+			right = a.drawingStatus() + fmt.Sprintf("   ·   %.0f fps", imgui.CurrentIO().Framerate())
+		} else if a.vp.hasCursor {
 			p := a.vp.cursor3
 			right = fmt.Sprintf("(%.2f, %.2f, %.2f)   ·   %s", p.X, p.Y, p.Z, right)
 		}
@@ -263,6 +269,12 @@ func (a *App) helpWindow() {
 			{"G", "Grid snap on / off"},
 			{"Double-click a dimension", "Type its value (mm, cm, in, deg, 20+5)"},
 			{"Ctrl+Enter", "Finish the sketch"},
+			{"", ""},
+			{"In a drawing", ""},
+			{"Wheel / middle or right drag", "Zoom / pan the sheet"},
+			{"Click, drag", "Select, move a view, dimension or note"},
+			{"Double-click a view", "Zoom to it"},
+			{"Right click", "Drop the dimension tool"},
 		}
 		if imgui.BeginTableV("keys", 2, imgui.TableFlagsRowBg|imgui.TableFlagsSizingStretchProp, imgui.Vec2{}, 0) {
 			for _, r := range rows {

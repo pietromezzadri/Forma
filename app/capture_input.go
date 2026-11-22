@@ -157,6 +157,26 @@ func (c *captureRun) where(spec string) (imgui.Vec2, bool) {
 		if len(n) == 2 {
 			return imgui.Vec2{X: float32(n[0]), Y: float32(n[1])}, true
 		}
+	case "sh":
+		// sheet mm on the drawing shown
+		if a.dw != nil && len(n) == 2 {
+			return a.dw.toScreen(&a.vp, geom.V2(n[0], n[1])), true
+		}
+	case "dv":
+		// a model point where the drawing's view (by index) shows it,
+		// optionally moved by sheet mm: dv:<view>:<x>,<y>,<z>[,<dx>,<dy>]
+		vi, pt, _ := strings.Cut(rest, ":")
+		i, _ := strconv.Atoi(vi)
+		m := floats(pt)
+		if s := a.dwSheet(); s != nil && a.dw.res != nil && i >= 0 && i < len(s.Views) && len(m) >= 3 {
+			if b := a.dw.res.Views[s.Views[i].ID]; b != nil && b.Err == "" {
+				p := b.SheetOf(geom.V3(m[0], m[1], m[2]))
+				if len(m) == 5 {
+					p = p.Add(geom.V2(m[3], m[4]))
+				}
+				return a.dw.toScreen(&a.vp, p), true
+			}
+		}
 	case "sk":
 		if a.sk != nil && len(n) == 2 {
 			return a.skScreen(a.sk.item.S, geom.V2(n[0], n[1])), true

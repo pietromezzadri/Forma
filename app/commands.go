@@ -258,6 +258,10 @@ func (a *App) registerCommands() *Commands {
 			}})
 	}
 	c.add(&Command{ID: "view.fit", Label: "Zoom to fit", Group: "View", Shortcut: "F", Icon: ui.FaExpand, Run: func(string) {
+		if a.dw != nil {
+			a.dw.fit = true
+			return
+		}
 		a.cam.Fit(a.fitBounds(), a.aspect(), a.animate())
 	}})
 	c.add(&Command{ID: "view.layout", Label: "Reset panel layout", Group: "View",
@@ -273,6 +277,7 @@ func (a *App) registerCommands() *Commands {
 	c.add(&Command{ID: "palette", Label: "Command palette", Group: "Help", Shortcut: "Ctrl+K", Icon: ui.FaSearch,
 		Run: func(string) { a.palette.open = true; a.palette.filter = ""; a.palette.cursor = 0 }})
 	a.registerModifyCommands(c)
+	a.registerDrawingCommands(c)
 	a.registerExchangeCommands(c)
 	a.registerAssemblyCommands(c)
 	a.registerInspectCommands(c)
@@ -287,6 +292,10 @@ func (a *App) registerCommands() *Commands {
 
 // escape cancels the tool in progress, then the tool, then the selection.
 func (a *App) escape() {
+	if a.dw != nil && a.sk == nil {
+		a.drawingEscape()
+		return
+	}
 	if a.sk != nil {
 		sm := a.sk
 		switch {

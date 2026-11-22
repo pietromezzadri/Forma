@@ -113,7 +113,7 @@ new ones as features land.
 
 ## Holes, patterns, mirror, move
 
-- **H1 Holes:** no threads (cosmetic or modelled), the countersink is always
+- **H1 Holes:** no threads (cosmetic or modelled; planned in M20), the countersink is always
   90° and the drill point 118°; holes go square into the sketch's face only.
 - **P1 Linear patterns** run along X, Y or Z only (not along an edge or a
   sketch line); no pattern along a path; no skipping instances.
@@ -283,6 +283,54 @@ new ones as features land.
 - **EL8 Wiring is by name:** pins are picked per part, not drawn; no
   wires, no breadboard view, no reading a Wokwi `diagram.json` or a KiCad
   netlist; one board per circuit and an Uno only.
+
+## Drawings (`drawing/`, `app/drawing_ui.go`; M16)
+
+- **DW1 Hidden lines come from the tessellation:**
+  - Something in front of a line by less than about 0.04 % of the part's
+    size doesn't hide it.
+  - Where a torus or spline face hides part of its own outline, only from
+    2 % of the part's size in front.
+  - The split between visible and hidden is found to a hundredth of a
+    sample step (about 1/500 of the part's size).
+- **DW2 Views:** base, projected and full sections only.
+  - No detail views, broken views, auxiliary views at any angle, half,
+    offset or aligned sections, or breakout views.
+  - No exploded assembly view on a sheet.
+  - A section cuts with one straight plane through the whole part.
+- **DW3 Dimensions:**
+  - Horizontal, vertical, aligned, radius, diameter and angle only. No
+    ordinate, baseline or chain dimensions, no arc lengths.
+  - Tolerances only as typed text, no GD&T frames or datums.
+  - Nothing is dimensioned automatically.
+  - The text sits on the line (no horizontal text on a vertical
+    dimension). No snapping of a dimension's place to others.
+- **DW4 Annotations:** no automatic hole callouts, no balloons or parts
+  list for an assembly, no surface finish or weld symbols, no revision
+  table.
+- **DW5 One sheet per export:** each sheet is its own PDF, SVG or DXF (no
+  multi-page PDF).
+- **DW6 Text:**
+  - Laid out with Helvetica's metrics, and written in Helvetica (PDF), a
+    Helvetica / Arial family (SVG) or the reader's DXF font.
+  - On screen it is the UI's font stretched to the same widths.
+  - No choice of font, and no bold on screen.
+- **DW7 DXF R12:** arcs only where a circle is seen end on. Ellipses and
+  everything else are polylines.
+- **DW8 Speed:** a view is worked out again from scratch when any of its
+  bodies changes (cached otherwise). A big assembly takes seconds, and the
+  app waits for it.
+- **DW9 Hatching:** one pattern (45°, the direction and spacing alternating
+  between bodies), no patterns by material.
+- **DW10 Sections go through the booleans:** a plane lying along faces is
+  retried a hair beyond it (K4b), and a body that still can't be cut is
+  left out with a warning on the view.
+- **DW11 Anchors are face names** (as D1): an edit that renames or splits
+  the faces either side of an anchored edge loses the dimension, which is
+  then listed with why it can't be drawn.
+- **DW12 Placement:** new projected views and sections are placed by the
+  bodies' extent, and nothing stops views, dimensions or notes from
+  overlapping.
 
 ## Exchange (`io/`)
 

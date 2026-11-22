@@ -149,6 +149,11 @@ func (a *App) viewportWindow() {
 		vp.scale = float32(fbw) / float32(ww)
 	}
 	vp.px, vp.py = int(vp.size.X*vp.scale), int(vp.size.Y*vp.scale)
+	if a.dw != nil && a.sk == nil {
+		a.drawingViewport()
+		imgui.End()
+		return
+	}
 	a.r.Resize(vp.px, vp.py)
 	tex := imgui.NewTextureRefTextureID(imgui.TextureID(a.r.Color.Texture))
 	imgui.ImageV(*tex, vp.size, imgui.Vec2{X: 0, Y: 1}, imgui.Vec2{X: 1, Y: 0})
@@ -353,7 +358,7 @@ func (a *App) doubleClick() {
 // then reads what is under the cursor.
 func (a *App) renderScene() {
 	vp := &a.vp
-	if vp.px == 0 || vp.py == 0 {
+	if vp.px == 0 || vp.py == 0 || (a.dw != nil && a.sk == nil) {
 		return
 	}
 	a.computeView()

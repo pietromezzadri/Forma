@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"forma/brep"
+	"forma/drawing"
 	"forma/expr"
 	"forma/geom"
 	"forma/sketch"
@@ -152,6 +153,9 @@ type Document struct {
 	// after the Rollback-th); -1 means all of them.
 	Rollback int `json:"rollback"`
 	NextID   int `json:"next"`
+	// Drawings are the design's drawing sheets (M16): made from its
+	// bodies whenever they are shown, so only what is on them is kept.
+	Drawings []*drawing.Sheet `json:"drawings,omitempty"`
 
 	// Bodies are the design's bodies after the last feature in play.
 	Bodies []*BodyRef `json:"-"`

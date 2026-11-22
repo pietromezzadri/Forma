@@ -533,3 +533,127 @@ What each milestone added, in the order they were built. The current gaps are in
   `TestElectronicsDemo` with `FORMA_WRITE_DEMO` set, with a wired copy
   (`arm_and_wheel_wired.forma`) to open and run. Capture
   `captures/m15.json`.
+
+## M16: drawings
+
+- **Views** (`drawing/view.go`): a view looks at the design's bodies along
+  a frame (right, up, the way it looks). Every B-rep edge is sampled, and
+  every curved face's **silhouette** is found as the zero line of n·D over
+  its own triangles (the mesh's normals are the surface's), chained into
+  polylines. Each line is then split into **visible and hidden** runs. Its
+  points are tested against all the bodies' triangles, projected and kept
+  in a 2D grid. A change of state is bisected to a hundredth of a sample
+  step, and lone flips are smoothed out. A silhouette is found a hair
+  inside the true outline, where its own face's nearer facets stand far in
+  front of it, so a cylinder's, cone's or sphere's outline ignores its own
+  face: a line of sight touching it doesn't meet it again. Other faces
+  count only from 2 % of the part's size in front. Lines lying on more
+  important lines are dropped: visible edges, then silhouettes, tangent
+  edges, hidden edges, hidden silhouettes, nearest first. A hole's far rim
+  goes under its near one, and a cylinder's outline under an edge. Seams
+  are left out. Tangent edges are kept as thin lines and can be switched
+  off. A circle seen end on is kept as a circle.
+- **Sections** (`drawing/section.go`): the bodies are cut by a plane with
+  the kernel's booleans (the bodies ∩ a half-space box). A plane lying
+  along a face is retried a hair beyond it. The faces on the plane come
+  back as regions, hatched at 45° every 2.5 mm, even–odd between their
+  loops. Neighbouring bodies alternate direction and spacing.
+- **Sheets** (`drawing/sheet.go`): ISO A4–A0 and ANSI A–E, landscape or
+  portrait, third or first angle projection.
+  - **Frame:** 20 mm on the filing side and 10 elsewhere, zones marked
+    every 50 mm, and centring marks.
+  - **Title block:** title, number, material, finish, drawn and checked by,
+    date, revision, company, scale, size, units and the projection symbol.
+  - **Views:** base views (front, back, top, bottom, left, right and four
+    isometric). Projected views and sections are seen from a side of
+    another view, by the projection's rule, and stay lined up with it.
+    They are placed clear of it from the bodies' extent, and a view's
+    centre is the bodies' middle, so every view of them lines up.
+  - **Standard sheet:** front, top, right and an isometric view, at the
+    largest ISO 5455 scale the three orthographic views fit at. The
+    isometric view takes its own smaller scale in the corner they leave,
+    and is labelled with it.
+  - **Centre lines:** a cross on every hole or boss seen end on, and a
+    chain line down the axis of every cylinder or cone seen side on. Only
+    for faces that go at least three-quarters of the way round, so a
+    rounded corner gets none.
+  - **Sections:** each gets its cutting line (thin chain, wide ends) with
+    arrows the way it looks, its letter, and a SECTION A-A label.
+  - **Line types:** after ISO 128 (wide 0.5 mm, narrow 0.25, dashed hidden
+    lines, long-dash-dot centre lines).
+- **Dimensions** (`drawing/dims.go`): horizontal, vertical, aligned,
+  radius, diameter and angle, plus notes.
+  - **Anchors:** a dimension is anchored to an edge by the names of the
+    faces either side of it and a model point, as fillets are, or to a
+    silhouette by its face. An anchor means the edge itself, its end, or
+    its circle's centre. That is how they follow an edit: moving the boss
+    or changing a parameter changes the number.
+  - **Measuring:** two parallel lines are measured square to them, and a
+    circle with a horizontal dimension gives its diameter.
+  - **Drawing:** extension lines with gaps and overshoot, arrowheads
+    inside, or outside when the span is narrow, and text readable from the
+    bottom or the right. Radius and diameter dimensions use a leader and a
+    shoulder. Text can stand in for the value (`<>` is the value:
+    "4× Ø5 C'BORE Ø<> × 3").
+- **Export:** written from one page of paths (with arcs where they are
+  circles), fills and text laid out with Helvetica's metrics.
+  - **SVG** in millimetres: a class per pen, true circles and arcs.
+  - **PDF**: one page at full size, flate-compressed, with the base fonts
+    Helvetica and Helvetica-Bold in WinAnsi, so nothing is embedded.
+  - **DXF R12**: a layer per pen with CONTINUOUS / DASHED / CENTER line
+    types, CIRCLE and ARC, polylines, SOLID arrowheads, TEXT with `%%c`
+    and `%%d`.
+- **In the design** (`doc/drawings.go`): `Document.Drawings` keeps the
+  sheets: their views, dimensions, notes and title block, never their
+  lines. They are saved with the design and are part of undo. Older Forma
+  versions read the file and ignore them.
+- **The app** (`app/drawing_ui.go`): the File group's Drawing button opens
+  the design's first sheet, or a new A3 with the standard views.
+  - **The sheet** is drawn on the viewport with ImGui's draw list: lines at
+    their pens' widths and dashes. Text is placed glyph by glyph from the
+    font atlas, so it turns to any angle, and is stretched to the width the
+    page laid it out at.
+  - **Ribbon:** Finish, New sheet (by size), Fit, Base view, Projected and
+    Section (by side), the six dimension tools, Note, and Export (PDF, SVG,
+    DXF).
+  - **Navigation:** the wheel zooms about the cursor, and middle or right
+    drag pans.
+  - **Editing:** a click selects a view, dimension or note, and dragging
+    moves it (a view takes the views seen from it along). Double-clicking a
+    view zooms to it.
+  - **Dimension tools:** these show what they would pick under the cursor
+    (an edge, an end, a centre), then the dimension itself at the cursor
+    before it is placed.
+  - **Panels:** the Browser lists the sheets, views and annotations with
+    their values. Properties edits the sheet (size, orientation,
+    projection, scale, decimals, the title block), a view (direction,
+    scale, hidden lines, tangent edges, centre lines, where a section
+    cuts), a dimension's text and a note.
+  - **Commands:** `drawing.*` (open, sheet, base, proj, section, dim, note,
+    adddim, select, set, export) for the palette and capture scripts.
+    Capture coordinates `sh:<x>,<y>` (sheet mm) and
+    `dv:<view>:<x>,<y>,<z>` (a model point in a view).
+- **Tests:**
+  - `drawing/view_test.go`:
+    - a plate with a hole seen from the front: 140 mm visible and the
+      hole's 20 hidden;
+    - the same plate from the top: the rim known as a circle, the far rim
+      under the near one;
+    - a cylinder side on and end on;
+    - a boss's outline visible;
+    - a section through the hole: 440 mm² cut, and its hatching.
+  - `drawing/sheet_test.go`:
+    - the side frames for both projections;
+    - scales;
+    - the standard layout lined up and inside the area, and a big part
+      going down to 1:5;
+    - six dimensions measuring 60, 15, Ø16, R10, 25 and 90° and following
+      the boss moved and made bigger;
+    - a section sheet;
+    - every page written as SVG (parsed as XML), PDF (each xref offset at
+      its object, the content stream inflated, every text there) and DXF
+      (group codes, entity counts).
+  - `doc/drawings_test.go`: a sheet saved and read back with the design,
+    and its dimension following a parameter.
+  - Captures: `captures/m16.json` (the tools driven by clicks, a section,
+    a note, dragging, export) and the README's `drawing` shot.
