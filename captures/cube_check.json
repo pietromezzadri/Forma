@@ -1,0 +1,20 @@
+{
+  "width": 1600, "height": 900, "out": "out/cube_check",
+  "shots": [
+    {"name": "a_iso", "frames": 6, "do": [
+      "file.new", "create.box:X=0,Y=0,Width=60,Depth=30,Height=15", "edit.clear", "view.iso:now", "view.fit", "wait:30"
+    ]},
+    {"name": "b_oblique", "frames": 6, "do": [
+      "camto:20,-15", "wait:40"
+    ]},
+    {"name": "c_low", "frames": 6, "do": [
+      "camto:-120,25", "wait:40"
+    ]},
+    {"name": "d_click_top", "frames": 6, "do": [
+      "view.iso:now", "wait:10", "move:ui:1218,170@6", "wait:4", "click", "wait:60"
+    ]},
+    {"name": "e_click_right", "frames": 6, "do": [
+      "view.iso:now", "wait:10", "move:ui:1238,195@6", "wait:4", "click", "wait:60"
+    ]}
+  ]
+}

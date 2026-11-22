@@ -1,0 +1,18 @@
+{
+  "width": 1600, "height": 900, "out": "out/elec_parts",
+  "shots": [
+    {"name": "a_open", "frames": 6, "do": [
+      "file.new", "electronics.add", "electronics.part:button=btn", "wait:10",
+      "move:ui:1225,345@4", "click", "wait:6",
+      "move:ui:1270,399@4", "click", "wait:6", "log"
+    ]},
+    {"name": "b_picked", "frames": 6, "do": [
+      "move:ui:1227,573@6", "click", "wait:8",
+      "move:ui:1431,449@6", "click", "wait:12", "log"
+    ]},
+    {"name": "c_models", "frames": 8, "do": [
+      "electronics.model:button", "electronics.model:pot", "electronics.model:led", "wait:6",
+      "electronics.open", "view.iso:now", "view.fit", "wait:15", "log"
+    ]}
+  ]
+}

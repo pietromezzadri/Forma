@@ -509,7 +509,9 @@ What each milestone added, in the order they were built. The current gaps are in
   PWM pins, pots on A0…). **3D models** of them (`doc/partlib.go`): the
   Uno's board with its holes, jacks, headers and chip, the servos with
   their tabs and shafts, the gear motors, the AA holder, the 18650 pack,
-  the driver boards — built from primitives, inserted as components.
+  the driver boards, and (added later) a 6 × 6 mm push button, a 16 mm
+  pot and a 5 mm LED — built from primitives, inserted as components
+  (Add part inserts the part's model too, unless its checkbox is off).
 - **Motion study** (`doc.Study`): the sketch on the emulated board with its
   parts, run in whole 1 ms steps; after each run the driven joints take
   their shafts' angles (a revolute one wrapped to ±180°) and the design

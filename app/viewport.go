@@ -127,6 +127,12 @@ func (a *App) rayPlane(f geom.Frame) (geom.Vec3, bool) {
 // gizmo space (Y up) to world (Z up)
 var gizmoToWorld = mgl32.Mat4{1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1}
 
+// cubeRoll turns the view half a turn about its axis: ImGuizmo's view cube
+// draws our camera upside down (its top face at the bottom, left and right
+// swapped), so it is handed the view turned over and its answer turned
+// back.
+var cubeRoll = mgl32.Scale3D(-1, -1, 1)
+
 func (a *App) viewportWindow() {
 	imgui.PushStyleVarVec2(imgui.StyleVarWindowPadding, imgui.Vec2{})
 	open := imgui.BeginV("Viewport", nil, imgui.WindowFlagsNoScrollbar|imgui.WindowFlagsNoScrollWithMouse)
@@ -187,7 +193,7 @@ func (a *App) viewCube(dl *imgui.DrawList) {
 	vp := &a.vp
 	size := float32(110)
 	pos := imgui.Vec2{X: vp.pos.X + vp.size.X - size - 8, Y: vp.pos.Y + 8}
-	m := a.vp.view.View.Mul4(gizmoToWorld)
+	m := cubeRoll.Mul4(a.vp.view.View).Mul4(gizmoToWorld)
 	before := m
 	imguizmo.SetDrawlistV(dl)
 	imguizmo.ViewManipulateFloat(&m[0], float32(a.cam.Dist), pos, imgui.Vec2{X: size, Y: size}, 0x00000000)
@@ -196,24 +202,22 @@ func (a *App) viewCube(dl *imgui.DrawList) {
 	if m == before {
 		return
 	}
-	view := m.Mul4(gizmoToWorld.Transpose())
+	view := cubeRoll.Mul4(m).Mul4(gizmoToWorld.Transpose())
 	inv := view.Inv()
-	eye := geom.V3(float64(inv[12]), float64(inv[13]), float64(inv[14]))
 	fwd := geom.V3(float64(-inv[8]), float64(-inv[9]), float64(-inv[10])).Norm()
-	up := geom.V3(float64(inv[4]), float64(inv[5]), float64(inv[6]))
 	c := a.cam
 	c.anim = nil
 	c.Pitch = math.Asin(math.Max(-1, math.Min(1, fwd.Z)))
 	if math.Abs(fwd.Z) > 0.9999 {
-		if fwd.Z < 0 {
-			c.Yaw = math.Atan2(up.Y, up.X)
-		} else {
-			c.Yaw = math.Atan2(-up.Y, -up.X)
-		}
+		// straight down or up: as the Top and Bottom views have it (+Y up
+		// the screen, X across), not whichever way the cube's up points
+		c.Yaw = math.Pi / 2
 	} else {
 		c.Yaw = math.Atan2(fwd.Y, fwd.X)
 	}
-	c.Target = eye.Add(fwd.Scale(c.Dist))
+	// only the way it looks, not where from: ImGuizmo's camera position
+	// isn't on the orbit round our target, and following it slid the
+	// target away each frame of the cube's turn (the part left the view)
 }
 
 // viewportInput handles the mouse over the view: orbit (right drag, or

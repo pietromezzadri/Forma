@@ -100,8 +100,9 @@ as PDF, SVG or DXF.</td>
   batteries, pots, buttons and LEDs from a small library are wired to its
   pins, and their shafts drive the assembly's joints in a motion study:
   run it, turn a pot, press a button, read the serial monitor. The parts
-  also come as 3D models (Uno, SG90, TT motor, AA holder, driver boards)
-  to design round.
+  also come as 3D models (Uno, SG90, TT motor, AA holder, driver boards,
+  push button, pot, LED) to design round, put in the design as each part
+  is added.
 - **Drawings.** Sheets from A4 to A0 (or ANSI A–E) with a title block, in
   third or first angle projection.
   - Front, top, side and isometric views, laid out and scaled to the sheet.
@@ -117,7 +118,8 @@ as PDF, SVG or DXF.</td>
     AP203/AP214/AP242 solids on analytic surfaces.
   - STL in (as a reference mesh) and out; OBJ out.
   - STEP output is checked against OpenCASCADE in the tests.
-- **App.** A ribbon toolbar, a Ctrl+K command palette, native file dialogs,
+- **App.** A ribbon toolbar that fits any window (names, then icons only,
+  then scrolling as it narrows), a Ctrl+K command palette, native file dialogs,
   autosave, and exact picking from an ID buffer.
 - **Dragging.** Arrows to resize features, a Resize · Move · Turn · Scale
   bar, and snapping to a set increment with Ctrl for free movement and

@@ -13,6 +13,7 @@ func TestPartModels(t *testing.T) {
 	want := map[string][3]float64{ // overall size (mm), within 15 %
 		"uno": {74.8, 53.3, 12.1}, "sg90": {32.2, 12.2, 27.5}, "tt-motor": {22.5, 73, 28.4},
 		"battery-4aa": {62.5, 57.5, 16}, "tb6612": {20.3, 20.3, 8.6},
+		"button": {6, 6, 8.4}, "pot": {16, 18, 29}, "led": {5.8, 5.8, 35.6},
 	}
 	for _, id := range PartModelIDs() {
 		d, err := PartDesign(id)

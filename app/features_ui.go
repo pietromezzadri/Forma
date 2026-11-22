@@ -256,15 +256,23 @@ func (a *App) exprField(f *doc.Feature, name, unit string) {
 func (a *App) combo(label string, cur string, options []string, disabled map[string]string) (string, bool) {
 	changed := false
 	imgui.SetNextItemWidth(130)
-	if imgui.BeginCombo(label, cur) {
-		for _, o := range options {
+	// an empty option (a pin not wired, no supply) is shown as "(none)":
+	// ImGui asserts on an item with an empty label
+	shown := func(o string) string {
+		if o == "" {
+			return "(none)"
+		}
+		return o
+	}
+	if imgui.BeginCombo(label, shown(cur)) {
+		for i, o := range options {
 			why, off := disabled[o]
 			imgui.BeginDisabledV(off)
-			txt := o
+			txt := shown(o)
 			if off {
 				txt += "  (" + why + ")"
 			}
-			if imgui.SelectableBoolV(txt, o == cur, 0, imgui.Vec2{}) && o != cur {
+			if imgui.SelectableBoolV(fmt.Sprintf("%s##opt%d", txt, i), o == cur, 0, imgui.Vec2{}) && o != cur {
 				cur, changed = o, true
 			}
 			imgui.EndDisabled()

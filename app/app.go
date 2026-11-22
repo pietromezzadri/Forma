@@ -37,9 +37,10 @@ type App struct {
 	palette paletteState
 	toast   toast
 
-	sk         *sketchMode // the sketch being edited, nil outside sketch mode
-	dw         *drawMode   // the drawing sheet shown, nil outside drawing mode
-	browserSel int         // body or sketch picked in the browser
+	sk         *sketchMode        // the sketch being edited, nil outside sketch mode
+	dw         *drawMode          // the drawing sheet shown, nil outside drawing mode
+	ribbonW    map[string]float32 // each ribbon's width, full and compact, as last drawn
+	browserSel int                // body or sketch picked in the browser
 
 	showGrid    bool
 	layoutSet   bool

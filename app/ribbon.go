@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	imgui "github.com/AllenDang/cimgui-go/imgui"
 
 	"forma/brep"
@@ -8,13 +10,18 @@ import (
 )
 
 // The toolbar is a ribbon as in Fusion: tools with an icon over a short
-// name, in groups captioned underneath (Sketch, Create, Modify, …).
+// name, in groups captioned underneath (Sketch, Create, Modify, …). When
+// the window is too narrow for it the tiles tighten round their names,
+// then lose them (icons only, named by their tooltips), and when even that
+// doesn't fit it scrolls sideways rather than cut tools off.
 
 type ribbon struct {
-	a      *App
-	f      float32 // font size
-	first  bool
-	groups int
+	a       *App
+	f       float32 // font size
+	first   bool
+	groups  int
+	tight   bool // tiles only as wide as their names
+	compact bool // icons only
 }
 
 func (r *ribbon) btnH() float32 { return r.f*2 + 12 }
@@ -23,7 +30,11 @@ func (r *ribbon) capH() float32 { return r.f + 2 }
 // group starts a captioned group of tools.
 func (r *ribbon) group() {
 	if r.groups > 0 {
-		imgui.SameLineV(0, 12)
+		gap := float32(12)
+		if r.tight || r.compact {
+			gap = 8
+		}
+		imgui.SameLineV(0, gap)
 	}
 	r.groups++
 	imgui.BeginGroup()
@@ -32,11 +43,12 @@ func (r *ribbon) group() {
 
 // end closes the group, writing its caption under it and a rule after it.
 func (r *ribbon) end(caption string) {
-	imgui.Dummy(imgui.Vec2{X: 1, Y: r.capH()})
+	tw := imgui.CalcTextSize(caption).X
+	// at least as wide as its caption (a lone icon is narrower)
+	imgui.Dummy(imgui.Vec2{X: tw + 4, Y: r.capH()})
 	imgui.EndGroup()
 	mn, mx := imgui.ItemRectMin(), imgui.ItemRectMax()
 	dl := imgui.WindowDrawList()
-	tw := imgui.CalcTextSize(caption).X
 	col := imgui.ColorConvertFloat4ToU32(imgui.Vec4{X: 0.55, Y: 0.57, Z: 0.62, W: 1})
 	dl.AddTextVec2(imgui.Vec2{X: (mn.X+mx.X)/2 - tw/2, Y: mx.Y - r.capH()}, col, caption)
 	rule := imgui.ColorConvertFloat4ToU32(imgui.Vec4{X: 1, Y: 1, Z: 1, W: 0.10})
@@ -56,6 +68,12 @@ func (r *ribbon) tile(id, icon, name, tip string, enabled, lit bool) bool {
 	w := imgui.CalcTextSize(name).X + 16
 	if w < 50 {
 		w = 50
+	}
+	switch {
+	case r.compact:
+		w = r.f + 18
+	case r.tight:
+		w = max(imgui.CalcTextSize(name).X+8, r.f+14)
 	}
 	imgui.BeginDisabledV(!enabled)
 	clicked := imgui.InvisibleButton("##rb"+id, imgui.Vec2{X: w, Y: r.btnH()})
@@ -77,9 +95,22 @@ func (r *ribbon) tile(id, icon, name, tip string, enabled, lit bool) bool {
 	}
 	cx := (mn.X + mx.X) / 2
 	iw := imgui.CalcTextSize(icon).X
-	dl.AddTextVec2(imgui.Vec2{X: cx - iw/2, Y: mn.Y + 5}, tc, icon)
-	nw := imgui.CalcTextSize(name).X
-	dl.AddTextVec2(imgui.Vec2{X: cx - nw/2, Y: mn.Y + 7 + r.f}, tc, name)
+	if r.compact {
+		// the icon in the middle; a menu's arrow under it
+		dl.AddTextVec2(imgui.Vec2{X: cx - iw/2, Y: mn.Y + 3 + r.f/2}, tc, icon)
+		if arrow := dropArrow(); strings.HasSuffix(name, arrow) {
+			a := strings.TrimSpace(arrow)
+			aw := imgui.CalcTextSize(a).X
+			dl.AddTextVec2(imgui.Vec2{X: cx - aw/2, Y: mn.Y + 5 + r.f*1.5}, tc, a)
+		}
+		if tip == "" {
+			tip = strings.TrimSuffix(name, dropArrow())
+		}
+	} else {
+		nw := imgui.CalcTextSize(name).X
+		dl.AddTextVec2(imgui.Vec2{X: cx - iw/2, Y: mn.Y + 5}, tc, icon)
+		dl.AddTextVec2(imgui.Vec2{X: cx - nw/2, Y: mn.Y + 7 + r.f}, tc, name)
+	}
 	if tip != "" && imgui.IsItemHoveredV(imgui.HoveredFlagsAllowWhenDisabled|imgui.HoveredFlagsDelayShort) {
 		imgui.SetTooltip(tip)
 	}
@@ -94,6 +125,9 @@ func (r *ribbon) cmd(id string, icon rune, name string, lit bool) {
 		return
 	}
 	tip := c.Label
+	if r.compact && name != "" && !strings.EqualFold(name, c.Label) {
+		tip = name + ": " + c.Label
+	}
 	if c.Shortcut != "" {
 		tip += "  (" + c.Shortcut + ")"
 	}
@@ -171,16 +205,48 @@ func (a *App) toolbar() {
 	r := &ribbon{a: a, f: imgui.FontSize()}
 	pad := imgui.CurrentStyle().WindowPadding().Y
 	h := r.btnH() + r.capH() + 2*pad + 4
+	// which ribbon, and how wide it came out last time (full and compact)
+	kind := "part"
+	switch {
+	case a.sk != nil:
+		kind = "sketch"
+	case a.dw != nil:
+		kind = "drawing"
+	}
+	if a.ribbonW == nil {
+		a.ribbonW = map[string]float32{}
+	}
+	avail := imgui.MainViewport().WorkSize().X - 2*imgui.CurrentStyle().WindowPadding().X - 4
+	// the first of full, tight and compact known to fit (one not yet
+	// measured is drawn to measure it)
+	levels := []string{kind, kind + "/tight", kind + "/compact"}
+	level := 0
+	for level < 2 {
+		w, ok := a.ribbonW[levels[level]]
+		if !ok || w <= avail {
+			break
+		}
+		level++
+	}
+	r.tight, r.compact = level == 1, level == 2
+	scroll := level == 2 && a.ribbonW[levels[2]] > avail
 	flags := imgui.WindowFlagsNoScrollbar | imgui.WindowFlagsNoSavedSettings | imgui.WindowFlagsNoTitleBar
+	if scroll {
+		flags = imgui.WindowFlagsHorizontalScrollbar | imgui.WindowFlagsNoSavedSettings | imgui.WindowFlagsNoTitleBar
+		h += imgui.CurrentStyle().ScrollbarSize()
+	}
 	imgui.PushStyleVarVec2(imgui.StyleVarItemSpacing, imgui.Vec2{X: 4, Y: 2})
 	if imgui.InternalBeginViewportSideBar("##toolbar", imgui.MainViewport(), imgui.DirUp, h, flags) {
-		if a.sk == nil && a.dw != nil {
+		x0 := imgui.CursorScreenPos().X
+		switch kind {
+		case "drawing":
 			a.drawingRibbon(r)
-		} else if a.sk == nil {
+		case "part":
 			a.partRibbon(r)
-		} else {
+		default:
 			a.sketchRibbon(r)
 		}
+		a.ribbonW[levels[level]] = imgui.ItemRectMax().X - x0
 	}
 	imgui.End()
 	imgui.PopStyleVar()

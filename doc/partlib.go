@@ -94,6 +94,23 @@ var PartModels = map[string]*PartModel{
 		box(23, 16, 25, 10, 26, 1.2, "Join"), // the heat sink
 		box(10, 8, 10, 0.5, 9, 1.2, "Join"), box(10, 8, 10, 32.5, 9, 1.2, "Join"),
 	}},
+	"button": {ID: "button", Label: "Push button (6 × 6 mm)", prims: []prim{
+		box(6, 6, 3.5, 0, 0, 0, ""),
+		cyl(1.75, 1.5, 3, 3, 3.4, "Join"),                                                      // the plunger
+		box(0.8, 0.6, 3.8, 0.6, 0.2, -3.5, "Join"), box(0.8, 0.6, 3.8, 4.6, 0.2, -3.5, "Join"), // legs
+		box(0.8, 0.6, 3.8, 0.6, 5.2, -3.5, "Join"), box(0.8, 0.6, 3.8, 4.6, 5.2, -3.5, "Join"),
+	}},
+	"pot": {ID: "pot", Label: "Potentiometer (16 mm)", prims: []prim{
+		cyl(8, 7, 0, 0, 0, ""),
+		box(14, 3.5, 4, -7, -10, 0, "Join"), // the terminals' tab
+		cyl(3.5, 7.1, 0, 0, 6.9, "Join"),    // the threaded bushing
+		cyl(3, 15.1, 0, 0, 13.9, "Join"),    // the shaft
+	}},
+	"led": {ID: "led", Label: "LED (5 mm)", prims: []prim{
+		cyl(2.9, 1, 0, 0, 0, ""),                                                                      // the flange
+		cyl(2.5, 7.7, 0, 0, 0.9, "Join"),                                                              // the lens
+		box(0.5, 0.5, 25.5, -1.52, -0.25, -25, "Join"), box(0.5, 0.5, 27.5, 1.02, -0.25, -27, "Join"), // legs, the anode longer
+	}},
 }
 
 // PartModelIDs are the 3D models in order.

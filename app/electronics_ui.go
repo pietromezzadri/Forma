@@ -42,6 +42,7 @@ type elecState struct {
 	last      time.Time
 	compiling string // the sketch being compiled
 	addModel  string
+	noModel   bool // Add part leaves the 3D model out
 }
 
 func (a *App) registerElecCommands(c *Commands) {
@@ -539,7 +540,15 @@ func (a *App) elecBody() {
 	imgui.SameLine()
 	if imgui.Button("Add part") {
 		a.elecAddPart(a.elec.addModel, "")
+		if !a.elec.noModel && doc.PartModels[a.elec.addModel] != nil {
+			a.elecInsertModel(a.elec.addModel)
+		}
 	}
+	model := !a.elec.noModel
+	if imgui.Checkbox("with its 3D model##addmodel", &model) {
+		a.elec.noModel = !model
+	}
+	imgui.SetItemTooltip("Put the part's 3D model in the design as a component too (each part's entry can insert it later)")
 }
 
 // partEditor edits one part: wiring, what it drives, its figures. It says
