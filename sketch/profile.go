@@ -256,6 +256,10 @@ func (s *Sketch) Regions() []Region {
 		used     bool
 	}
 	var hs []half
+	// a straight piece lying on another (two lines drawn over each other,
+	// a font's overlapping strokes sharing an edge: Inter's D is a bowl
+	// and a stem whose bottoms and tops overlap) is one edge, not two
+	straight := map[[2]int]bool{}
 	for _, g := range cs {
 		sort.Float64s(g.ts)
 		ts := []float64{g.ts[0]}
@@ -283,6 +287,13 @@ func (s *Sketch) Regions() []Region {
 			va, vb := vertex(pa), vertex(pb)
 			if va == vb && !g.arc {
 				continue
+			}
+			if !g.arc && g.bez == nil {
+				k := [2]int{min(va, vb), max(va, vb)}
+				if straight[k] {
+					continue
+				}
+				straight[k] = true
 			}
 			// a text's piece with ink on both sides (strokes overlapping) or
 			// none is no outline

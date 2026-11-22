@@ -289,6 +289,7 @@ func (a *App) partRibbon(r *ribbon) {
 	r.cmd("feature.chamfer", 0xf5cb, "Chamfer", false)
 	r.cmd("feature.shell", 0xf49e, "Shell", false)
 	r.cmd("feature.emboss", icEmboss, "Emboss", false)
+	r.cmd("feature.combine", icCombine, "Combine", false)
 	r.cmd("feature.move", icMove, "Move", false)
 	r.end("Modify")
 
@@ -319,6 +320,7 @@ func (a *App) partRibbon(r *ribbon) {
 	r.cmd("view.fit", ui.FaExpand, "Fit", false)
 	r.cmd("view.iso", ui.FaHouse, "Home", false)
 	r.cmd("view.ortho", 0xf546, "Ortho", a.cam.Ortho)
+	r.cmd("view.xray", icXRay, "X-ray", a.xrayLit())
 	r.end("View")
 
 	r.group()

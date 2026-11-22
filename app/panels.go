@@ -92,6 +92,7 @@ func (a *App) mainMenu() {
 		imgui.Separator()
 		a.menuItem("view.fit")
 		a.menuItem("view.ortho")
+		a.menuItem("view.xray")
 		imgui.Separator()
 		a.menuItem("view.layout")
 		a.menuItem("view.grid")

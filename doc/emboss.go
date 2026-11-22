@@ -49,7 +49,7 @@ func (d *Document) emboss(f *Feature, out []*BodyRef) ([]*BodyRef, error) {
 	if err != nil {
 		return nil, err
 	}
-	sp := ops.EmbossSpec{Depth: depth, Flip: f.Inputs["Flip"] == "1"}
+	sp := ops.EmbossSpec{Depth: depth, Flip: f.Inputs["Flip"] == "1", Wrap: f.Inputs["Wrap"] == "1"}
 	switch f.Inputs["Type"] {
 	case "Raise":
 		sp.Mode = ops.EmbossRaise

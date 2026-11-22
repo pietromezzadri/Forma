@@ -16,6 +16,7 @@ package ops
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"forma/brep"
 	"forma/geom"
@@ -37,6 +38,12 @@ type EmbossSpec struct {
 	// Flip lands the letters on the face behind the sketch (against its
 	// normal) where the line through a point meets the face both ways
 	Flip bool
+	// Wrap lays the text round a face that goes round an axis (cylinder,
+	// cone, sphere, torus, revolved): each letter's distance along the
+	// sketch's X becomes that arc round the face, and the letter is put on
+	// from the plane touching the face there, so text keeps its spacing
+	// and can go all the way round
+	Wrap bool
 }
 
 // EmbossFace embosses regions of a sketch (on plane) onto face fc of body
@@ -79,19 +86,49 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 	if sp.Flip {
 		dir = -1
 	}
+	// each letter's plane and outline: the sketch's own, or wrapped
+	place := func(i int, r sketch.Region, nudge float64) (geom.Frame, sketch.Region, error) { return plane, r, nil }
+	if sp.Wrap {
+		ax, ok := revAxisOf(fc.Surf)
+		if !ok {
+			return nil, nil, fmt.Errorf("wrapping needs a face that goes round an axis (a cylinder, cone, sphere or torus)")
+		}
+		if math.Abs(plane.X.Dot(ax.Z)) > 0.05 {
+			return nil, nil, fmt.Errorf("to wrap, the text must run round the face (the sketch's X square to its axis): sketch on the face, or turn the sketch")
+		}
+		// letters whose outlines (an inlay's pockets: grown) touch go
+		// round together, on one plane at their middle
+		mid := wrapClusters(src, 0, 0)
+		place = func(i int, r sketch.Region, nudge float64) (geom.Frame, sketch.Region, error) {
+			return wrapPlace(fc, ax, plane, r, mid[i], reach, dir, nudge)
+		}
+	}
+	letter := func(i int, r sketch.Region, d0, d1 float64, name string, nudge float64) (*brep.Body, error) {
+		pl, rr, err := place(i, r, nudge)
+		if err != nil {
+			return nil, err
+		}
+		return letterOn(fc, rr, pl, d0, d1, reach, dir, name)
+	}
 	out := b
 	// letters far enough apart go in together, one boolean a group; a group
 	// that fails goes again letter by letter
 	gap := 0.5 + sp.Depth
 	var done []bool
-	for _, g := range letterGroups(src, gap) {
+	groups := letterGroups(src, gap)
+	if sp.Wrap {
+		// round a face, letters far apart in the sketch can meet across
+		// the back: each goes in on its own
+		groups = nil
+	}
+	for _, g := range groups {
 		if len(g) < 2 {
 			continue
 		}
 		d0, d1 := span(0.3*sp.Depth + 0.2)
 		var tools []*brep.Body
 		for _, i := range g {
-			t, err := letterOn(fc, src[i], plane, d0, d1, reach, dir, fmt.Sprintf("letter%d", i+1))
+			t, err := letter(i, src[i], d0, d1, fmt.Sprintf("letter%d", i+1), 0)
 			if err != nil {
 				return nil, nil, fmt.Errorf("letter %d: %v", i+1, err)
 			}
@@ -113,18 +150,26 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 			done[i] = true
 		}
 	}
+	nudges := make([]float64, len(src)) // a wrapped letter's turn round the axis, as it went in
 	for i, r := range src {
 		if done != nil && done[i] {
 			continue
 		}
 		// a boolean can still trip where a cut happens to fall on the
 		// points its curves are traced at; a tool reaching a little further
-		// past the surface moves those points
+		// past the surface moves those points (and a wrapped one turned a
+		// hair round the axis, a few thousandths of a millimetre)
 		var err error
-		for _, over := range []float64{1, 1.17, 1.41, 1.73} {
+		for k, over := range []float64{1, 1.17, 1.41, 1.73, 1, 1.17, 1.41, 1.73} {
+			if k >= 4 && !sp.Wrap {
+				break
+			}
+			if sp.Wrap {
+				nudges[i] = float64(k) * 2e-4
+			}
 			d0, d1 := span(over * (0.3*sp.Depth + 0.2))
 			var t, res *brep.Body
-			t, err = letterOn(fc, r, plane, d0, d1, reach, dir, fmt.Sprintf("letter%d", i+1))
+			t, err = letter(i, r, d0, d1, fmt.Sprintf("letter%d", i+1), nudges[i])
 			if err != nil {
 				return nil, nil, fmt.Errorf("letter %d: %v", i+1, err)
 			}
@@ -133,6 +178,11 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 				out = res
 				break
 			}
+		}
+		if err != nil && sp.Wrap && sp.Mode != EmbossRaise {
+			// wrapped, each letter is cut along the normal at its own
+			// middle, so a neighbour's cut converges on it in the material
+			return nil, nil, fmt.Errorf("letter %d: its cut meets its neighbour's in the face (wrapped letters are cut along their own normals): space the letters out, make the clearance or depth smaller, or raise them (%v)", i+1, err)
 		}
 		if err != nil {
 			return nil, nil, fmt.Errorf("letter %d: %v", i+1, err)
@@ -144,7 +194,10 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 	}
 	var inlays []*brep.Body
 	for i, r := range regs {
-		l, err := letterOn(fc, r, plane, -(sp.Depth - sp.Clearance), 0, reach, dir, fmt.Sprintf("inlay%d", i+1))
+		// a letter goes on as its pocket did: grown letters that touch
+		// make one pocket, so the pocket is the one holding its middle
+		k := pocketOf(r, src, i)
+		l, err := letter(k, r, -(sp.Depth - sp.Clearance), 0, fmt.Sprintf("inlay%d", i+1), nudges[k])
 		if err != nil {
 			return nil, nil, fmt.Errorf("inlay %d: %v", i+1, err)
 		}
@@ -166,11 +219,13 @@ func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, d
 		return nil, err
 	}
 	// built directly between the face's surface moved d0 and d1 out
+	offSide := false // some of it misses the face moved in or out
 	if s0, err := capSurface(fc, d0, hits, margin); err == nil {
 		if s1, err := capSurface(fc, d1, hits, margin); err == nil {
 			guess := hits[0].Sub(plane.At2(pts[0])).Dot(plane.Z)
 			if t, ok := crossAlong(fc.Surf, plane.At2(r.Outer[0].A), plane.Z, guess, reach); ok {
 				l, err := ExtrudeBetween(name, tidyRegion(r, 0.15), plane, s0, s1, t)
+				offSide = err != nil && strings.Contains(err.Error(), "doesn't reach")
 				if err == nil && brep.Check(l) == nil {
 					nameFaces(l, name)
 					return l, nil
@@ -199,6 +254,9 @@ func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, d
 	if err == brep.ErrEmpty {
 		return nil, fmt.Errorf("it misses the face")
 	}
+	if err != nil && offSide {
+		return nil, ErrOffSide
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -206,6 +264,221 @@ func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, d
 	nameFaces(l, name)
 	return l, nil
 }
+
+// wrapPlace puts a letter for wrapping: its middle's distance x along the
+// sketch's X is taken as an arc round the face's axis (at the face's
+// radius where the letter lands), so its plane is the sketch's turned about
+// the axis by x / radius, and the letter moved back by x along it.
+func wrapPlace(fc *brep.Face, ax, plane geom.Frame, r sketch.Region, mid geom.Vec2, reach, dir, nudge float64) (geom.Frame, sketch.Region, error) {
+	cx, cy := mid.X, mid.Y
+	// the face's radius where the letter's middle would land (at x = 0)
+	q := plane.At2(geom.V2(0, cy))
+	t, ok := crossAlong(fc.Surf, q, plane.Z.Scale(dir), 0, reach)
+	if !ok {
+		return plane, r, ErrOffSide
+	}
+	hit := q.Add(plane.Z.Scale(dir * t))
+	rel := hit.Sub(ax.O)
+	rad := rel.Sub(ax.Z.Scale(rel.Dot(ax.Z))).Len()
+	if rad < 1e-6 {
+		return plane, r, fmt.Errorf("it lands on the face's axis, where nothing wraps")
+	}
+	// turning about the axis carries the plane's X along the round: which
+	// way is +X?
+	sign := 1.0
+	if ax.Z.Cross(rel).Dot(plane.X) < 0 {
+		sign = -1
+	}
+	th := sign*cx/rad + nudge
+	rot := func(v geom.Vec3) geom.Vec3 { // about the axis direction
+		c, s := math.Cos(th), math.Sin(th)
+		k := ax.Z
+		return v.Scale(c).Add(k.Cross(v).Scale(s)).Add(k.Scale(k.Dot(v) * (1 - c)))
+	}
+	pl := geom.Frame{O: ax.O.Add(rot(plane.O.Sub(ax.O))), X: rot(plane.X), Y: rot(plane.Y), Z: rot(plane.Z)}
+	return pl, shiftRegion(r, geom.V2(-cx, 0)), nil
+}
+
+// pocketOf is the index of the pocket (a grown region) that holds letter
+// r; i when none is found.
+func pocketOf(r sketch.Region, pockets []sketch.Region, i int) int {
+	pts := footprint(r)
+	if len(pts) == 0 {
+		return min(i, len(pockets)-1)
+	}
+	// a point of the letter's own outline is inside its grown pocket (its
+	// middle may not be: a W's isn't in the W)
+	for k, g := range pockets {
+		poly := g.Poly
+		if len(poly) == 0 {
+			poly = sketch.SegPoints2(g.Outer, 1e-2)
+		}
+		if inPoly(pts[0], poly) {
+			return k
+		}
+	}
+	return min(i, len(pockets)-1)
+}
+
+func inPoly(p geom.Vec2, poly []geom.Vec2) bool {
+	in := false
+	for i := range poly {
+		u, v := poly[i], poly[(i+1)%len(poly)]
+		if (u.Y > p.Y) != (v.Y > p.Y) && p.X < u.X+(p.Y-u.Y)*(v.X-u.X)/(v.Y-u.Y) {
+			in = !in
+		}
+	}
+	return in
+}
+
+// wrapClusters is, for each region, the middle of the cluster of regions
+// near it (itself alone when none is): where it is put round. Two are
+// near when they touch, or when cuts into reaching that far into a face
+// of radius rad, each along the normal at its middle, would meet.
+func wrapClusters(rs []sketch.Region, into, rad float64) []geom.Vec2 {
+	n := len(rs)
+	polys := make([][]geom.Vec2, n)
+	lo := make([]geom.Vec2, n)
+	hi := make([]geom.Vec2, n)
+	for i, r := range rs {
+		polys[i] = footprint(r)
+		lo[i], hi[i] = geom.V2(math.Inf(1), math.Inf(1)), geom.V2(math.Inf(-1), math.Inf(-1))
+		for _, p := range polys[i] {
+			lo[i] = geom.V2(math.Min(lo[i].X, p.X), math.Min(lo[i].Y, p.Y))
+			hi[i] = geom.V2(math.Max(hi[i].X, p.X), math.Max(hi[i].Y, p.Y))
+		}
+	}
+	parent := make([]int, n)
+	for i := range parent {
+		parent[i] = i
+	}
+	var find func(int) int
+	find = func(i int) int {
+		for parent[i] != i {
+			parent[i] = parent[parent[i]]
+			i = parent[i]
+		}
+		return i
+	}
+	const touch = 0.05 // mm: closer than this counts as touching
+	for i := 0; i < n; i++ {
+		for j := i + 1; j < n; j++ {
+			near := touch
+			if into > 0 && rad > 0 {
+				dth := math.Abs((lo[i].X+hi[i].X)/2-(lo[j].X+hi[j].X)/2) / rad
+				near += into * dth
+			}
+			if lo[i].X > hi[j].X+near || lo[j].X > hi[i].X+near || lo[i].Y > hi[j].Y+near || lo[j].Y > hi[i].Y+near {
+				continue
+			}
+			if polysTouch(polys[i], polys[j], near) {
+				parent[find(i)] = find(j)
+			}
+		}
+	}
+	clo, chi := map[int]geom.Vec2{}, map[int]geom.Vec2{}
+	for i := 0; i < n; i++ {
+		c := find(i)
+		if _, ok := clo[c]; !ok {
+			clo[c], chi[c] = lo[i], hi[i]
+		}
+		clo[c] = geom.V2(math.Min(clo[c].X, lo[i].X), math.Min(clo[c].Y, lo[i].Y))
+		chi[c] = geom.V2(math.Max(chi[c].X, hi[i].X), math.Max(chi[c].Y, hi[i].Y))
+	}
+	out := make([]geom.Vec2, n)
+	for i := 0; i < n; i++ {
+		c := find(i)
+		out[i] = clo[c].Add(chi[c]).Scale(0.5)
+	}
+	return out
+}
+
+// polysTouch: two closed polygons come within d of each other (or one
+// holds the other).
+func polysTouch(a, b []geom.Vec2, d float64) bool {
+	if len(a) < 2 || len(b) < 2 {
+		return false
+	}
+	segDist := func(p, q, r, s geom.Vec2) float64 {
+		pt := func(x, a, b geom.Vec2) float64 {
+			ab := b.Sub(a)
+			t := 0.0
+			if l2 := ab.Dot(ab); l2 > 0 {
+				t = math.Max(0, math.Min(1, x.Sub(a).Dot(ab)/l2))
+			}
+			return x.Dist(a.Add(ab.Scale(t)))
+		}
+		// crossing?
+		d1, d2 := q.Sub(p).Cross(r.Sub(p)), q.Sub(p).Cross(s.Sub(p))
+		d3, d4 := s.Sub(r).Cross(p.Sub(r)), s.Sub(r).Cross(q.Sub(r))
+		if (d1 > 0) != (d2 > 0) && (d3 > 0) != (d4 > 0) {
+			return 0
+		}
+		return math.Min(math.Min(pt(p, r, s), pt(q, r, s)), math.Min(pt(r, p, q), pt(s, p, q)))
+	}
+	for i := range a {
+		for j := range b {
+			if segDist(a[i], a[(i+1)%len(a)], b[j], b[(j+1)%len(b)]) <= d {
+				return true
+			}
+		}
+	}
+	inside := func(p geom.Vec2, poly []geom.Vec2) bool {
+		in := false
+		for i := range poly {
+			u, v := poly[i], poly[(i+1)%len(poly)]
+			if (u.Y > p.Y) != (v.Y > p.Y) && p.X < u.X+(p.Y-u.Y)*(v.X-u.X)/(v.Y-u.Y) {
+				in = !in
+			}
+		}
+		return in
+	}
+	return inside(a[0], b) || inside(b[0], a)
+}
+
+// shiftRegion is a region moved by d.
+func shiftRegion(r sketch.Region, d geom.Vec2) sketch.Region {
+	seg := func(s sketch.Seg) sketch.Seg {
+		s.A, s.B, s.C = s.A.Add(d), s.B.Add(d), s.C.Add(d)
+		if s.Ctrl != nil {
+			c := make([]geom.Vec2, len(s.Ctrl))
+			for i, p := range s.Ctrl {
+				c[i] = p.Add(d)
+			}
+			s.Ctrl = c
+		}
+		return s
+	}
+	out := r
+	out.Outer = make([]sketch.Seg, len(r.Outer))
+	for i, s := range r.Outer {
+		out.Outer[i] = seg(s)
+	}
+	out.Holes = make([][]sketch.Seg, len(r.Holes))
+	for i, h := range r.Holes {
+		out.Holes[i] = make([]sketch.Seg, len(h))
+		for j, s := range h {
+			out.Holes[i][j] = seg(s)
+		}
+	}
+	mv := func(ps []geom.Vec2) []geom.Vec2 {
+		o := make([]geom.Vec2, len(ps))
+		for i, p := range ps {
+			o[i] = p.Add(d)
+		}
+		return o
+	}
+	out.Poly = mv(r.Poly)
+	out.HolePolys = make([][]geom.Vec2, len(r.HolePolys))
+	for i, h := range r.HolePolys {
+		out.HolePolys[i] = mv(h)
+	}
+	return out
+}
+
+// ErrOffSide: a letter runs over the side of the face, where it turns away
+// from the sketch (seen edge on there, it can't be cut cleanly).
+var ErrOffSide = fmt.Errorf("it runs over the side of the face, where the face turns away from the sketch: move the text toward the middle of the face, make it smaller, or sketch on the face itself (select the face, then Sketch)")
 
 // nameFaces puts the letter's name before its faces' (letter2/side:3:1).
 func nameFaces(b *brep.Body, name string) {

@@ -177,3 +177,27 @@ func (t *PickTarget) Read(x, y, r int) ([]uint32, int, float32) {
 	}
 	return out, n, depth
 }
+
+// ReadRect returns the distinct IDs in the rectangle from (x0, y0) to
+// (x1, y1) (pixels, top-left origin).
+func (t *PickTarget) ReadRect(x0, y0, x1, y1 int) []uint32 {
+	x0, x1 = max(0, min(x0, x1)), min(t.W, max(x0, x1))
+	y0, y1 = max(0, min(y0, y1)), min(t.H, max(y0, y1))
+	if x1 <= x0 || y1 <= y0 {
+		return nil
+	}
+	gl.BindFramebuffer(gl.READ_FRAMEBUFFER, t.fbo)
+	defer gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
+	w, h := x1-x0, y1-y0
+	buf := make([]uint32, w*h)
+	gl.ReadPixels(int32(x0), int32(t.H-y1), int32(w), int32(h), gl.RED_INTEGER, gl.UNSIGNED_INT, gl.Ptr(buf))
+	seen := map[uint32]bool{}
+	var out []uint32
+	for _, id := range buf {
+		if id != 0 && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
+}

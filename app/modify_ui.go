@@ -92,8 +92,21 @@ func (a *App) selectedEdges() []doc.EdgeRef {
 			if _, f := a.refFace(r); f != nil {
 				for _, l := range f.Loops {
 					for _, h := range l.HalfEdges() {
-						add(h.Edge)
+						if sharp(h.Edge) {
+							add(h.Edge)
+						}
 					}
+				}
+			}
+		}
+	}
+	// nothing picked in the view: every sharp edge of the bodies picked in
+	// the browser (the same round on several bodies at once)
+	if len(out) == 0 && len(a.sel) == 0 {
+		for _, b := range a.pickedBodies() {
+			for _, e := range b.Body.Edges() {
+				if sharp(e) {
+					add(e)
 				}
 			}
 		}
@@ -115,8 +128,9 @@ func (a *App) selectedBodies() []int {
 			}
 		}
 	}
-	if len(out) == 0 {
-		if b := a.doc.Body(a.browserSel); b != nil {
+	for _, b := range a.pickedBodies() {
+		if !seen[b.ID] {
+			seen[b.ID] = true
 			out = append(out, b.ID)
 		}
 	}
@@ -186,7 +200,7 @@ func (a *App) toolFeature() *doc.Feature {
 		return nil
 	}
 	switch f.Kind {
-	case doc.KSketch, doc.KMove, doc.KMirror, doc.KPattern, doc.KFillet, doc.KChamfer, doc.KShell, doc.KEmboss:
+	case doc.KSketch, doc.KMove, doc.KMirror, doc.KPattern, doc.KFillet, doc.KChamfer, doc.KShell, doc.KEmboss, doc.KCombine:
 		return nil
 	}
 	return f
@@ -206,7 +220,7 @@ func (a *App) newFeature(f *doc.Feature, arg string) {
 	a.doc.D.Insert(f)
 	a.doc.Commit()
 	a.sel = a.sel[:0]
-	a.browserSel = bodyKey(f.ID, 0)
+	a.browserSel, a.multi = bodyKey(f.ID, 0), nil
 	if f.Err != "" {
 		a.notify("%s: %s", f.Name, f.Err)
 	}
@@ -258,6 +272,17 @@ func (a *App) registerModifyCommands(c *Commands) {
 				s.Hidden = true
 			}
 			a.newFeature(doc.NewHole(sk, pts), arg)
+		}})
+	c.add(&Command{ID: "feature.combine", Label: "Combine: join, cut or intersect bodies", Group: "Modify", Icon: icCombine,
+		Enabled: func() bool { return notSketch() && len(a.selectedBodies()) >= 2 },
+		Run: func(arg string) {
+			// the first body picked is the target, the others the tools
+			bs := a.selectedBodies()
+			if len(bs) < 2 {
+				a.notify("Pick the body to keep, then (Ctrl+click) the bodies to join, cut or intersect with it")
+				return
+			}
+			a.newFeature(doc.NewCombine(bs[0], bs[1:]), arg)
 		}})
 	c.add(&Command{ID: "feature.shell", Label: "Shell", Group: "Modify", Icon: icShell,
 		Enabled: func() bool { return notSketch() && len(a.selectedBodies()) > 0 },
@@ -380,6 +405,33 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 		}
 	}
 	switch f.Kind {
+	case doc.KCombine:
+		var names []string
+		for _, k := range f.Targets {
+			if b := a.doc.Body(k); b != nil {
+				names = append(names, b.Name)
+			} else if g := a.doc.D.Feature(k / doc.KeysPerFeature); g != nil {
+				names = append(names, g.Name) // used up by this step
+			} else {
+				names = append(names, "?")
+			}
+		}
+		if len(names) > 0 {
+			imgui.TextWrapped("Target: " + names[0])
+			imgui.TextWrapped("Tools: " + strings.Join(names[1:], ", "))
+		}
+		if bs := a.selectedBodies(); len(bs) >= 2 {
+			if imgui.SmallButton(fmt.Sprintf("Use the %d selected (the first is the target)", len(bs))) {
+				f.Targets = bs
+				a.sel = a.sel[:0]
+				a.doc.Commit()
+			}
+		}
+		comboIn("Operation", "Operation", doc.CombineOps)
+		keep := f.Inputs["Keep tools"] == "1"
+		if imgui.Checkbox("Keep the tools", &keep) {
+			set("Keep tools", map[bool]string{true: "1", false: "0"}[keep])
+		}
 	case doc.KMove:
 		targets()
 		imgui.SeparatorText("Move")
@@ -530,6 +582,11 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 		if imgui.Checkbox("Land on the far side", &flip) {
 			set("Flip", map[bool]string{true: "1", false: "0"}[flip])
 		}
+		wrap := f.Inputs["Wrap"] == "1"
+		if imgui.Checkbox("Wrap round the face", &wrap) {
+			set("Wrap", map[bool]string{true: "1", false: "0"}[wrap])
+		}
+		imgui.SetItemTooltip("On a cylinder, cone, sphere or torus: the text keeps its spacing round the face (it can go all the way round) instead of being projected straight on")
 	case doc.KShell:
 		targets()
 		imgui.Text(fmt.Sprintf("%d open face(s)", len(f.Faces)))

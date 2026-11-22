@@ -31,6 +31,7 @@ func vperp(a imgui.Vec2) imgui.Vec2 { return imgui.Vec2{X: -a.Y, Y: a.X} }
 // drawOverlays draws what ImGui draws over the 3D view: the sketch's
 // dimensions and constraint badges, the snap cursor, the tool hint.
 func (a *App) drawOverlays(dl *imgui.DrawList) {
+	a.drawBox(dl)
 	vp := &a.vp
 	dl.PushClipRect(vp.pos, vadd(vp.pos, vp.size))
 	defer dl.PopClipRect()

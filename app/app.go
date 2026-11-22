@@ -13,6 +13,7 @@ import (
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.4/glfw"
 
+	"forma/geom"
 	"forma/render"
 	"forma/ui"
 )
@@ -31,6 +32,7 @@ type App struct {
 	vp  viewport
 
 	sel   []Ref
+	selAt map[Ref]geom.Vec3 // where a selected face was clicked (a sketch on a curved face touches it there)
 	hover Ref
 
 	cmds    *Commands
@@ -41,6 +43,7 @@ type App struct {
 	dw         *drawMode          // the drawing sheet shown, nil outside drawing mode
 	ribbonW    map[string]float32 // each ribbon's width, full and compact, as last drawn
 	browserSel int                // body or sketch picked in the browser
+	multi      []int              // more browser / timeline picks (Ctrl+click), besides browserSel
 
 	showGrid    bool
 	layoutSet   bool
@@ -55,6 +58,7 @@ type App struct {
 	m13        m13State
 	sim        simState
 	elec       elecState
+	code       codeEditor
 	postQueue
 	showParams bool
 
@@ -237,6 +241,7 @@ func (a *App) buildUI() {
 	a.explodeWindow()
 	a.simWindow()
 	a.elecWindow()
+	a.codeWindow()
 	a.files.draw()
 	a.paramsWindow()
 	a.helpWindow()

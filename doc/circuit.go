@@ -21,9 +21,12 @@ const KCircuit = "circuit"
 
 // Circuit is what a circuit feature holds.
 type Circuit struct {
-	Board string        `json:"board"`          // "uno"
-	File  string        `json:"file,omitempty"` // where its firmware came from (a .hex, or the .ino compiled)
-	Parts []CircuitPart `json:"parts,omitempty"`
+	Board string `json:"board"`          // "uno"
+	File  string `json:"file,omitempty"` // where its firmware came from (a .hex, or the .ino compiled)
+	// Source is the sketch's code (C++, an .ino) as written in Forma's
+	// editor, kept with the design; its firmware is what it compiled to
+	Source string        `json:"source,omitempty"`
+	Parts  []CircuitPart `json:"parts,omitempty"`
 }
 
 // CircuitPart is a library part in the circuit.
@@ -39,6 +42,9 @@ type CircuitPart struct {
 	Joint int     `json:"joint,omitempty"`
 	Ratio float64 `json:"ratio,omitempty"`
 	Zero  float64 `json:"zero,omitempty"`
+	// Model3D is the component its 3D model was put in as (a step's ID):
+	// clicking it presses a button, and an LED's glows as it runs
+	Model3D int `json:"model3d,omitempty"`
 }
 
 // NewCircuit is an empty Uno with no firmware yet.

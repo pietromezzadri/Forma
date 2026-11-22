@@ -41,6 +41,8 @@ func kindIcon(k string) rune {
 		return icShell
 	case doc.KEmboss:
 		return icEmboss
+	case doc.KCombine:
+		return icCombine
 	case doc.KImport:
 		return icImport
 	case doc.KMesh:
@@ -107,8 +109,12 @@ func (a *App) browserPanel() {
 				eye(b.F)
 			}
 			shown[b.F.ID] = true
-			if imgui.SelectableBoolV(fmt.Sprintf("%s##b%d", ui.Icon(bodyIcon(b.F), b.Name), b.ID), a.browserSel == b.ID, 0, imgui.Vec2{}) {
-				a.browserSel = b.ID
+			label := b.Name
+			if b.F.XRay {
+				label += "  (x-ray)"
+			}
+			if imgui.SelectableBoolV(fmt.Sprintf("%s##b%d", ui.Icon(bodyIcon(b.F), label), b.ID), a.browserPicked(b.ID), 0, imgui.Vec2{}) {
+				a.pickBrowser(b.ID)
 			}
 			a.markItem("item:" + b.Name)
 			a.featureMenu(b.F)
@@ -126,8 +132,8 @@ func (a *App) browserPanel() {
 			if a.sk != nil && a.sk.item == s {
 				name += "  (editing)"
 			}
-			if imgui.SelectableBoolV(fmt.Sprintf("%s##s%d", name, s.ID), a.browserSel == s.ID, 0, imgui.Vec2{}) {
-				a.browserSel = s.ID
+			if imgui.SelectableBoolV(fmt.Sprintf("%s##s%d", name, s.ID), a.browserPicked(s.ID), 0, imgui.Vec2{}) {
+				a.pickBrowser(s.ID)
 			}
 			a.markItem("item:" + s.Name)
 			if imgui.IsItemHovered() && imgui.IsMouseDoubleClicked(imgui.MouseButtonLeft) && a.sk == nil {
@@ -174,6 +180,10 @@ func (a *App) featureMenu(f *doc.Feature) {
 		f.Hidden = !f.Hidden
 		a.doc.Commit()
 	}
+	if f.Kind != doc.KSketch && imgui.MenuItemBoolV("X-ray (see through)", "", f.XRay, true) {
+		f.XRay = !f.XRay
+		a.doc.Commit()
+	}
 	imgui.Separator()
 	deps := a.doc.D.Dependents(f.ID)
 	del := "Delete"
@@ -203,7 +213,9 @@ func (a *App) propertiesPanel() {
 		imgui.End()
 		return
 	}
-	if a.sk != nil {
+	if fs := a.pickedFeatures(); a.sk == nil && len(fs) > 1 {
+		a.multiProperties(fs)
+	} else if a.sk != nil {
 		a.sketchProperties(a.sk.item)
 	} else if f := a.selFeature(); f != nil {
 		a.featureProperties(f)
@@ -306,7 +318,7 @@ func (a *App) featureProperties(f *doc.Feature) {
 		if it := a.doc.Sketch(bodyKey(f.ID, 0)); it != nil {
 			a.sketchProperties(it)
 		}
-		imgui.TextDisabled(planeText(f.Plane, a.doc.D))
+		a.sketchPlacement(f)
 		return
 	case doc.KExtrude:
 		a.profilesRow(f)
@@ -409,6 +421,29 @@ func (a *App) useSelectedLine(f *doc.Feature) {
 	a.notify("Select a line in the profile's sketch")
 }
 
+// sketchPlacement is where a sketch lies and how it is moved from there:
+// along its normal, turned about it, along its own axes; or put on the
+// face selected now (a curved one touching it where it was clicked).
+func (a *App) sketchPlacement(f *doc.Feature) {
+	imgui.SeparatorText("Placement")
+	imgui.TextDisabled(planeText(f.Plane, a.doc.D))
+	units := map[string]string{"Offset": " mm", "Turn": "°", "Move X": " mm", "Move Y": " mm"}
+	for _, n := range doc.SketchPlacement {
+		if f.Inputs[n] == "" {
+			f.Inputs[n] = "0"
+		}
+		a.exprField(f, n, units[n])
+	}
+	if ref, ok := a.planeFor(""); ok && a.sk == nil {
+		if imgui.Button(ui.Icon(ui.FaPen, "Put on the selected face")) {
+			f.Plane = &ref
+			a.doc.Commit()
+			a.notify("%s moved onto the face", f.Name)
+		}
+		imgui.SetItemTooltip("The sketch lies on the selected face from now on; a curved face is touched where it was clicked")
+	}
+}
+
 func planeText(p *doc.PlaneRef, d *doc.Document) string {
 	if p == nil {
 		return ""
@@ -417,6 +452,9 @@ func planeText(p *doc.PlaneRef, d *doc.Document) string {
 		return "On the " + map[string]string{"xy": "XY (top)", "xz": "XZ (front)", "yz": "YZ (right)"}[p.Std] + " plane"
 	}
 	if f := d.Feature(p.Feature); f != nil {
+		if p.At != nil {
+			return fmt.Sprintf("Touching face %q of %s", p.Face, f.Name)
+		}
 		return fmt.Sprintf("On face %q of %s", p.Face, f.Name)
 	}
 	return "On a face that is gone"
@@ -424,6 +462,10 @@ func planeText(p *doc.PlaneRef, d *doc.Document) string {
 
 func (a *App) bodyInfo(b *BodyItem) {
 	imgui.SeparatorText(b.Name)
+	if imgui.Checkbox("X-ray (see through)##xray", &b.F.XRay) {
+		a.doc.Commit()
+	}
+	imgui.SetItemTooltip("Draw it see-through, with its hidden edges dashed; clicks go through it to what is inside")
 	v, e, f, r, s := b.Body.Counts()
 	imgui.Text(fmt.Sprintf("%d faces · %d edges · %d vertices", f, e, v))
 	imgui.Text(fmt.Sprintf("%d shell · %d rings · genus %d", s, r, brep.Genus(b.Body)))
@@ -478,7 +520,7 @@ func (a *App) timelinePanel() {
 		marker()
 	}
 	for i, f := range d.Features {
-		sel := featureOf(a.browserSel) == f.ID
+		sel := a.stepPicked(f.ID)
 		pushed := 0
 		switch {
 		case sel:
@@ -493,7 +535,7 @@ func (a *App) timelinePanel() {
 			pushed++
 		}
 		if imgui.Button(fmt.Sprintf("%s##t%d", ui.Icon(kindIcon(f.Kind), f.Name), f.ID)) {
-			a.browserSel = bodyKey(f.ID, 0)
+			a.pickBrowser(bodyKey(f.ID, 0))
 		}
 		a.markItem("step:" + f.Name)
 		imgui.PopStyleColorV(int32(pushed))

@@ -8,6 +8,7 @@ import (
 	"github.com/go-gl/mathgl/mgl32"
 
 	"forma/doc"
+	"forma/elec"
 	"forma/geom"
 	"forma/render"
 	"forma/sketch"
@@ -50,6 +51,10 @@ type viewport struct {
 	leftDown  imgui.Vec2
 	leftHeld  bool
 	wholeBody bool // a double click picked a whole body: its release keeps that
+
+	pressing *elec.Button // a circuit's button held down by its 3D model
+	boxOn    bool         // a selection box is being dragged
+	boxFrom  imgui.Vec2   // from here
 
 	cubeHot   bool
 	gizmoHot  bool // the cursor is on the move gizmo
@@ -291,9 +296,16 @@ func (a *App) leftPress() {
 	if a.vp.handle.press() {
 		return
 	}
+	if a.pressPart() {
+		return
+	}
 	if a.sk != nil {
 		a.sk.press(a)
+		return
 	}
+	// pressed on nothing: a drag is a selection box
+	a.vp.boxOn = a.hover.IsZero()
+	a.vp.boxFrom = a.vp.mouse
 }
 
 func (a *App) leftDrag() {
@@ -310,10 +322,21 @@ func (a *App) leftRelease(moved bool) {
 	if a.vp.handle.release(a) {
 		return
 	}
+	if a.vp.pressing != nil {
+		a.vp.pressing.Pressed = false
+		a.vp.pressing = nil
+		return
+	}
 	if a.sk != nil && a.sk.release(a, moved) {
 		return
 	}
+	box := a.vp.boxOn
+	a.vp.boxOn = false
 	if moved {
+		if box && a.sk == nil {
+			io := imgui.CurrentIO()
+			a.boxSelect(a.vp.boxFrom, a.vp.mouse, io.KeyCtrl(), io.KeyShift())
+		}
 		return
 	}
 	if a.vp.wholeBody {
@@ -322,8 +345,15 @@ func (a *App) leftRelease(moved bool) {
 	}
 	io := imgui.CurrentIO()
 	add := io.KeyCtrl() || io.KeyShift()
+	if a.hover.Kind == KindFace && a.vp.hasCursor {
+		if a.selAt == nil {
+			a.selAt = map[Ref]geom.Vec3{}
+		}
+		a.selAt[a.hover] = a.vp.cursor3
+	}
 	a.toggleSelect(a.hover, add)
 	if a.sk == nil && !add {
+		a.multi = nil
 		// a click on a body picks the body too, so its gizmo comes up; a click
 		// on nothing lets it go
 		switch a.hover.Kind {
@@ -344,15 +374,35 @@ func (a *App) doubleClick() {
 		a.sk.doubleClick(a)
 		return
 	}
-	// a double click on a body selects the whole of it: every face
+	// a double click on an edge selects its tangent chain, on a body the
+	// whole of it (every face); with Ctrl, as well as what is selected
+	add := imgui.CurrentIO().KeyCtrl()
 	switch a.hover.Kind {
-	case KindFace, KindEdge, KindVertex:
-		if b := a.doc.Body(a.hover.Item); b != nil {
+	case KindEdge:
+		if !add {
 			a.sel = a.sel[:0]
-			for _, f := range b.Body.Faces() {
-				a.sel = append(a.sel, Ref{Kind: KindFace, Item: b.ID, Local: f.ID})
+		}
+		for _, r := range a.tangentChain(a.hover) {
+			if !a.isSelected(r) {
+				a.sel = append(a.sel, r)
 			}
-			a.browserSel = b.ID
+		}
+		a.vp.wholeBody = true
+	case KindFace, KindVertex:
+		if b := a.doc.Body(a.hover.Item); b != nil {
+			if !add {
+				a.sel = a.sel[:0]
+			}
+			for _, f := range b.Body.Faces() {
+				if r := (Ref{Kind: KindFace, Item: b.ID, Local: f.ID}); !a.isSelected(r) {
+					a.sel = append(a.sel, r)
+				}
+			}
+			if add && a.browserSel != 0 && a.browserSel != b.ID {
+				a.multi = append(a.multi, b.ID)
+			} else {
+				a.browserSel = b.ID
+			}
 			a.vp.wholeBody = true
 		}
 	}
@@ -373,10 +423,23 @@ func (a *App) renderScene() {
 
 	r.BeginColor(colBgTop, colBgBottom)
 	inSketch := a.sk != nil
+	// opaque bodies first, then the see-through (X-ray) ones over them
+	bodies := make([]*BodyItem, 0, len(a.doc.Bodies))
 	for _, b := range a.doc.Bodies {
+		if !b.F.XRay {
+			bodies = append(bodies, b)
+		}
+	}
+	for _, b := range a.doc.Bodies {
+		if b.F.XRay {
+			bodies = append(bodies, b)
+		}
+	}
+	for _, b := range bodies {
 		if !b.Visible || a.simHides(b.ID) {
 			continue
 		}
+		xray := b.F.XRay
 		g := b.upload()
 		off := a.explodeOffset(doc.ExplodeGroup(b.Comp, b.ID))
 		if g == nil {
@@ -386,14 +449,26 @@ func (a *App) renderScene() {
 		if inSketch {
 			col[3] = 0.25
 		}
+		if xray {
+			col = mgl32.Vec4{0.55, 0.72, 0.95, 0.16}
+		}
+		if glow := a.ledGlow(b.F.ID); glow > 0 {
+			// an LED's model lit by the running sketch
+			red := mgl32.Vec4{1, 0.18, 0.1, col[3]}
+			col = col.Mul(1 - float32(glow)).Add(red.Mul(float32(glow)))
+		}
 		hoverFace := uint32(0)
 		if a.hover.Kind == KindFace && a.hover.Item == b.ID {
 			hoverFace = uint32(a.hover.Local)
 		}
-		r.DrawFaces(v, g.faces, render.Paint{Offset: off, Color: col, HoverColor: mgl32.Vec4{1, 0.65, 0.25, 0.45}, Hover: hoverFace}, false)
+		r.DrawFaces(v, g.faces, render.Paint{Offset: off, Color: col, HoverColor: mgl32.Vec4{1, 0.65, 0.25, 0.45}, Hover: hoverFace, NoDepth: xray, CullBack: xray}, false)
 		for _, s := range a.sel {
 			if s.Kind == KindFace && s.Item == b.ID {
-				r.DrawFaceRange(v, g.faces, uint32(s.Local), render.Paint{Offset: off, Color: mgl32.Vec4{0.98, 0.55, 0.2, 1}})
+				sc := mgl32.Vec4{0.98, 0.55, 0.2, 1}
+				if xray {
+					sc[3] = 0.4
+				}
+				r.DrawFaceRange(v, g.faces, uint32(s.Local), render.Paint{Offset: off, Color: sc, NoDepth: xray, CullBack: xray})
 			}
 		}
 		hoverEdge := uint32(0)
@@ -403,6 +478,12 @@ func (a *App) renderScene() {
 		ec := colEdge
 		if inSketch {
 			ec[3] = 0.35
+		}
+		if xray {
+			// the edges behind, faint and dashed, then the ones in sight
+			hc := mgl32.Vec4{0.2, 0.32, 0.5, 0.45}
+			r.DrawLines(v, g.edges, render.Paint{Offset: off, Color: hc, Width: 1.2 * px, Dash: wpp * 9, OnTop: true}, false)
+			ec = mgl32.Vec4{0.15, 0.28, 0.48, 0.9}
 		}
 		r.DrawLines(v, g.edges, render.Paint{Offset: off, Color: ec, HoverColor: colHover, Hover: hoverEdge, Width: 1.6 * px, DepthBias: 1e-5}, false)
 		for _, s := range a.sel {
@@ -451,7 +532,11 @@ func (a *App) renderScene() {
 			}
 			slot := vp.slots.slot(b.ID)
 			off := a.explodeOffset(doc.ExplodeGroup(b.Comp, b.ID))
-			r.DrawFaces(v, b.gpu.faces, render.Paint{Offset: off, IDBase: idBase(KindFace, slot)}, true)
+			// a see-through body's faces let clicks through to what is inside
+			// (its edges and corners still pick)
+			if !b.F.XRay {
+				r.DrawFaces(v, b.gpu.faces, render.Paint{Offset: off, IDBase: idBase(KindFace, slot)}, true)
+			}
 			r.DrawLines(v, b.gpu.edges, render.Paint{Offset: off, IDBase: idBase(KindEdge, slot), Width: 7 * px, DepthBias: 1e-5}, true)
 			r.DrawPoints(v, b.gpu.verts, render.Paint{Offset: off, IDBase: idBase(KindVertex, slot), Width: 12 * px, DepthBias: 2e-5}, true)
 		}

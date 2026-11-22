@@ -1,0 +1,8 @@
+{
+  "width": 1600, "height": 900, "out": "out/installcli",
+  "shots": [
+    {"name": "a_banner", "frames": 6, "do": [
+      "file.new", "electronics.add", "wait:6", "electronics.code", "wait:10", "log"
+    ]}
+  ]
+}

@@ -52,6 +52,7 @@ const (
 	KComponent = "component" // another design inserted and placed
 	KJoint     = "joint"     // moves a component onto another
 	KEmboss    = "emboss"    // profiles raised, engraved or inlaid on a face
+	KCombine   = "combine"   // bodies joined, cut or intersected with a target body
 )
 
 // KeysPerFeature: a body's key is its feature's ID × KeysPerFeature + its
@@ -78,12 +79,14 @@ type EdgeRef struct {
 }
 
 // PlaneRef is where a sketch lies: a standard plane ("xy", "xz", "yz") or a
-// planar face of an earlier feature, found by its persistent name.
+// face of an earlier feature, found by its persistent name: on a flat face
+// its plane, on a curved one the plane touching it at At.
 type PlaneRef struct {
-	Std     string `json:"std,omitempty"`
-	Feature int    `json:"feature,omitempty"`
-	Body    int    `json:"body,omitempty"`
-	Face    string `json:"face,omitempty"`
+	Std     string     `json:"std,omitempty"`
+	Feature int        `json:"feature,omitempty"`
+	Body    int        `json:"body,omitempty"`
+	Face    string     `json:"face,omitempty"`
+	At      *geom.Vec3 `json:"at,omitempty"`
 }
 
 // ProfileRef picks a region of a sketch by the entities round it, so it is
@@ -124,6 +127,7 @@ type Feature struct {
 	Joint    []JointRef        `json:"joint,omitempty"`  // a joint's fixed and moving ends
 	Circuit  *Circuit          `json:"circuit,omitempty"`
 	Hidden   bool              `json:"hidden,omitempty"`
+	XRay     bool              `json:"xray,omitempty"` // its bodies drawn see-through
 	Off      bool              `json:"suppressed,omitempty"`
 
 	// results of the last regeneration
@@ -219,7 +223,7 @@ func (d *Document) uniqueName(base string) string {
 
 var kindLabel = map[string]string{KBox: "Box", KCylinder: "Cylinder", KCone: "Cone", KSphere: "Sphere",
 	KTorus: "Torus", KSketch: "Sketch", KExtrude: "Extrude", KRevolve: "Revolve", KMove: "Move",
-	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell", KEmboss: "Emboss",
+	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell", KEmboss: "Emboss", KCombine: "Combine",
 	KImport: "Import", KMesh: "Mesh", KComponent: "Component", KJoint: "Joint", KCircuit: "Electronics"}
 
 // KindLabel names a kind for the UI.
@@ -519,6 +523,77 @@ func PlaneOf(fc *brep.Face) (geom.Frame, bool) {
 	fr.O = fr.ToWorld(geom.V3(l.X, l.Y, 0))
 	return fr, true
 }
+
+// TangentPlane is the plane touching a curved face at the point of it
+// nearest at, facing out of the body: on a face round an axis (cylinder,
+// cone, sphere, torus) its X runs round the axis and its Y along it, so a
+// text on it stands upright on an upright part.
+func TangentPlane(fc *brep.Face, at geom.Vec3) (geom.Frame, bool) {
+	u, v := fc.Surf.Project(at)
+	p := fc.Surf.Eval(u, v)
+	n := fc.OutwardNormal(u, v).Norm()
+	if n.Len() < 0.5 {
+		return geom.Frame{}, false
+	}
+	var axis geom.Vec3
+	switch s := fc.Surf.(type) {
+	case geom.Cylinder:
+		axis = s.F.Z
+	case geom.Cone:
+		axis = s.F.Z
+	case geom.Sphere:
+		axis = s.F.Z
+	case geom.Torus:
+		axis = s.F.Z
+	default:
+		axis = geom.ZAxis
+	}
+	x := axis.Cross(n)
+	if x.Len() < 1e-6 { // at a pole, or the axis along the normal
+		x = n.AnyPerp()
+	}
+	x = x.Norm()
+	return geom.Frame{O: p, X: x, Y: n.Cross(x), Z: n}, true
+}
+
+// Placed moves a sketch's plane by its feature's placement inputs: Offset
+// along its normal, Turn about it (degrees), then Move X and Move Y along
+// its (turned) axes.
+func (d *Document) Placed(f *Feature, fr geom.Frame) (geom.Frame, error) {
+	val := func(name string) (float64, error) {
+		if s := strings.TrimSpace(f.Inputs[name]); s == "" || s == "0" {
+			return 0, nil
+		}
+		return d.input(f, name)
+	}
+	off, err := val("Offset")
+	if err != nil {
+		return fr, err
+	}
+	turn, err := val("Turn")
+	if err != nil {
+		return fr, err
+	}
+	mx, err := val("Move X")
+	if err != nil {
+		return fr, err
+	}
+	my, err := val("Move Y")
+	if err != nil {
+		return fr, err
+	}
+	if turn != 0 {
+		a := turn * math.Pi / 180
+		c, s := math.Cos(a), math.Sin(a)
+		x := fr.X.Scale(c).Add(fr.Y.Scale(s))
+		fr.X, fr.Y = x, fr.Z.Cross(x)
+	}
+	fr.O = fr.O.Add(fr.Z.Scale(off)).Add(fr.X.Scale(mx)).Add(fr.Y.Scale(my))
+	return fr, nil
+}
+
+// SketchPlacement are a sketch's placement inputs, in display order.
+var SketchPlacement = []string{"Offset", "Turn", "Move X", "Move Y"}
 
 // StdPlane is a standard sketch plane.
 func StdPlane(name string) (geom.Frame, bool) {

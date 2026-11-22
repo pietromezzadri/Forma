@@ -101,6 +101,10 @@ func ApplyTheme(scale float32) {
 // Icons is set once the icon font is loaded.
 var Icons bool
 
+// Mono is a fixed-width font for code (Consolas where Windows has it, else
+// ImGui's own), nil before LoadFonts.
+var Mono *imgui.Font
+
 // LoadFonts adds Inter with Font Awesome merged in, found under assets/fonts
 // next to the executable or the working directory; without them ImGui's
 // built-in font stays.
@@ -124,6 +128,15 @@ func LoadFonts(px float32) {
 		Icons = true
 	}
 	imgui.CurrentIO().SetFontDefault(f)
+	for _, mono := range []string{filepath.Join(os.Getenv("WINDIR"), "Fonts", "consola.ttf"), "/System/Library/Fonts/Menlo.ttc", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"} {
+		if _, err := os.Stat(mono); err == nil {
+			Mono = atlas.AddFontFromFileTTFV(mono, px, imgui.NewFontConfig(), nil)
+			break
+		}
+	}
+	if Mono == nil {
+		Mono = atlas.AddFontDefault()
+	}
 }
 
 // findAssets locates the assets folder.

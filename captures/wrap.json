@@ -1,0 +1,20 @@
+{
+  "width": 1600, "height": 900, "out": "out/wrap",
+  "shots": [
+    {"name": "a_wrapped", "frames": 8, "do": [
+      "create.cylinder:X=0,Y=0,Radius=12,Height=30", "edit.clear", "view.front:now", "view.fit", "wait:10",
+      "move:w:0,-12,15@6", "click", "wait:4",
+      "move:btn:sketch.face@6", "click", "wait:30",
+      "move:btn:tool.text@4", "click", "move:sk:0,-2@6", "wait:3", "click", "wait:6",
+      "text.set:WRAPPED ROUND", "text.size:5", "wait:6",
+      "move:btn:sketch.finish@4", "click", "wait:8", "view.front:now", "view.fit", "wait:10",
+      "move:item:Sketch 1@4", "click", "wait:4",
+      "move:w:0,-12,8@6", "wait:4", "addclick", "wait:4",
+      "move:btn:feature.emboss@4", "click", "wait:30",
+      "feature.set:Type=Raise,Depth=0.8,Wrap=1", "wait:30", "log",
+      "camto:90,-12", "wait:40", "view.fit", "edit.clear", "move:vp:0.98,0.98@2", "wait:10", "log"
+    ]},
+    {"name": "b_side", "frames": 8, "do": ["camto:20,-12", "wait:40"]},
+    {"name": "c_back", "frames": 8, "do": ["camto:-60,-12", "wait:40"]}
+  ]
+}

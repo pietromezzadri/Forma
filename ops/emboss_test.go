@@ -189,7 +189,7 @@ func TestEmbossAround(t *testing.T) {
 	for _, x := range []float64{-24, -10, 0, 14, 20} {
 		regs, fr := nameSketch(t, "a", -90, 33, 12, 0)
 		for i := range regs {
-			regs[i] = shiftRegion(regs[i], x)
+			regs[i] = shiftRegion(regs[i], geom.V2(x, 0))
 		}
 		for _, mode := range []int{EmbossCut, EmbossRaise} {
 			b, _, err := EmbossFace(cone, side, regs, nil, fr, EmbossSpec{Mode: mode, Depth: 2})
@@ -201,36 +201,4 @@ func TestEmbossAround(t *testing.T) {
 			}
 		}
 	}
-}
-
-// shiftRegion moves a region dx along the sketch's X.
-func shiftRegion(r sketch.Region, dx float64) sketch.Region {
-	mv := func(l []sketch.Seg) []sketch.Seg {
-		out := make([]sketch.Seg, len(l))
-		d := geom.V2(dx, 0)
-		for i, s := range l {
-			s.A, s.B, s.C = s.A.Add(d), s.B.Add(d), s.C.Add(d)
-			if s.Ctrl != nil {
-				c := make([]geom.Vec2, len(s.Ctrl))
-				for k, q := range s.Ctrl {
-					c[k] = q.Add(d)
-				}
-				s.Ctrl = c
-			}
-			out[i] = s
-		}
-		return out
-	}
-	r.Outer = mv(r.Outer)
-	holes := make([][]sketch.Seg, len(r.Holes))
-	for i, h := range r.Holes {
-		holes[i] = mv(h)
-	}
-	r.Holes = holes
-	poly := make([]geom.Vec2, len(r.Poly))
-	for i, p := range r.Poly {
-		poly[i] = p.Add(geom.V2(dx, 0))
-	}
-	r.Poly = poly
-	return r
 }

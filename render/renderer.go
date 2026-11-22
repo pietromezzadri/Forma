@@ -29,7 +29,9 @@ type Paint struct {
 	Dash       float32    // world units per dash period, 0 = solid
 	DepthBias  float32    // clip-space z pulled toward the camera
 	IDBase     uint32     // OR'ed into IDs in the pick pass
-	OnTop      bool       // faces: drawn over everything (no depth test)
+	OnTop      bool       // drawn over everything (no depth test)
+	NoDepth    bool       // faces: drawn without writing depth (see-through: what is behind still shows)
+	CullBack   bool       // faces: their backs left out (a see-through body's far side isn't drawn red)
 	Offset     mgl32.Vec3 // moves what is drawn (a component in an exploded view)
 }
 
@@ -184,7 +186,20 @@ func (r *Renderer) DrawFaces(v View, m *TriMesh, p Paint, pick bool) {
 	if p.OnTop {
 		gl.Disable(gl.DEPTH_TEST)
 	}
+	if p.NoDepth {
+		gl.DepthMask(false)
+	}
+	if p.CullBack {
+		gl.Enable(gl.CULL_FACE)
+		gl.CullFace(gl.BACK)
+	}
 	m.Draw()
+	if p.CullBack {
+		gl.Disable(gl.CULL_FACE)
+	}
+	if p.NoDepth {
+		gl.DepthMask(true)
+	}
 	if p.OnTop {
 		gl.Enable(gl.DEPTH_TEST)
 	}
@@ -195,7 +210,20 @@ func (r *Renderer) DrawFaces(v View, m *TriMesh, p Paint, pick bool) {
 func (r *Renderer) DrawFaceRange(v View, m *TriMesh, id uint32, p Paint) {
 	r.faceSetup(v, p, false)
 	gl.DepthFunc(gl.LEQUAL)
+	if p.NoDepth {
+		gl.DepthMask(false)
+	}
+	if p.CullBack {
+		gl.Enable(gl.CULL_FACE)
+		gl.CullFace(gl.BACK)
+	}
 	m.DrawRange(id)
+	if p.CullBack {
+		gl.Disable(gl.CULL_FACE)
+	}
+	if p.NoDepth {
+		gl.DepthMask(true)
+	}
 	gl.Disable(gl.POLYGON_OFFSET_FILL)
 }
 
@@ -212,7 +240,13 @@ func (r *Renderer) lineSetup(s *Shader, v View, p Paint, pick bool) {
 // DrawLines draws polylines as screen-space strips p.Width pixels wide.
 func (r *Renderer) DrawLines(v View, l *LineSet, p Paint, pick bool) {
 	r.lineSetup(pickOr(pick, r.line, r.linePick), v, p, pick)
+	if p.OnTop {
+		gl.Disable(gl.DEPTH_TEST)
+	}
 	l.Draw()
+	if p.OnTop {
+		gl.Enable(gl.DEPTH_TEST)
+	}
 }
 
 func (r *Renderer) DrawLineRange(v View, l *LineSet, id uint32, p Paint) {

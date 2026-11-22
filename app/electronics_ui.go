@@ -75,7 +75,28 @@ func (a *App) registerElecCommands(c *Commands) {
 	c.add(&Command{ID: "electronics.set", Label: "Electronics: set a part's figure (part.figure=value)", Group: "Assemble",
 		Run: func(arg string) { a.elecCommand(arg, "set") }})
 	c.add(&Command{ID: "electronics.model", Label: "Electronics: insert a part's 3D model as a component", Group: "Assemble", Icon: icComponent,
-		Run: func(arg string) { a.elecInsertModel(arg) }})
+		Run: func(arg string) {
+			// "id" or "id@part": the model, linked to that part
+			id, part, _ := strings.Cut(arg, "@")
+			m := a.elecInsertModel(id)
+			if f := a.elecCircuit(); m != nil && f != nil && part != "" {
+				for i := range f.Circuit.Parts {
+					if f.Circuit.Parts[i].Name == part {
+						f.Circuit.Parts[i].Model3D = m.ID
+					}
+				}
+				a.doc.Commit()
+			}
+		}})
+	c.add(&Command{ID: "electronics.press", Label: "Electronics: press or let go of a button (name=1|0)", Group: "Assemble",
+		Run: func(arg string) {
+			name, v, _ := strings.Cut(arg, "=")
+			if st := a.elec.study; st != nil {
+				if b, ok := st.Parts[name].(*elec.Button); ok {
+					b.Pressed = v != "0"
+				}
+			}
+		}})
 	c.add(&Command{ID: "electronics.run", Label: "Electronics: run the motion study", Group: "Assemble", Icon: icPlay,
 		Run: func(string) { a.elecPlay(true) }})
 	c.add(&Command{ID: "electronics.pause", Label: "Electronics: pause the motion study", Group: "Assemble",
@@ -196,14 +217,14 @@ func (a *App) elecAddPart(model, name string) {
 
 // elecInsertModel puts a library part's 3D model (Arduino Uno, SG90, TT
 // motor…) in the design as a component, clear of what is there.
-func (a *App) elecInsertModel(id string) {
+func (a *App) elecInsertModel(id string) *doc.Feature {
 	if id == "" {
 		id = "uno"
 	}
 	f, err := doc.NewPartComponent(id)
 	if err != nil {
 		a.notify("%v", err)
-		return
+		return nil
 	}
 	first := true
 	for _, g := range a.doc.D.Features {
@@ -213,7 +234,11 @@ func (a *App) elecInsertModel(id string) {
 		f.Inputs["Grounded"] = "1"
 	}
 	a.placeNew(f)
+	if a.doc.D.Feature(f.ID) == nil {
+		return nil
+	}
 	a.notify("Inserted the %s model as a component", doc.PartModels[id].Label)
+	return f
 }
 
 // elecCommand is the wire / drive / set commands' "part.what=value".
@@ -502,10 +527,20 @@ func (a *App) elecBody() {
 		a.cmds.Run("electronics.firmware", "")
 	}
 	imgui.SetItemTooltip("A compiled sketch (.hex), or a sketch (.ino) compiled with arduino-cli if it is installed")
+	imgui.SameLine()
+	if imgui.Button(ui.Icon(icCode, "Write code…")) {
+		a.codeOpen()
+	}
+	a.markItem("btn:electronics.code")
+	imgui.SetItemTooltip("Write the sketch here (or in VS Code), compile it and load it")
+	a.cliBanner()
 
 	a.elecStudyUI(f)
 
 	imgui.SeparatorText("Parts")
+	if a.wiringTable(f) {
+		return
+	}
 	changed := false
 	for i := range c.Parts {
 		imgui.PushIDInt(int32(i))
@@ -541,7 +576,12 @@ func (a *App) elecBody() {
 	if imgui.Button("Add part") {
 		a.elecAddPart(a.elec.addModel, "")
 		if !a.elec.noModel && doc.PartModels[a.elec.addModel] != nil {
-			a.elecInsertModel(a.elec.addModel)
+			if m := a.elecInsertModel(a.elec.addModel); m != nil {
+				if f := a.elecCircuit(); f != nil && len(f.Circuit.Parts) > 0 {
+					f.Circuit.Parts[len(f.Circuit.Parts)-1].Model3D = m.ID
+					a.doc.Commit()
+				}
+			}
 		}
 	}
 	model := !a.elec.noModel
@@ -570,7 +610,10 @@ func (a *App) partEditor(f *doc.Feature, p *doc.CircuitPart) (del, changed bool)
 	defer func() {
 		if doc.PartModels[p.Model] != nil {
 			if imgui.SmallButton("Insert 3D model") {
-				a.elecInsertModel(p.Model)
+				if m := a.elecInsertModel(p.Model); m != nil {
+					p.Model3D = m.ID
+					a.doc.Commit()
+				}
 			}
 			imgui.SameLine()
 		}
@@ -795,4 +838,118 @@ func stateOf(p elec.Part) string {
 		return s.State()
 	}
 	return ""
+}
+
+// wiringTable shows every part's pins and where each goes on the board,
+// all at once (each part's entry below has the rest of it). It says
+// whether it changed the circuit.
+func (a *App) wiringTable(f *doc.Feature) bool {
+	c := f.Circuit
+	rows := 0
+	for _, p := range c.Parts {
+		if m := elec.Library[p.Model]; m != nil {
+			rows += len(m.Pins)
+		}
+	}
+	if rows == 0 {
+		return false
+	}
+	imgui.TextDisabled("Wiring: each part's pin to a pin of the Uno")
+	changed := false
+	if imgui.BeginTableV("##wiring", 3, imgui.TableFlagsRowBg|imgui.TableFlagsBordersInnerV|imgui.TableFlagsSizingStretchProp, imgui.Vec2{}, 0) {
+		imgui.TableSetupColumn("Part")
+		imgui.TableSetupColumn("Pin")
+		imgui.TableSetupColumn("Board pin")
+		imgui.TableHeadersRow()
+		for i := range c.Parts {
+			p := &c.Parts[i]
+			m := elec.Library[p.Model]
+			if m == nil {
+				continue
+			}
+			for k, role := range m.Pins {
+				imgui.TableNextRow()
+				imgui.TableNextColumn()
+				if k == 0 {
+					imgui.TextUnformatted(p.Name)
+				}
+				imgui.TableNextColumn()
+				imgui.TextDisabled(role)
+				imgui.TableNextColumn()
+				opts := unoPins
+				if m.Analog {
+					opts = []string{"", "A0", "A1", "A2", "A3", "A4", "A5"}
+				}
+				if p.Pins == nil {
+					p.Pins = map[string]string{}
+				}
+				// pins another part has taken are marked
+				taken := map[string]string{}
+				for _, q := range c.Parts {
+					if q.Name == p.Name {
+						continue
+					}
+					for _, v := range q.Pins {
+						if v != "" {
+							taken[v] = "on " + q.Name
+						}
+					}
+				}
+				imgui.PushIDStr(p.Name + "." + role)
+				if v, ok := a.combo("##wire", p.Pins[role], opts, taken); ok {
+					p.Pins[role] = v
+					changed = true
+				}
+				a.markItem("wire:" + p.Name + "." + role)
+				imgui.PopID()
+			}
+		}
+		imgui.EndTable()
+	}
+	if changed {
+		a.elecEdit()
+	}
+	return changed
+}
+
+// partOfModel is the running study's part whose 3D model is step fid.
+func (a *App) partOfModel(fid int) elec.Part {
+	st := a.elec.study
+	f := a.elecCircuit()
+	if st == nil || f == nil || fid == 0 {
+		return nil
+	}
+	for _, p := range f.Circuit.Parts {
+		if p.Model3D == fid {
+			return st.Parts[p.Name]
+		}
+	}
+	return nil
+}
+
+// pressPart: a press on a button's 3D model while the study runs holds the
+// button down until the mouse is let go.
+func (a *App) pressPart() bool {
+	if a.sk != nil || a.hover.IsZero() {
+		return false
+	}
+	b := a.doc.Body(a.hover.Item)
+	if b == nil {
+		return false
+	}
+	if q, ok := a.partOfModel(b.F.ID).(*elec.Button); ok {
+		q.Pressed = true
+		a.vp.pressing = q
+		return true
+	}
+	return false
+}
+
+// ledGlow is how bright the LED whose model is step fid is lit (0 when it
+// isn't one, or no study runs).
+func (a *App) ledGlow(fid int) float64 {
+	if q, ok := a.partOfModel(fid).(*elec.LED); ok {
+		return math.Max(0, math.Min(1, q.Brightness))
+	}
+	return 0
 }

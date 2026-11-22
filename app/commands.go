@@ -178,7 +178,7 @@ func (a *App) registerCommands() *Commands {
 		Run: func(string) {
 			ref, ok := a.planeFor("")
 			if !ok {
-				a.notify("Select a flat face first")
+				a.notify("Select a face first (a curved one: where the sketch should touch it)")
 				return
 			}
 			a.enterSketch(a.doc.AddSketch(ref))
@@ -266,6 +266,26 @@ func (a *App) registerCommands() *Commands {
 	}})
 	c.add(&Command{ID: "view.layout", Label: "Reset panel layout", Group: "View",
 		Run: func(string) { a.layoutSet, a.layoutReset = false, true }})
+	c.add(&Command{ID: "view.xray", Label: "X-ray: see through the selected parts", Group: "View", Icon: icXRay,
+		Enabled: func() bool { return len(a.selectedBodies()) > 0 },
+		Run: func(arg string) {
+			// all on if any is off, else all off
+			on := false
+			for _, k := range a.selectedBodies() {
+				if b := a.doc.Body(k); b != nil && !b.F.XRay {
+					on = true
+				}
+			}
+			if arg == "on" || arg == "off" {
+				on = arg == "on"
+			}
+			for _, k := range a.selectedBodies() {
+				if b := a.doc.Body(k); b != nil {
+					b.F.XRay = on
+				}
+			}
+			a.doc.Commit()
+		}})
 	c.add(&Command{ID: "view.ortho", Label: "Toggle orthographic", Group: "View", Shortcut: "Num 5", Run: func(string) {
 		a.cam.Ortho = !a.cam.Ortho
 	}})
@@ -287,6 +307,7 @@ func (a *App) registerCommands() *Commands {
 	a.registerM13Commands(c)
 	a.registerSimCommands(c)
 	a.registerElecCommands(c)
+	a.registerCodeCommands(c)
 	return c
 }
 
@@ -311,7 +332,7 @@ func (a *App) escape() {
 		return
 	}
 	a.sel = a.sel[:0]
-	a.browserSel = 0
+	a.browserSel, a.multi = 0, nil
 }
 
 // shortcuts handles the keyboard when no text field has it.

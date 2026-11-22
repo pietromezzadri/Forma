@@ -3,6 +3,7 @@ package doc
 import (
 	"fmt"
 	"math"
+	"sort"
 
 	"forma/brep"
 	"forma/geom"
@@ -92,6 +93,18 @@ func NewHole(sketchID int, points []int) *Feature {
 }
 
 // NewShell hollows a body, its open faces left open.
+// Combine operations and inputs.
+var (
+	CombineOps    = []string{"Join", "Cut", "Intersect"}
+	CombineInputs = [][2]string{{"Operation", "Join"}, {"Keep tools", "0"}}
+)
+
+// NewCombine joins, cuts or intersects bodies (Targets[1:], the tools)
+// with a target body (Targets[0]).
+func NewCombine(target int, tools []int) *Feature {
+	return withInputs(&Feature{Kind: KCombine, Targets: append([]int{target}, tools...)}, CombineInputs)
+}
+
 func NewShell(target int, open []FaceRef) *Feature {
 	return withInputs(&Feature{Kind: KShell, Targets: []int{target}, Faces: open}, ShellInputs)
 }
@@ -114,7 +127,7 @@ func fmtNum(x float64) string {
 // adding tool bodies of their own.
 func (f *Feature) modifies() bool {
 	switch f.Kind {
-	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss:
+	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss, KCombine:
 		return true
 	}
 	return false
@@ -331,6 +344,51 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 		return i, nil
 	}
 	switch f.Kind {
+	case KCombine:
+		if len(f.Targets) < 2 {
+			return nil, fmt.Errorf("pick a target body and at least one tool body")
+		}
+		ti, err := target(f.Targets[0])
+		if err != nil {
+			return nil, err
+		}
+		op := brep.Union
+		switch f.Inputs["Operation"] {
+		case "Cut":
+			op = brep.Subtract
+		case "Intersect":
+			op = brep.Intersect
+		}
+		b := out[ti].Body
+		var gone []int
+		for k, key := range f.Targets[1:] {
+			i, err := target(key)
+			if err != nil {
+				return nil, fmt.Errorf("tool %d: %v", k+1, err)
+			}
+			if i == ti {
+				return nil, fmt.Errorf("tool %d is the target body itself", k+1)
+			}
+			r, err := brep.Boolean(b, out[i].Body, op)
+			if err == brep.ErrEmpty {
+				return nil, fmt.Errorf("nothing is left: the bodies don't overlap (tool %d)", k+1)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("tool %d: %v", k+1, err)
+			}
+			b = r
+			gone = append(gone, i)
+		}
+		b.Name = out[ti].Body.Name
+		changed(ti, b)
+		if f.Inputs["Keep tools"] != "1" {
+			// the tools are used up
+			sort.Sort(sort.Reverse(sort.IntSlice(gone)))
+			for _, i := range gone {
+				out = append(out[:i], out[i+1:]...)
+			}
+		}
+		return out, nil
 	case KMove:
 		x, err := d.MoveXform(f)
 		if err != nil {

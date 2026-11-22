@@ -1,0 +1,21 @@
+{
+  "width": 1600, "height": 900, "out": "out/cone_emboss",
+  "shots": [
+    {"name": "a_sketch_on_cone", "frames": 8, "do": [
+      "create.cone:X=0,Y=0,Base radius=30,Top radius=15,Height=40", "wait:6",
+      "view.front:now", "view.fit", "wait:10",
+      "move:w:0,-22.5,20@6", "wait:4", "click", "wait:6", "log",
+      "move:btn:sketch.face@6", "click", "wait:30",
+      "move:btn:tool.text@4", "click", "move:sk:-13,-2@6", "wait:3", "click", "wait:6",
+      "text.set:FORMA", "text.size:6", "wait:10", "log"
+    ]},
+    {"name": "b_embossed", "frames": 8, "do": [
+      "move:btn:sketch.finish@4", "click", "wait:8",
+      "view.front:now", "view.fit", "wait:10",
+      "move:item:Sketch 1@4", "click", "wait:4",
+      "move:w:0,-22.5,14@6", "wait:4", "addclick", "wait:4", "log",
+      "move:btn:feature.emboss@4", "click", "wait:40", "log",
+      "camto:110,-20", "wait:40", "view.fit", "edit.clear", "move:vp:0.98,0.98@2", "wait:10", "log"
+    ]}
+  ]
+}

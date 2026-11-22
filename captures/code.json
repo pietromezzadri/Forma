@@ -1,0 +1,18 @@
+{
+  "width": 1600, "height": 900, "out": "out/code",
+  "shots": [
+    {"name": "a_editor", "frames": 8, "do": [
+      "file.new", "electronics.add", "wait:6", "electronics.code", "wait:6",
+      "electronics.example:Blink", "wait:4", "electronics.compile:now", "wait:8", "log"
+    ]},
+    {"name": "b_running", "frames": 8, "do": [
+      "electronics.part:led=led", "electronics.wire:led.pin=D13", "wait:4",
+      "electronics.run", "wait:20", "log"
+    ]},
+    {"name": "c_error", "frames": 8, "do": [
+      "electronics.reset", "electronics.example:Servo sweep", "wait:4",
+      "move:ui:300,442@6", "click", "wait:4", "key:end", "type:oops", "wait:4",
+      "electronics.compile:now", "wait:10", "log"
+    ]}
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "width": 1600, "height": 900, "out": "out/multiselect2",
+  "shots": [
+    {"name": "a_rounded", "frames": 6, "do": [
+      "create.box:X=-20,Y=-15,Width=40,Depth=30,Height=12", "edit.clear", "view.iso:now", "view.fit", "wait:20",
+      "move:w:20,-15,6@6", "click", "wait:4", "hold:ctrl", "move:w:-20,-15,6@6", "click", "move:w:20,15,6@6", "click", "release:ctrl", "wait:4", "log",
+      "move:btn:feature.fillet@6", "click", "wait:20",
+      "move:prop:Radius@6", "click", "wait:3", "key:ctrl+a", "type:6", "key:enter", "wait:20", "edit.clear", "wait:6",
+      "move:w:0,-15,12@6", "wait:6", "log"
+    ]},
+    {"name": "b_chain", "frames": 6, "do": [
+      "dclick", "wait:8", "log"
+    ]},
+    {"name": "c_chamfered", "frames": 6, "do": [
+      "move:btn:feature.chamfer@6", "click", "wait:20",
+      "move:prop:Distance@6", "click", "wait:3", "key:ctrl+a", "type:1.5", "key:enter", "wait:20", "edit.clear", "move:vp:0.98,0.98@2", "wait:10", "log"
+    ]}
+  ]
+}

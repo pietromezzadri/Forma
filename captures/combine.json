@@ -1,0 +1,18 @@
+{
+  "width": 1600, "height": 900, "out": "out/combine",
+  "shots": [
+    {"name": "a_cut", "frames": 8, "do": [
+      "create.box:X=-20,Y=-15,Width=40,Depth=30,Height=12", "create.cylinder:X=0,Y=0,Z=-5,Radius=8,Height=30", "edit.clear",
+      "view.iso:now", "view.fit", "wait:20",
+      "move:item:Box 1@6", "click", "hold:ctrl", "move:item:Cylinder 1@6", "click", "release:ctrl", "wait:4",
+      "feature.combine:Operation=Cut", "wait:25", "inputs", "log"
+    ]},
+    {"name": "b_intersect", "frames": 8, "do": [
+      "file.new",
+      "create.box:X=-20,Y=-15,Width=40,Depth=30,Height=12", "create.sphere:X=0,Y=0,Z=6,Radius=14", "edit.clear",
+      "view.iso:now", "view.fit", "wait:20",
+      "move:item:Box 1@6", "click", "hold:ctrl", "move:item:Sphere 1@6", "click", "release:ctrl", "wait:4",
+      "feature.combine:Operation=Intersect", "wait:25", "inputs", "log"
+    ]}
+  ]
+}

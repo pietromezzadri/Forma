@@ -32,10 +32,18 @@ func (a *App) planeFor(name string) (doc.PlaneRef, bool) {
 			if f.ID != r.Local {
 				continue
 			}
-			if _, ok := doc.PlaneOf(f); !ok {
+			if _, ok := doc.PlaneOf(f); ok {
+				return doc.PlaneRef{Feature: b.F.ID, Body: b.K, Face: f.Name}, true
+			}
+			// a curved face: the plane touching it where it was clicked
+			at, ok := a.selAt[r]
+			if !ok {
 				return doc.PlaneRef{}, false
 			}
-			return doc.PlaneRef{Feature: b.F.ID, Body: b.K, Face: f.Name}, true
+			if _, ok := doc.TangentPlane(f, at); !ok {
+				return doc.PlaneRef{}, false
+			}
+			return doc.PlaneRef{Feature: b.F.ID, Body: b.K, Face: f.Name, At: &at}, true
 		}
 	}
 	return doc.PlaneRef{}, false

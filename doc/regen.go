@@ -311,7 +311,7 @@ func (d *Document) build(f *Feature) error {
 		return d.buildComponent(f)
 	case KCircuit:
 		return d.buildCircuit(f)
-	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss:
+	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss, KCombine:
 		return nil // they work on the bodies there are (modify)
 	default:
 		return fmt.Errorf("unknown feature kind %q", f.Kind)
@@ -373,11 +373,19 @@ func (d *Document) buildSketch(f *Feature) error {
 				return fmt.Errorf("its face %q is gone", f.Plane.Face)
 			}
 			pl, ok := PlaneOf(fc)
+			if !ok && f.Plane.At != nil {
+				pl, ok = TangentPlane(fc, *f.Plane.At)
+			}
 			if !ok {
 				return fmt.Errorf("face %q is not flat", f.Plane.Face)
 			}
 			s.Plane = pl
 		}
+		pl, err := d.Placed(f, s.Plane)
+		if err != nil {
+			return err
+		}
+		s.Plane = pl
 	}
 	var dimErr error
 	// edges projected into it follow the bodies
