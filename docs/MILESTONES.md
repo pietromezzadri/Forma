@@ -659,3 +659,81 @@ What each milestone added, in the order they were built. The current gaps are in
     and its dimension following a parameter.
   - Captures: `captures/m16.json` (the tools driven by clicks, a section,
     a note, dragging, export) and the README's `drawing` shot.
+
+## After M16: selection, sketches on faces, the sketch's code
+
+- **Sketches on curved faces** (`doc.TangentPlane`): a sketch on a
+  cylinder, cone, sphere or torus face lies on the plane touching it where
+  the face was clicked (`PlaneRef.At`), facing out, its X round the
+  axis and its Y along it, so a text on it stands upright; Sketch is on
+  for any face picked. **Moving a sketch** (`Document.Placed`): every
+  sketch has Offset (along its normal), Turn (about it, degrees), Move X
+  and Move Y (along its turned axes), expressions like any input; "Put on
+  the selected face" moves it onto another face or place.
+- **Emboss off a face's side:** a letter running over the side of the face
+  as the sketch sees it (where the face turns away and its moved copy is
+  missed) is refused with a plain message (`ops.ErrOffSide`) instead of a
+  boolean's topology error.
+- **Selecting several things** (`app/multiselect.go`): Ctrl+click adds in
+  the view, the browser and the timeline; several steps picked together
+  show their shared values in Properties, an edit setting them on all
+  (and hide, suppress or delete them together); a drag on empty space is
+  a box picking the sharp edges it shows (Shift: the faces; read from the
+  ID buffer, `render.PickTarget.ReadRect`); double-clicking an edge picks
+  its tangent chain (`brep.TangentChain`), a body all of it (Ctrl: as
+  well); fillet and chamfer with bodies picked in the browser and nothing
+  in the view round all their sharp edges (`brep.Sharp`: no seams, no
+  tangent edges).
+- **The sketch's code** (`app/code_editor.go`): the Electronics window's
+  Write code opens an editor (ImGui Color Text Edit: C++ highlighting,
+  undo, find; Consolas) whose text is kept with the circuit
+  (`Circuit.Source`); examples to start from (Blink, Servo sweep,
+  Button and LED, Motor speed from a pot); Compile and load builds it
+  with arduino-cli on a goroutine (`compileCode`), loads the firmware and
+  marks the compiler's errors and warnings on their lines, listed under it
+  (a click goes there); Open in VS Code writes it to
+  Documents/Forma/sketches/<name>/<name>.ino and opens it there, and a
+  save there is read back.
+- **Combine** (`KCombine`, `doc.NewCombine`): bodies already made
+  joined, cut or intersected with a target body (the first picked, the
+  others the tools), the tools used up or kept (Keep tools); bodies that
+  don't meet are refused plainly.
+- **X-ray** (`Feature.XRay`): any body drawn see-through (no depth
+  writes, back faces culled), its edges dashed over everything; picks go
+  through it to what is behind. From the body's Properties, its context
+  menu or View → X-ray.
+- **Text wrapped round a face** (Emboss's Wrap, `ops.EmbossSpec.Wrap`):
+  on a cylinder or cone each letter goes to the angle its place along the
+  line gives (x / radius round the axis), turned to face out there, so a
+  line longer than half the way round reaches the back; inlaid pockets
+  that grow into each other are matched to their letters
+  (`pocketOf`), and a letter landing on the seam is nudged and tried again.
+- **Arduino parts you can touch:** holding the mouse on a button's 3D
+  model presses it while a study runs; an LED's model glows with its
+  pin's duty; the Electronics window has a wiring table (part, pin, Uno
+  pin). **arduino-cli from Forma** (`arduinocli`): when it isn't installed,
+  Forma downloads Arduino's release for the system into
+  %LOCALAPPDATA%\arduino-cli\bin and installs the AVR core and the Servo
+  library, with a progress bar.
+- Also: sketch regions with overlapping straight pieces (Inter's D, whose
+  outline runs back along itself) made doubled loops, which broke emboss
+  and inlay on that letter; the duplicate is now dropped
+  (`sketch/overlap_test.go`). A new step made with several things picked
+  shows its own properties.
+- Also: the view cube drew the camera upside down and slid the target off
+  the part when a face of it was clicked; the ribbon tightens, drops its
+  names, then scrolls in narrow windows; adding an electronics part puts
+  its 3D model in (push button, pot and LED models added); picking a pin
+  no longer crashes.
+- Tests: `doc/sketch_place_test.go` (a sketch touching a cone, FORMA
+  raised, engraved and inlaid on it, the sketch moved and saved; text off
+  the side refused plainly), `brep/chain_test.go` (a rounded plate's rim
+  a chain of 4 lines and 4 arcs, its tangent edges not sharp). Captures
+  `cone_emboss.json`, `multiselect.json`, `multiselect2.json` (a chain
+  chamfered), `code.json` (Blink compiled and blinking an LED, an error
+  marked on its line), `cube_check.json`; `doc/combine_test.go` (two boxes
+  joined, cut and intersected, the tool kept or not, saved and read
+  back), `TestEmbossWrapsRound` (WRAPPED ROUND inlaid round a cylinder,
+  letters on the back), `arduinocli/install_test.go` (the download and set-up
+  against a local server); captures `combine.json`, `xray.json`,
+  `press.json`, `wrap.json`, `installcli.json`.

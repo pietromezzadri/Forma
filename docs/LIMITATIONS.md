@@ -89,10 +89,14 @@ new ones as features land.
 
 ## Emboss and inlay (`ops/emboss.go`, `doc/emboss.go`)
 
-- **EM1 Projected, not wrapped:** letters are projected along the sketch's
-  normal, so on a curved face they spread a little toward its sides (a
-  name 30 mm wide on a 40 mm radius is 3–4 % wider at its ends) and their
-  walls lean against the face's normal there. No wrapping by arc length yet.
+- **EM1 Projected, not wrapped** (partly fixed: Wrap places the letters
+  by arc length round a cylinder or cone): each letter is still a flat
+  piece projected where it lands, so a letter wider than about a sixth of
+  the way round sits proud at its edges; on spheres and tori text is only
+  projected (a name 30 mm wide on a 40 mm radius is 3–4 % wider at its
+  ends, its walls leaning against the face's normal there). Wrapped
+  raised or engraved letters set so close that their cuts meet fail with
+  a plain message (space them out).
 - **EM2 One face:** the letters must land on the one face picked; a name
   running over the edge between two faces (a bowl's side and its foot)
   fails ("the letters run off the face").
@@ -110,6 +114,15 @@ new ones as features land.
   past the surface (up to four times). Very tight letter curves (a heavy
   font's small counter grown by more than its own radius) are offset
   roughly where the offset folds over.
+
+## Combine (`doc/modify.go`)
+
+- **C1 Bodies by key:** Combine keeps its target and tools as body keys
+  (feature and index); an upstream edit that changes how many bodies a
+  feature makes can point it at another body or lose one (reported).
+- **C2 One target:** the tools all go into one body, in the order picked;
+  no "each with each" or splitting a body by another into pieces kept
+  apart. It is as robust as the booleans (K-limits).
 
 ## Holes, patterns, mirror, move
 
@@ -161,6 +174,9 @@ new ones as features land.
   that isn't a line or a circle square to the sketch comes in as 24 lines;
   a projected circle that later becomes another kind of curve stops
   following (reported on the sketch).
+- **SK7 Sketches on curved faces** lie on the plane touching the face at
+  one point: what is drawn on them is flat (text on a cylinder or cone
+  can be wrapped round it by Emboss's Wrap: EM1).
 - **SK6 Offset:** the copy is locked geometry worked out after each solve,
   not solved with the sketch (constraints can be put on it, but it can't
   be dragged); where an offset wider than a short piece swallows it the
@@ -190,6 +206,16 @@ new ones as features land.
   (`btn:create.box`, `btn:sketch.xy`, …) no longer find them; they'd need to
   open the menu first or call the command.
 - **U5 Section panel's radio buttons** look odd (empty circles beside X / Z).
+- **U8 X-ray** bodies aren't sorted by depth among themselves (two
+  overlapping see-through bodies can blend in the wrong order), and their
+  faces can't be picked while see-through (only what is behind).
+- **U6 Box selection** picks what the view shows (the nearest faces and
+  their edges, not what is behind), sharp edges only, and has no window /
+  crossing distinction.
+- **U7 Several steps edited together** share only their number and
+  expression values; choices (Operation, Direction, Type) are set one
+  step at a time. Rounding every edge of a body fails at corners where
+  three rounds meet (F2, M19).
 
 ## Assemblies (`doc/assembly.go`, `app/assembly_ui.go`)
 
@@ -280,9 +306,19 @@ new ones as features land.
   no plot of a part over time, no export of the motion; a study ends when
   the circuit is edited, and the design's undo history sees the joints
   only once something else is committed while one runs.
+- **EL9 The code editor** has no completion or Arduino library manager
+  (libraries are arduino-cli's own: `arduino-cli lib install`); VS Code is
+  linked through the file (a save there is read back, an edit here
+  written to it), not as an extension; a board other than the Uno isn't
+  compiled for.
 - **EL8 Wiring is by name:** pins are picked per part, not drawn; no
   wires, no breadboard view, no reading a Wokwi `diagram.json` or a KiCad
-  netlist; one board per circuit and an Uno only.
+  netlist; one board per circuit and an Uno only. Parts connect only
+  through the Uno: a button and an LED are tied together by the sketch
+  (the Button and LED example), not by a wire between them.
+- **EL10 Installing arduino-cli** takes Arduino's latest release (no
+  version pinned, so a future one could change its output), needs the
+  internet the first time, and sets up the AVR core only.
 
 ## Drawings (`drawing/`, `app/drawing_ui.go`; M16)
 

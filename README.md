@@ -66,11 +66,18 @@ as PDF, SVG or DXF.</td>
   - Profiles, holes included, are found automatically.
   - An offset tool copies a chain of curves to one side, mitring its
     corners, and the copy follows the curves and its distance.
+  - A sketch goes on a standard plane or on a face: a flat one, or a
+    curved one (cylinder, cone, sphere, torus) touching it where it was
+    clicked, upright along its axis. It can be moved afterwards: offset
+    along its normal, turned, moved in its plane, or put on another face.
 - **Features and history.** Extrude and revolve, primitives, holes (simple,
-  counterbored, countersunk), fillet and chamfer, shell, mirror, linear and
-  circular patterns, and moving bodies with a gizmo.
+  counterbored, countersunk), fillet and chamfer, shell, emboss (text
+  raised, engraved or inlaid, and wrapped round a cylinder or cone),
+  mirror, linear and circular patterns, and moving bodies with a gizmo.
   - Every feature can make a new body, or join, cut or intersect with the
     bodies it touches.
+  - Combine joins, cuts or intersects bodies already made: the first body
+    picked is the target, the others the tools, kept or used up.
   - A parameters table drives the dimensions.
   - The timeline has a rollback marker, regeneration is incremental, and undo
     and redo work for every step.
@@ -99,10 +106,17 @@ as PDF, SVG or DXF.</td>
   `.ino` built with arduino-cli). Servos, gear motors, motor drivers,
   batteries, pots, buttons and LEDs from a small library are wired to its
   pins, and their shafts drive the assembly's joints in a motion study:
-  run it, turn a pot, press a button, read the serial monitor. The parts
+  run it, turn a pot, press a button (or hold the mouse on its 3D model),
+  watch the LEDs light, read the serial monitor. A wiring table lists
+  every part's pins and the Uno pin each is on. The parts
   also come as 3D models (Uno, SG90, TT motor, AA holder, driver boards,
   push button, pot, LED) to design round, put in the design as each part
   is added.
+  - The sketch's code is written in Forma (an editor with C++
+    highlighting, examples to start from, compile errors marked on their
+    lines) or in VS Code, and compiled with arduino-cli into the firmware.
+    Without arduino-cli, Forma downloads it from Arduino and sets up the
+    Uno's core and the Servo library.
 - **Drawings.** Sheets from A4 to A0 (or ANSI A–E) with a title block, in
   third or first angle projection.
   - Front, top, side and isometric views, laid out and scaled to the sheet.
@@ -120,7 +134,8 @@ as PDF, SVG or DXF.</td>
   - STEP output is checked against OpenCASCADE in the tests.
 - **App.** A ribbon toolbar that fits any window (names, then icons only,
   then scrolling as it narrows), a Ctrl+K command palette, native file dialogs,
-  autosave, and exact picking from an ID buffer.
+  autosave, and exact picking from an ID buffer. Any body can be shown
+  in X-ray: see-through, its edges dashed on top, and picked through.
 - **Dragging.** Arrows to resize features, a Resize · Move · Turn · Scale
   bar, and snapping to a set increment with Ctrl for free movement and
   Shift for fine control.
@@ -163,7 +178,10 @@ dialogs on macOS and Linux go through zenity and haven't been tried.
 | Middle drag | Pan |
 | Wheel | Zoom toward the cursor |
 | Click a body | Select that face and the body (its Move · Turn · Scale gizmo comes up) |
-| Double-click a body | Select the whole body |
+| Ctrl+click (view, browser, timeline) | Add to the selection: several steps are edited together, several bodies rounded at once |
+| Drag on empty space | Box-select the edges it shows (Shift: faces) |
+| Double-click a body / an edge | Select the whole body / the edge's tangent chain |
+| Hold the mouse on a button's model (study running) | Press the button |
 | F | Fit the view |
 | Numpad | Standard views |
 | Ctrl+K | Command palette |
@@ -224,7 +242,8 @@ PNGs to `captures/out/`. The images above come from that script. See
 - **M11 emboss and inlay** (done): texts projected onto curved faces,
   raised, engraved or inlaid (the pocket with a clearance, the letters as
   bodies of their own: a name inlaid into a bowl, printed in two colours).
-  Left: wrapping by arc length, letters over several faces.
+  Since: text wrapped round cylinders and cones. Left: letters over
+  several faces.
 - **M12 ribbed forms** (done): a sketch offset tool, fins patterned round
   a revolved body (a pattern's copies that stand apart go in as one
   boolean), clearance on any inlay, and booleans 2–3× faster. Left: more
@@ -254,9 +273,10 @@ PNGs to `captures/out/`. The images above come from that script. See
   mechanism back on its motors ([EL6](docs/LIMITATIONS.md)).
 - **M18 scripted parts** (planned): parts written in Starlark, with
   parameters, as a step in the timeline like any feature.
-- **M19 fillet upgrades** (planned): corner patches where three fillets
-  meet, tangent chains followed, more kinds of edges, chamfers by two
-  distances ([F1–F5](docs/LIMITATIONS.md)).
+- **M19 fillet upgrades** (planned, next): corner patches where three fillets
+  meet (so every edge of a body, or of several, can be rounded in one
+  step), more kinds of edges, chamfers by two distances
+  ([F1–F5](docs/LIMITATIONS.md)).
 - **M20 screws and threaded holes** (planned): a fastener library of
   screws (ISO metric to begin with: socket head, button head, countersunk,
   hex) inserted as components; threaded holes made to fit them, plain,
