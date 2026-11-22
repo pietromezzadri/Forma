@@ -55,6 +55,17 @@ new ones as features land.
   radius whose axes cross are cut by their two planes
   (`splitPlanes`); other degenerate pairs (equal cones, a sphere touching a
   cylinder) have no such help.
+- ~~K7 Holes across a tapered wall, wavy splits, text on revolved
+  splines~~ (fixed after M16, found modelling two pet bowls: see
+  MILESTONES). A spline face is now carried on past its curve's ends
+  along the end tangents when a boolean cuts it; a face lying along such
+  a tangent (a plane where a revolved profile ends flat on it) meets a
+  whole band of the carried-on surface, which hasn't been tried.
+- ~~K8 Many ribs through raised letters~~ (fixed: 48, 60 and 72 ribs
+  join a bowl with its name raised; see MILESTONES). Still: a pattern
+  whose copies have to go in a few at a time (a group failed) is slow on
+  a detailed body — 60 ribs through a raised name take about a minute,
+  each union with the lettered bowl 1–6 s (K3).
 
 ## Fillet and chamfer (`ops/fillet.go`)
 

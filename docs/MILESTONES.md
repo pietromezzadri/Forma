@@ -720,6 +720,44 @@ What each milestone added, in the order they were built. The current gaps are in
   and inlay on that letter; the duplicate is now dropped
   (`sketch/overlap_test.go`). A new step made with several things picked
   shows its own properties.
+- **Kernel fixes from two pet bowls** (a tapered two-colour bowl with
+  oval hand holes and its name wrapped round, and a ribbed bulb with its
+  name raised, both from photos; `doc/bowls_test.go`):
+  - a hole across a tapered wall failed: an extruded circle is two half
+    cylinders, and the cut round the hole comes back to each half a turn
+    on, in a copy of its parameters the trim never looked at; it now
+    enters a face's next copy across its edge there (`clip`);
+  - splitting a body along a wave failed: past a spline face's curve the
+    distance to it jumped in sign, which the contour followed as a curve,
+    and real curves stopped short of the face's edge; extruded and
+    revolved splines are carried on past their ends along the end
+    tangents (`geom.evalOn`, `projectOn`), and contour points that don't
+    lie on both surfaces are dropped;
+  - a name on a revolved spline failed at every size: the same, on the
+    offset faces the letters are built between, and a letter's flat foot
+    on the circle the letters before it left on the bowl was trimmed
+    against the whole bowl first (`turnShareAbout`: a plain face's share
+    of the turn is the angle its points span);
+  - a contour crossing a face's edge at the very start of a segment
+    shorter than the weld tolerance was taken for a touch, and a contour
+    starting just past an extruded face's edge for one starting on it;
+  - text running off the side of a face is refused plainly again,
+    rather than silently losing the part past the side.
+- **Ribs through a raised name (K8):** three ribs of 48, 60 or 72 failed
+  where they passed a hair from a letter's corner. A crossing within the
+  weld distance of its edge's end is now that end (at 285° a rib's side
+  missed the A's top corner by 0.6 µm, and its crossings of the three
+  edges there made three vertices too close for any cut to join), and an
+  exact edge whose vertex was welded off it more than Check allows is a
+  toleranced polyline; a boolean that fails is tried again at finer
+  tolerances (`Boolean`: ½, ¼, 1⁄10; never coarser, which could weld a real
+  feature away), which settles an edge passing 0.02 mm from another; a
+  pattern's group of copies that fails goes in as halves, not one by one
+  (`applyCopies`; the groups without retries, `brep.BooleanOnce`).
+  `TestRibByLetterCorners`.
+- **A tutorial video** (`captures/tutorial_bowls.json`, recorded with
+  FORMA_CAPTURE's `record`): both bowls built in the app's own UI step by
+  step with captions; `text.align` (left, centre, right) for scripts.
 - Also: the view cube drew the camera upside down and slid the target off
   the part when a face of it was clicked; the ribbon tightens, drops its
   names, then scrolls in narrow windows; adding an electronics part puts
