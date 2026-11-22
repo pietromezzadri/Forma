@@ -104,7 +104,7 @@ func checkGeom(b *Body) error {
 			p := e.Curve.Eval(e.T0 + (e.T1-e.T0)*float64(i)/8)
 			for _, h := range e.HE {
 				if d := geom.SurfaceDist(h.Loop.Face.Surf, p); d > tol {
-					return fmt.Errorf("edge %d (a %s) leaves face %q's surface by %.3g mm", e.ID, e.Curve.Kind(), h.Loop.Face.Name, d)
+					return fmt.Errorf("edge %d (a %s, %.4v to %.4v) leaves face %q's surface by %.3g mm", e.ID, e.Curve.Kind(), e.Verts[0].P, e.Verts[1].P, h.Loop.Face.Name, d)
 				}
 			}
 		}

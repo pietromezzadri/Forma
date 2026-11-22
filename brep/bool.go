@@ -33,7 +33,31 @@ func (o BoolOp) String() string { return [...]string{"union", "subtract", "inter
 // came from (a piece of an original edge, a piece of an intersection curve),
 // not by matching geometry.
 func Boolean(a, b *Body, op BoolOp) (*Body, error) {
-	c := newBoolCtx(a, b)
+	r, err := boolean(a, b, op, 1)
+	if err == nil || err == ErrEmpty {
+		return r, err
+	}
+	// a feature about as small as the tolerances (an edge of one body
+	// passing a hair from an edge or corner of the other: a rib by a
+	// letter's corner) is neither clearly apart nor clearly one; tried again
+	// at finer tolerances it is apart (never coarser: that could weld away
+	// a real feature)
+	for _, k := range []float64{0.5, 0.25, 0.1} {
+		if r2, err2 := boolean(a, b, op, k); err2 == nil || err2 == ErrEmpty {
+			return r2, err2
+		}
+	}
+	return nil, err
+}
+
+// BooleanOnce is Boolean without the retries at finer tolerances: for a
+// caller with a cheaper way out when it fails (a pattern's copies joined
+// together, then one by one).
+func BooleanOnce(a, b *Body, op BoolOp) (*Body, error) { return boolean(a, b, op, 1) }
+
+// boolean is Boolean with its tolerances scaled by tk.
+func boolean(a, b *Body, op BoolOp, tk float64) (*Body, error) {
+	c := newBoolCtx(a, b, tk)
 	if err := c.intersect(); err != nil {
 		return nil, err
 	}
@@ -117,12 +141,12 @@ type bevent struct {
 	p geom.Vec3
 }
 
-func newBoolCtx(a, b *Body) *bctx {
+func newBoolCtx(a, b *Body, tk float64) *bctx {
 	var box geom.Box
 	box.Union(a.Bounds())
 	box.Union(b.Bounds())
 	c := &bctx{a: a, b: b, scale: math.Max(box.Diagonal(), 1e-3)}
-	c.ctol = math.Max(c.scale*5e-5, 1e-5)
+	c.ctol = math.Max(c.scale*5e-5, 1e-5) * tk
 	c.tolOn = 1e-7 * math.Max(1, c.scale)
 	c.weldExact = 1e-6 * math.Max(1, c.scale)
 	c.weldLoose = c.ctol * 3
@@ -476,19 +500,49 @@ func (c *bctx) ssi(x, y *bface) error {
 	both := isPlane(D.s) && isPlane(O.s)
 	for _, l := range lines {
 		closed := len(l) > 2 && l[0].Dist(l[len(l)-1]) < 1e-12
-		pts := make([]geom.Vec3, 0, len(l))
-		for _, q := range l {
+		// only points that do lie on both surfaces: a jump in a surface's
+		// distance (where it isn't smooth) changes its sign without a zero,
+		// and the contour follows it all the same
+		var runs [][]geom.Vec3
+		var run []geom.Vec3
+		bad, firstOK := false, true
+		for i, q := range l {
 			p, _ := geom.OntoBoth(D.s, O.s, D.at(q), c.tolOn*0.01)
-			pts = append(pts, p)
+			if math.Abs(geom.SignedDist(D.s, p)) > c.ctol || math.Abs(geom.SignedDist(O.s, p)) > c.ctol {
+				bad = true
+				if i == 0 {
+					firstOK = false
+				}
+				if len(run) > 1 {
+					runs = append(runs, run)
+				}
+				run = nil
+				continue
+			}
+			run = append(run, p)
 		}
-		if closed {
-			pts[len(pts)-1] = pts[0]
+		if len(run) > 1 {
+			runs = append(runs, run)
 		}
-		pts = simplify(pts, closed, c.tolOn, both, c.ctol*0.05)
-		if len(pts) < 2 {
-			continue
+		if bad {
+			if closed && firstOK && len(run) > 1 && len(runs) > 1 {
+				// the run through the closing point (it ends the contour and
+				// starts it again): one
+				last := runs[len(runs)-1]
+				runs = append([][]geom.Vec3{append(last, runs[0][1:]...)}, runs[1:len(runs)-1]...)
+			}
+			closed = false
 		}
-		c.addCut(D, O, pts, closed, both)
+		for _, pts := range runs {
+			if closed {
+				pts[len(pts)-1] = pts[0]
+			}
+			pts = simplify(pts, closed, c.tolOn, both, c.ctol*0.05)
+			if len(pts) < 2 {
+				continue
+			}
+			c.addCut(D, O, pts, closed, both)
+		}
 	}
 	return nil
 }
@@ -617,6 +671,18 @@ func (c *bctx) addEvent(ev *bevent) {
 	if ev == nil || ev.e == nil {
 		return
 	}
+	// a crossing a hair from an end of its edge is at that end: a surface
+	// passing just by a corner where three edges meet crosses each of them
+	// there, and points of its own on each, too close together for a cut to
+	// join them, would leave the faces round the corner open
+	for k, v := range ev.e.Verts {
+		if v != nil && ev.p.Dist(v.P) < c.weldLoose && ev.e.Verts[0] != ev.e.Verts[1] {
+			ev.p = v.P
+			ev.t = [2]float64{ev.e.T0, ev.e.T1}[k]
+			c.weld(ev.p, 2, c.weldExact)
+			return // nothing to split at an end
+		}
+	}
 	c.weld(ev.p, 2, c.weldExact)
 	c.splits[ev.e] = append(c.splits[ev.e], ev.t)
 }
@@ -659,7 +725,13 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 	lastAt := -1
 	// starting on the boundary (an edge from a vertex on it): in if it
 	// heads inside, with that point as its start
-	if n >= 2 && c.onBoundary(F, pts[0]) {
+	// (on an extruded spline's face, carried on past its curve's ends, a
+	// point near an end edge but plainly beyond it — a contour run on past
+	// it — is outside: the crossing is found as any other; other faces'
+	// curved edges are chords in the parameters, a point on the edge can
+	// lie outside them)
+	_, ext := F.s.(geom.Extruded)
+	if n >= 2 && c.onBoundary(F, pts[0]) && (!ext || F.inside(uv[0]) || F.nearBoundaryTol(uv[0], c.weldExact*10)) {
 		// which way it heads: judged at the first point clear of the
 		// boundary (the first step can be too short to tell)
 		q := F.wrapNear(F.uvRaw(pts[0].Lerp(pts[1], 0.5)), uv[0])
@@ -721,7 +793,9 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 			}
 			// at the segment's end, on the boundary: a touch if the curve
 			// stays on the same side either way
-			if xp := pts[i-1].Lerp(pts[i], x.s); i+1 < n && xp.Dist(pts[i]) < c.weldLoose {
+			// (nearer the end than the start: on a segment shorter than
+			// weldLoose a crossing at its start is a plain crossing)
+			if xp := pts[i-1].Lerp(pts[i], x.s); i+1 < n && xp.Dist(pts[i]) < c.weldLoose && x.s > 0.5 {
 				side := func(p, q geom.Vec3, f float64, ref geom.Vec2) bool {
 					m := F.wrapNear(F.uvRaw(p.Lerp(q, f)), ref)
 					return F.inside(m)
@@ -755,12 +829,23 @@ func (c *bctx) clip(F *bface, pts []geom.Vec3, closed bool, other geom.Surface, 
 		}
 		if !in {
 			// crossed a seam onto the face's other copy?
-			if q, ok := F.place(b); ok && len(xs) > 0 && q.Dist(b) > 1e-9 {
-				last := xs[len(xs)-1]
-				ev := c.refineCrossing(F, last, pts[i-1].Lerp(pts[i], last.s), other, along)
-				cur = &bpiece{pts: []geom.Vec3{ev.p}, start: ev}
-				in = true
-				uv[i] = q
+			if q, ok := F.place(b); ok && q.Dist(b) > 1e-9 {
+				last, found := crossing{}, false
+				if len(xs) > 0 {
+					last, found = xs[len(xs)-1], true
+				} else if ys := F.crossings(a.Add(q.Sub(b)), q); len(ys) > 0 {
+					// into a copy of the face a period on, across its
+					// boundary there (a face spanning less than the period,
+					// half a split cylinder, has no seam of its own to cross:
+					// a curve coming round the axis enters it in its next copy)
+					last, found = ys[len(ys)-1], true
+				}
+				if found {
+					ev := c.refineCrossing(F, last, pts[i-1].Lerp(pts[i], last.s), other, along)
+					cur = &bpiece{pts: []geom.Vec3{ev.p}, start: ev}
+					in = true
+					uv[i] = q
+				}
 			}
 		}
 		if in {

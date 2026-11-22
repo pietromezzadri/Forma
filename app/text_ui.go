@@ -178,4 +178,9 @@ func (a *App) registerTextCommands(c *Commands) {
 				apply(func(e *sketch.Entity) { e.Size = v })
 			}
 		}})
+	c.add(&Command{ID: "text.align", Label: "Align the text (left, centre, right)", Group: "Sketch",
+		Run: func(arg string) {
+			k := map[string]int{"left": 0, "centre": 1, "center": 1, "right": 2}[strings.ToLower(strings.TrimSpace(arg))]
+			apply(func(e *sketch.Entity) { e.Align = k })
+		}})
 }

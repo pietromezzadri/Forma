@@ -799,7 +799,7 @@ func (d *Document) scaleRef(out []*BodyRef, i int, f *Feature) error {
 // applyCopies puts a pattern's (or mirror's) copies of a feature's tools in
 // with op. Copies standing apart from each other that each touch a body go
 // in together, a single boolean for a group (a ring of fins in two or three
-// instead of one each); a group that fails goes in again one by one.
+// instead of one each); a group that fails goes in again in halves.
 func (d *Document) applyCopies(op string, copies [][]*brep.Body, out []*BodyRef, fresh func(*brep.Body) *BodyRef) ([]*BodyRef, error) {
 	var tools []*brep.Body
 	for _, c := range copies {
@@ -853,17 +853,28 @@ next:
 		groups = append(groups, []*brep.Body{t})
 		boxes = append(boxes, []geom.Box{b})
 	}
-	for _, g := range groups {
-		if len(g) > 1 {
-			if all, err := brep.Gather(g[0].Name, g...); err == nil {
-				if res, err := d.applyOp(op, []*brep.Body{all}, out, fresh); err == nil {
-					out = res
-					continue
-				}
+	// a group that fails goes in as two halves, and so on down to the copy
+	// that needs going in alone (with Boolean's retries at finer
+	// tolerances, which a group would make slow)
+	var put func(g []*brep.Body, out []*BodyRef) ([]*BodyRef, error)
+	put = func(g []*brep.Body, out []*BodyRef) ([]*BodyRef, error) {
+		if len(g) == 1 {
+			return one(g, out)
+		}
+		if all, err := brep.Gather(g[0].Name, g...); err == nil {
+			if res, err := d.applyOpWith(brep.BooleanOnce, op, []*brep.Body{all}, out, fresh); err == nil {
+				return res, nil
 			}
 		}
+		out, err := put(g[:len(g)/2], out)
+		if err != nil {
+			return nil, err
+		}
+		return put(g[len(g)/2:], out)
+	}
+	for _, g := range groups {
 		var err error
-		if out, err = one(g, out); err != nil {
+		if out, err = put(g, out); err != nil {
 			return nil, err
 		}
 	}

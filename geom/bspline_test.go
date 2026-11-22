@@ -119,3 +119,46 @@ func TestExtrudedMatchesPlane(t *testing.T) {
 		t.Fatalf("mirrored normal off by %g", d)
 	}
 }
+
+// Past its curve's ends an extruded or revolved spline goes on along the
+// end tangents: a point there projects to a parameter beyond the curve's
+// range that evaluates back to it, and the distance runs smoothly through
+// the end (it used to jump in sign there, past the end, which a contour
+// followed as if it were an intersection).
+func TestSweptSurfacesCarryOnPastTheEnds(t *testing.T) {
+	c := Bezier(Vec3{X: 60}, Vec3{X: 84, Z: 10}, Vec3{X: 82, Z: 42}, Vec3{X: 62, Z: 55})
+	t0, t1 := c.Range()
+	ex := Extruded{C: c, D: Vec3{Y: 1}}
+	rv := Revolved{F: World, C: c}
+	end, dir := c.Eval(t1), c.Deriv(t1).Norm()
+	side := Vec3{X: dir.Z, Z: -dir.X} // the profile's normal, in its plane
+	for _, k := range []float64{0.5, 3, 10} {
+		// on the tangent past the end, and a little off it
+		on := end.Add(dir.Scale(k))
+		off := on.Add(side.Scale(0.7))
+		for name, s := range map[string]Surface{"extruded": ex, "revolved": rv} {
+			u, v := s.Project(on)
+			if q := s.Eval(u, v); q.Dist(on) > 1e-9 {
+				t.Fatalf("%s: %v past the end projects back to %v", name, on, q)
+			}
+			pu := u
+			if name == "revolved" {
+				pu = v
+			}
+			if pu <= t1 {
+				t.Fatalf("%s: a point past the end has parameter %g in the range [%g, %g]", name, pu, t0, t1)
+			}
+			if d := SignedDist(s, on); math.Abs(d) > 1e-9 {
+				t.Fatalf("%s: %g from the carried-on surface on it", name, d)
+			}
+			if d := math.Abs(SignedDist(s, off)); math.Abs(d-0.7) > 1e-6 {
+				t.Fatalf("%s: %g from the carried-on surface 0.7 off it", name, d)
+			}
+		}
+	}
+	// within the range nothing changed
+	mid := c.Eval((t0 + t1) / 2)
+	if u, _ := ex.Project(mid); math.Abs(u-(t0+t1)/2) > 1e-6 {
+		t.Fatalf("the middle projects to %g", u)
+	}
+}

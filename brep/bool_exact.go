@@ -53,7 +53,10 @@ func (c *bctx) exactEdge(b *Builder, va, vb *Vertex, pc *gpiece) (*Edge, bool) {
 	if cv == nil {
 		return nil, false
 	}
-	tol := math.Max(c.exactTol(), 1e-7)
+	// the vertices on it as closely as Check wants an edge on its faces (a
+	// vertex welded a hair off it — a corner a surface passes just by —
+	// makes the edge a toleranced polyline instead)
+	tol := 5e-7
 	for _, v := range []*Vertex{va, vb} {
 		if cv.Eval(cv.Project(v.P)).Dist(v.P) > tol {
 			return nil, false

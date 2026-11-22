@@ -148,6 +148,11 @@ func (d *Document) apply(f *Feature, state []*BodyRef) []*BodyRef {
 // by fresh), or joined to, cut from or intersected with the bodies they
 // touch.
 func (d *Document) applyOp(op string, tools []*brep.Body, state []*BodyRef, fresh func(*brep.Body) *BodyRef) ([]*BodyRef, error) {
+	return d.applyOpWith(brep.Boolean, op, tools, state, fresh)
+}
+
+// applyOpWith is applyOp doing its booleans with boolean.
+func (d *Document) applyOpWith(boolean func(a, b *brep.Body, op brep.BoolOp) (*brep.Body, error), op string, tools []*brep.Body, state []*BodyRef, fresh func(*brep.Body) *BodyRef) ([]*BodyRef, error) {
 	out := append([]*BodyRef(nil), state...)
 	touching := func(tool *brep.Body) []int {
 		tb := tool.Bounds()
@@ -173,7 +178,7 @@ func (d *Document) applyOp(op string, tools []*brep.Body, state []*BodyRef, fres
 			}
 			acc := tool
 			for _, i := range hit {
-				r, err := brep.Boolean(out[i].Body, acc, brep.Union)
+				r, err := boolean(out[i].Body, acc, brep.Union)
 				if err != nil {
 					return nil, err
 				}
@@ -194,7 +199,7 @@ func (d *Document) applyOp(op string, tools []*brep.Body, state []*BodyRef, fres
 			var gone []int
 			for _, i := range hit {
 				any = true
-				r, err := brep.Boolean(out[i].Body, tool, bop)
+				r, err := boolean(out[i].Body, tool, bop)
 				if err == brep.ErrEmpty {
 					gone = append(gone, i)
 					continue

@@ -9,6 +9,7 @@ package brep
 
 import (
 	"math"
+	"sort"
 
 	"forma/geom"
 )
@@ -106,7 +107,7 @@ func (c *bctx) ssiCoaxial(x, y *bface) (bool, error) {
 		// opens the circle at its seam, which a part face may wrap wrongly),
 		// starting outside it so each piece runs between two crossings
 		D, E := R, O
-		if turnShare(O) < turnShare(R) {
+		if turnShareAbout(O, rv.F) < turnShare(R) {
 			D, E = O, R
 		}
 		// (just before it enters, along the way it runs: an outside start
@@ -159,6 +160,30 @@ func coaxial(s geom.Surface, o, d geom.Vec3, tol float64) bool {
 
 // turnShare is how much of a turn a face's periodic parameter covers (2
 // for a face that isn't periodic).
+// turnShareAbout is turnShare, a face that isn't periodic measured by
+// the angle its points span round the axis of frame a (a narrow wall
+// standing on a drum covers a sliver of the turn: trimmed first, the
+// circle's piece on it never runs along the drum's other edges).
+func turnShareAbout(f *bface, a geom.Frame) float64 {
+	if f.pu > 0 || len(f.mpts) == 0 {
+		return turnShare(f)
+	}
+	var as []float64
+	for _, p := range f.mpts {
+		l := a.ToLocal(p)
+		if math.Hypot(l.X, l.Y) < 1e-9 {
+			return 2 // round the axis itself
+		}
+		as = append(as, math.Atan2(l.Y, l.X))
+	}
+	sort.Float64s(as)
+	gap := as[0] + 2*math.Pi - as[len(as)-1]
+	for i := 1; i < len(as); i++ {
+		gap = math.Max(gap, as[i]-as[i-1])
+	}
+	return (2*math.Pi - gap) / (2 * math.Pi)
+}
+
 func turnShare(f *bface) float64 {
 	if f.pu <= 0 {
 		return 2

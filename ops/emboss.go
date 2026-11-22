@@ -233,6 +233,11 @@ func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, d
 			}
 		}
 	}
+	if offSide {
+		// the prism cut down to the layer below would only lose the part
+		// past the side, silently
+		return nil, ErrOffSide
+	}
 	// else as the prism cut down to the layer
 	layer, err := faceLayer(fc, hits, d0, d1, margin)
 	if err != nil {
