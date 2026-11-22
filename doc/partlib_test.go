@@ -48,3 +48,29 @@ func TestPartModels(t *testing.T) {
 		}
 	}
 }
+
+// Only the LED's lens lights up: its top and side, not the flange or legs.
+func TestLEDLitFaces(t *testing.T) {
+	d := New()
+	f, err := NewPartComponent("led")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.Insert(f)
+	d.Regenerate()
+	m := PartModels["led"]
+	var lit []string
+	for _, b := range d.Bodies {
+		for _, fc := range b.Body.Faces() {
+			if m.LitFace(fc.Name) {
+				lit = append(lit, fc.Name)
+			}
+		}
+	}
+	if len(lit) != 2 {
+		t.Fatalf("lit faces %v, want the lens's top and side", lit)
+	}
+	if PartModels["button"].LitFace(lit[0]) {
+		t.Fatal("a button has nothing lit")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 // Part models: the electronics library's parts as components with their
@@ -19,7 +20,20 @@ type PartModel struct {
 	// Shaft is the output shaft's top rim (centre and radius) in the
 	// model's frame, if it has one
 	Shaft *[4]float64
+	// Lit is the piece that lights up (an LED's lens): its index among the
+	// model's pieces, from 1; 0 for none
+	Lit   int
 	prims []prim
+}
+
+// LitFace says whether a face of a part model's component belongs to its
+// lit piece (faces are named <component>/f<piece>/<role>).
+func (m *PartModel) LitFace(name string) bool {
+	if m == nil || m.Lit == 0 {
+		return false
+	}
+	parts := strings.Split(name, "/")
+	return len(parts) >= 2 && parts[len(parts)-2] == "f"+strconv.Itoa(m.Lit)
 }
 
 type prim struct {
@@ -106,7 +120,7 @@ var PartModels = map[string]*PartModel{
 		cyl(3.5, 7.1, 0, 0, 6.9, "Join"),    // the threaded bushing
 		cyl(3, 15.1, 0, 0, 13.9, "Join"),    // the shaft
 	}},
-	"led": {ID: "led", Label: "LED (5 mm)", prims: []prim{
+	"led": {ID: "led", Label: "LED (5 mm)", Lit: 2, prims: []prim{
 		cyl(2.9, 1, 0, 0, 0, ""),                                                                      // the flange
 		cyl(2.5, 7.7, 0, 0, 0.9, "Join"),                                                              // the lens
 		box(0.5, 0.5, 25.5, -1.52, -0.25, -25, "Join"), box(0.5, 0.5, 27.5, 1.02, -0.25, -27, "Join"), // legs, the anode longer

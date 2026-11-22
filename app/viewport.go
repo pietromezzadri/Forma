@@ -452,16 +452,23 @@ func (a *App) renderScene() {
 		if xray {
 			col = mgl32.Vec4{0.55, 0.72, 0.95, 0.16}
 		}
-		if glow := a.ledGlow(b.F.ID); glow > 0 {
-			// an LED's model lit by the running sketch
-			red := mgl32.Vec4{1, 0.18, 0.1, col[3]}
-			col = col.Mul(1 - float32(glow)).Add(red.Mul(float32(glow)))
-		}
 		hoverFace := uint32(0)
 		if a.hover.Kind == KindFace && a.hover.Item == b.ID {
 			hoverFace = uint32(a.hover.Local)
 		}
 		r.DrawFaces(v, g.faces, render.Paint{Offset: off, Color: col, HoverColor: mgl32.Vec4{1, 0.65, 0.25, 0.45}, Hover: hoverFace, NoDepth: xray, CullBack: xray}, false)
+		if glow := a.ledGlow(b.F.ID); glow > 0 {
+			// an LED's lens lit by the running sketch (its flange and legs
+			// keep their colour)
+			red := mgl32.Vec4{1, 0.18, 0.1, col[3]}
+			lit := col.Mul(1 - float32(glow)).Add(red.Mul(float32(glow)))
+			m := doc.PartModels["led"]
+			for _, fc := range b.Body.Faces() {
+				if m.LitFace(fc.Name) {
+					r.DrawFaceRange(v, g.faces, uint32(fc.ID), render.Paint{Offset: off, Color: lit, NoDepth: xray, CullBack: xray})
+				}
+			}
+		}
 		for _, s := range a.sel {
 			if s.Kind == KindFace && s.Item == b.ID {
 				sc := mgl32.Vec4{0.98, 0.55, 0.2, 1}

@@ -709,7 +709,7 @@ What each milestone added, in the order they were built. The current gaps are in
   that grow into each other are matched to their letters
   (`pocketOf`), and a letter landing on the seam is nudged and tried again.
 - **Arduino parts you can touch:** holding the mouse on a button's 3D
-  model presses it while a study runs; an LED's model glows with its
+  model presses it while a study runs; an LED's lens glows with its
   pin's duty; the Electronics window has a wiring table (part, pin, Uno
   pin). **arduino-cli from Forma** (`arduinocli`): when it isn't installed,
   Forma downloads Arduino's release for the system into
