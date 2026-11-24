@@ -210,7 +210,7 @@ new ones as features land.
 ## App and UI (`app/`)
 
 - ~~U1 No native file dialogs~~ (Windows' own Open / Save As windows now, `app/native_dialog.go`; captures still type paths). On macOS they are the system's own (through osascript), on Linux zenity's or kdialog's, which must be installed; off Windows a dialog isn't tied to Forma's window, so it can fall behind it.
-- **U9 macOS and Linux builds are new** (0.2.0). They are built and their tests run on GitHub's runners (macOS on Apple silicon), and the Linux build was run under WSLg; the macOS app hasn't been opened on a real Mac yet. It isn't notarised (right-click → Open the first time). Linux builds are X11 only (Wayland desktops run them through XWayland) and x86-64 only.
+- **U9 macOS and Linux builds are new** (0.2.0). They are built and their tests run on GitHub's runners — macOS on an Intel Mac (`macos-15-intel`: the Apple-silicon runners were too short to get), so the app's arm64 half is cross-built and untested — and the Linux build was run under WSLg; the macOS app hasn't been opened on a real Mac yet. It isn't notarised (right-click → Open the first time). Linux builds are X11 only (Wayland desktops run them through XWayland) and x86-64 only.
 - **U2 Not tried with a real mouse yet:** everything was checked by scripted
   captures; the feel of orbiting, picking, sketching and the gizmo needs a
   real session.
