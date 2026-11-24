@@ -327,7 +327,7 @@ func (a *App) registerModifyCommands(c *Commands) {
 			}
 			for _, k := range a.selectedBodies() {
 				if b := a.doc.Body(k); b != nil {
-					b.F.Color = arg
+					a.setBodyColor(b, arg)
 				}
 			}
 			a.doc.Commit()

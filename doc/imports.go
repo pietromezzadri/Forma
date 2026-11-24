@@ -36,6 +36,9 @@ func baseName(file string) string {
 }
 
 func (d *Document) buildImport(f *Feature) error {
+	if f.Inputs["Format"] == "3mf" {
+		return d.build3MF(f)
+	}
 	solids, err := fio.ReadSTEPString(f.Data)
 	if err != nil {
 		return err

@@ -30,13 +30,13 @@ func (a *App) registerExchangeCommands(c *Commands) {
 				a.exportFile(withExt(p, ".step", ".step", ".stp", ".stl", ".obj", ".3mf"))
 			})
 		}})
-	c.add(&Command{ID: "file.import", Label: "Import… (STEP, STL)", Group: "File", Icon: icImport, Shortcut: "Ctrl+I",
+	c.add(&Command{ID: "file.import", Label: "Import… (STEP, STL, 3MF)", Group: "File", Icon: icImport, Shortcut: "Ctrl+I",
 		Run: func(arg string) {
 			if arg != "" {
 				a.importFile(arg)
 				return
 			}
-			a.pickFile(false, "Import a STEP or STL file", "Import", startIn(a.importPath, ""), importFilter, a.importFile)
+			a.pickFile(false, "Import a STEP, STL or 3MF file", "Import", startIn(a.importPath, ""), importFilter, a.importFile)
 		}})
 }
 
@@ -161,7 +161,7 @@ func (a *App) writeExport(path string) error {
 				continue
 			}
 			col := [3]float64{float64(colBody[0]), float64(colBody[1]), float64(colBody[2])}
-			if c, ok := doc.ParseColor(b.F.Color); ok {
+			if c, ok := doc.ParseColor(doc.ColorOf(b.F, b.K)); ok {
 				col = c
 			}
 			items = append(items, fio.ThreeMFItem{Name: b.Name, Mesh: fine(b.Body), Color: col})
@@ -182,10 +182,16 @@ func (a *App) importFile(path string) {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".step", ".stp":
 		f = doc.NewImport(path, string(data))
+	case ".3mf":
+		if _, _, err := doc.Check3MF(data); err != nil {
+			a.notify("Import: %v", err)
+			return
+		}
+		f = doc.NewImport3MF(path, data)
 	case ".stl":
 		f = doc.NewMesh(path, data)
 	default:
-		a.notify("Import: %q isn't a STEP (.step, .stp) or STL file", filepath.Ext(path))
+		a.notify("Import: %q isn't a STEP (.step, .stp), STL or 3MF file", filepath.Ext(path))
 		return
 	}
 	a.doc.D.Insert(f)

@@ -311,10 +311,16 @@ func (b *BodyItem) upload() *bodyGPU {
 	for i, k := range order {
 		tris[i] = m.Tris[k]
 	}
-	// seams (an edge with the same face on both sides) aren't drawn
+	// seams (an edge with the same face on both sides) aren't drawn, nor the
+	// edges between flat faces meeting almost flat (under 10°: the facets of
+	// a mesh brought in as a solid, which would draw it as a wire net)
 	seam := map[int]bool{}
 	for _, e := range b.Body.Edges() {
-		if e.HE[0] != nil && e.HE[1] != nil && e.HE[0].Loop.Face == e.HE[1].Loop.Face {
+		if e.HE[0] == nil || e.HE[1] == nil {
+			continue
+		}
+		fa, fb := e.HE[0].Loop.Face, e.HE[1].Loop.Face
+		if fa == fb || softEdge(fa, fb) {
 			seam[e.ID] = true
 		}
 	}
@@ -493,4 +499,24 @@ func niceStep(x float64) float64 {
 		return 5 * e
 	}
 	return 10 * e
+}
+
+// softEdge: two flat faces meeting at under 10° (facets of a mesh).
+func softEdge(a, b *brep.Face) bool {
+	pa, ok := a.Surf.(geom.Plane)
+	if !ok {
+		return false
+	}
+	pb, ok := b.Surf.(geom.Plane)
+	if !ok {
+		return false
+	}
+	na, nb := pa.F.Z, pb.F.Z
+	if a.Reversed {
+		na = na.Neg()
+	}
+	if b.Reversed {
+		nb = nb.Neg()
+	}
+	return na.Dot(nb) > math.Cos(10*math.Pi/180)
 }

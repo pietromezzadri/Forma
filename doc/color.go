@@ -27,3 +27,19 @@ func FormatColor(c [3]float64) string {
 	}
 	return fmt.Sprintf("#%02x%02x%02x", b(c[0]), b(c[1]), b(c[2]))
 }
+
+// ColorOf is the colour body k of step f is drawn and printed in: one
+// picked for that body, else the step's, else a 3MF part's own ("": the
+// default).
+func ColorOf(f *Feature, k int) string {
+	if c, ok := f.BodyColors[k]; ok && c != "" {
+		return c
+	}
+	if f.Color != "" {
+		return f.Color
+	}
+	if k < len(f.PartColors) {
+		return f.PartColors[k]
+	}
+	return ""
+}

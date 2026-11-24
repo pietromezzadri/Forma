@@ -31,6 +31,9 @@ type MeshPart struct {
 	Name string
 	Pos  []float32
 	Tris []uint32
+	// its colour, when the file gives one (core base materials)
+	Color    [3]float64
+	HasColor bool
 }
 
 // Triangles counts its triangles.
@@ -82,6 +85,8 @@ type mfObject struct {
 	pos   []float32
 	tris  []uint32
 	comps []mfComp
+	pid   int // its base materials group and index (pid 0: none)
+	pidx  int
 }
 
 type mfComp struct {
@@ -98,6 +103,19 @@ func Read3MFParts(path string) ([]MeshPart, error) {
 		return nil, fmt.Errorf("not a 3MF (zip) file: %v", err)
 	}
 	defer zr.Close()
+	return read3MF(&zr.Reader)
+}
+
+// Read3MFPartsFrom reads the parts of a 3MF held in memory.
+func Read3MFPartsFrom(data []byte) ([]MeshPart, error) {
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, fmt.Errorf("not a 3MF (zip) file: %v", err)
+	}
+	return read3MF(zr)
+}
+
+func read3MF(zr *zip.Reader) ([]MeshPart, error) {
 	var model *zip.File
 	names := map[int]string{}
 	for _, f := range zr.File {
@@ -116,7 +134,7 @@ func Read3MFParts(path string) ([]MeshPart, error) {
 		return nil, err
 	}
 	defer rc.Close()
-	objs, build, err := scanModel(bufio.NewReaderSize(rc, 1<<20))
+	objs, build, bases, err := scanModel(bufio.NewReaderSize(rc, 1<<20))
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +161,9 @@ func Read3MFParts(path string) ([]MeshPart, error) {
 		}
 		if len(o.tris) > 0 {
 			p := MeshPart{Name: name, Pos: make([]float32, 0, len(o.pos)), Tris: append([]uint32(nil), o.tris...)}
+			if cs := bases[o.pid]; o.pid != 0 && o.pidx >= 0 && o.pidx < len(cs) {
+				p.Color, p.HasColor = cs[o.pidx], true
+			}
 			for i := 0; i+2 < len(o.pos); i += 3 {
 				a, b, c := x.apply(float64(o.pos[i]), float64(o.pos[i+1]), float64(o.pos[i+2]))
 				p.Pos = append(p.Pos, float32(a), float32(b), float32(c))
@@ -219,7 +240,9 @@ func slicerNames(f *zip.File, names map[int]string) {
 }
 
 // scanModel reads the model's objects and build items tag by tag.
-func scanModel(r *bufio.Reader) (map[int]*mfObject, []mfComp, error) {
+func scanModel(r *bufio.Reader) (map[int]*mfObject, []mfComp, map[int][][3]float64, error) {
+	bases := map[int][][3]float64{} // base materials groups' colours
+	group := 0
 	objs := map[int]*mfObject{}
 	var build []mfComp
 	var cur *mfObject
@@ -231,7 +254,7 @@ func scanModel(r *bufio.Reader) (map[int]*mfObject, []mfComp, error) {
 				break
 			}
 			if err != bufio.ErrBufferFull {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			continue
 		}
@@ -243,7 +266,7 @@ func scanModel(r *bufio.Reader) (map[int]*mfObject, []mfComp, error) {
 				break
 			}
 			if err != bufio.ErrBufferFull {
-				return nil, nil, fmt.Errorf("the model ends inside a tag")
+				return nil, nil, nil, fmt.Errorf("the model ends inside a tag")
 			}
 		}
 		tag = tag[:len(tag)-1]
@@ -266,7 +289,7 @@ func scanModel(r *bufio.Reader) (map[int]*mfObject, []mfComp, error) {
 			for i, k := range []string{"x", "y", "z"} {
 				x, err := strconv.ParseFloat(attr(attrs, k), 32)
 				if err != nil {
-					return nil, nil, fmt.Errorf("a vertex with a bad %s: %v", k, err)
+					return nil, nil, nil, fmt.Errorf("a vertex with a bad %s: %v", k, err)
 				}
 				v[i] = float32(x)
 			}
@@ -278,26 +301,38 @@ func scanModel(r *bufio.Reader) (map[int]*mfObject, []mfComp, error) {
 			for _, k := range []string{"v1", "v2", "v3"} {
 				x, err := strconv.ParseUint(attr(attrs, k), 10, 32)
 				if err != nil {
-					return nil, nil, fmt.Errorf("a triangle with a bad %s: %v", k, err)
+					return nil, nil, nil, fmt.Errorf("a triangle with a bad %s: %v", k, err)
 				}
 				cur.tris = append(cur.tris, uint32(x))
 			}
 		case "object":
 			id, err := strconv.Atoi(attr(attrs, "id"))
 			if err != nil {
-				return nil, nil, fmt.Errorf("an object with a bad id")
+				return nil, nil, nil, fmt.Errorf("an object with a bad id")
 			}
 			cur = &mfObject{name: attr(attrs, "name")}
+			if pid, err := strconv.Atoi(attr(attrs, "pid")); err == nil {
+				cur.pid = pid
+				cur.pidx, _ = strconv.Atoi(attr(attrs, "pindex"))
+			}
 			objs[id] = cur
+		case "basematerials":
+			group, _ = strconv.Atoi(attr(attrs, "id"))
+		case "base":
+			if c, ok := parseDisplayColor(attr(attrs, "displaycolor")); ok {
+				bases[group] = append(bases[group], c)
+			} else {
+				bases[group] = append(bases[group], [3]float64{0.7, 0.7, 0.7})
+			}
 		case "component", "item":
 			id, err := strconv.Atoi(attr(attrs, "objectid"))
 			if err != nil {
-				return nil, nil, fmt.Errorf("a %s with a bad objectid", name)
+				return nil, nil, nil, fmt.Errorf("a %s with a bad objectid", name)
 			}
 			x := ident3
 			if t := attr(attrs, "transform"); t != "" {
 				if x, err = parseXform(t); err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 			}
 			if string(name) == "item" {
@@ -311,11 +346,11 @@ func scanModel(r *bufio.Reader) (map[int]*mfObject, []mfComp, error) {
 		n := uint32(len(o.pos) / 3)
 		for _, t := range o.tris {
 			if t >= n {
-				return nil, nil, fmt.Errorf("object %d: a triangle names vertex %d of %d", id, t, n)
+				return nil, nil, nil, fmt.Errorf("object %d: a triangle names vertex %d of %d", id, t, n)
 			}
 		}
 	}
-	return objs, build, nil
+	return objs, build, bases, nil
 }
 
 // localName drops a namespace prefix ("p:object" → "object").
@@ -601,4 +636,33 @@ func fileName(s string) string {
 		s = "part"
 	}
 	return s
+}
+
+// parseDisplayColor reads a 3MF colour, "#RRGGBB" or "#RRGGBBAA".
+func parseDisplayColor(s string) ([3]float64, bool) {
+	s = strings.TrimPrefix(strings.TrimSpace(s), "#")
+	if len(s) != 6 && len(s) != 8 {
+		return [3]float64{}, false
+	}
+	n, err := strconv.ParseUint(s[:6], 16, 32)
+	if err != nil {
+		return [3]float64{}, false
+	}
+	return [3]float64{float64(n>>16&255) / 255, float64(n>>8&255) / 255, float64(n&255) / 255}, true
+}
+
+// Model3MFSize is the size of a 3MF's model (its XML, unpacked), read from
+// the zip's directory without unpacking anything.
+func Model3MFSize(data []byte) (uint64, error) {
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return 0, fmt.Errorf("not a 3MF (zip) file: %v", err)
+	}
+	var n uint64
+	for _, f := range zr.File {
+		if strings.HasSuffix(strings.ToLower(f.Name), ".model") {
+			n += f.UncompressedSize64
+		}
+	}
+	return n, nil
 }

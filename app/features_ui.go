@@ -468,23 +468,23 @@ func (a *App) bodyInfo(b *BodyItem) {
 		a.doc.Commit()
 	}
 	imgui.SetItemTooltip("Draw it see-through, with its hidden edges dashed; clicks go through it to what is inside")
-	// its colour (the step's: every body the step makes), shown in the
-	// view and written to 3MF for printing in colour
+	// its colour, shown in the view and written to 3MF for printing in
+	// colour (this body's own; a 3MF part comes in with the file's)
 	col := [3]float32{colBody[0], colBody[1], colBody[2]}
-	if c, ok := doc.ParseColor(b.F.Color); ok {
+	if c, ok := doc.ParseColor(doc.ColorOf(b.F, b.K)); ok {
 		col = [3]float32{float32(c[0]), float32(c[1]), float32(c[2])}
 	}
 	if imgui.ColorEdit3V("Colour##bodycol", &col, imgui.ColorEditFlagsNoInputs) {
-		b.F.Color = doc.FormatColor([3]float64{float64(col[0]), float64(col[1]), float64(col[2])})
+		a.setBodyColor(b, doc.FormatColor([3]float64{float64(col[0]), float64(col[1]), float64(col[2])}))
 	}
 	if imgui.IsItemDeactivatedAfterEdit() {
 		a.doc.Commit()
 	}
 	imgui.SetItemTooltip("The colour it is drawn in, and printed in from a 3MF export")
-	if b.F.Color != "" {
+	if doc.ColorOf(b.F, b.K) != "" {
 		imgui.SameLine()
 		if imgui.SmallButton("Default##bodycol") {
-			b.F.Color = ""
+			a.setBodyColor(b, "")
 			a.doc.Commit()
 		}
 	}
@@ -660,4 +660,23 @@ func (a *App) opCombo(f *doc.Feature) {
 		a.doc.Commit()
 	}
 	a.markItemLeft("prop:Operation")
+}
+
+// setBodyColor gives one body its colour ("": back to the default: the
+// step's own colour cleared too, a 3MF part's dropped for this body).
+func (a *App) setBodyColor(b *BodyItem, c string) {
+	f := b.F
+	if f.BodyColors == nil {
+		f.BodyColors = map[int]string{}
+	}
+	if c == "" {
+		f.Color = ""
+		if b.K < len(f.PartColors) && f.PartColors[b.K] != "" {
+			f.BodyColors[b.K] = doc.FormatColor([3]float64{float64(colBody[0]), float64(colBody[1]), float64(colBody[2])})
+			return
+		}
+		delete(f.BodyColors, b.K)
+		return
+	}
+	f.BodyColors[b.K] = c
 }

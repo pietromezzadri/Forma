@@ -130,19 +130,24 @@ type Feature struct {
 	Hidden   bool              `json:"hidden,omitempty"`
 	XRay     bool              `json:"xray,omitempty"`  // its bodies drawn see-through
 	Color    string            `json:"color,omitempty"` // its bodies' colour, "#rrggbb" ("": the default grey)
-	Off      bool              `json:"suppressed,omitempty"`
+	// BodyColors: colours picked for single bodies of the step (by index),
+	// over Color and over a 3MF part's own
+	BodyColors map[int]string `json:"bodyColors,omitempty"`
+	Off        bool           `json:"suppressed,omitempty"`
 
 	// results of the last regeneration
-	Bodies  []*brep.Body    `json:"-"`
-	Regions []sketch.Region `json:"-"`
-	Err     string          `json:"-"`
-	Warn    string          `json:"-"` // what an import left out (a joint: held at a limit)
-	RefMesh *brep.Mesh      `json:"-"` // a mesh feature's triangles
-	Local   []*brep.Body    `json:"-"` // a component's bodies in its own frame
-	Place   geom.Xform      `json:"-"` // and where it put them
-	Active  bool            `json:"-"` // before the rollback marker and not suppressed
-	After   []*BodyRef      `json:"-"` // the design's bodies after it
-	Gen     int             `json:"-"` // bumped whenever the results change
+	Bodies     []*brep.Body    `json:"-"`
+	Regions    []sketch.Region `json:"-"`
+	Err        string          `json:"-"`
+	Warn       string          `json:"-"` // what an import left out (a joint: held at a limit)
+	RefMesh    *brep.Mesh      `json:"-"` // a mesh feature's triangles
+	Local      []*brep.Body    `json:"-"` // a component's bodies in its own frame
+	Place      geom.Xform      `json:"-"` // and where it put them
+	PartNames  []string        `json:"-"` // a 3MF import's bodies' names, from the file
+	PartColors []string        `json:"-"` // and their colours ("" none)
+	Active     bool            `json:"-"` // before the rollback marker and not suppressed
+	After      []*BodyRef      `json:"-"` // the design's bodies after it
+	Gen        int             `json:"-"` // bumped whenever the results change
 	// a joint: the component (or body's feature) it moved, and its axis
 	// (where the ends met, and the fixed end's Z) in the design
 	Moved     int        `json:"-"`
@@ -475,6 +480,9 @@ func (d *Document) input(f *Feature, name string) (float64, error) {
 
 // BodyName names a feature's k-th body.
 func (f *Feature) BodyName(k int) string {
+	if k < len(f.PartNames) && f.PartNames[k] != "" {
+		return f.PartNames[k]
+	}
 	if len(f.Bodies) <= 1 {
 		return f.Name
 	}

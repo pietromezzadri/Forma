@@ -26,9 +26,10 @@ var (
 		{Name: "3MF for slicers, in colour (*.3mf)", Patterns: []string{"*.3mf"}},
 	}
 	importFilter = zenity.FileFilters{
-		{Name: "STEP and STL (*.step, *.stp, *.stl)", Patterns: []string{"*.step", "*.stp", "*.stl"}},
+		{Name: "STEP, STL and 3MF (*.step, *.stp, *.stl, *.3mf)", Patterns: []string{"*.step", "*.stp", "*.stl", "*.3mf"}},
 		{Name: "STEP (*.step, *.stp)", Patterns: []string{"*.step", "*.stp"}},
 		{Name: "STL mesh (*.stl)", Patterns: []string{"*.stl"}},
+		{Name: "3MF (*.3mf)", Patterns: []string{"*.3mf"}},
 	}
 	separateFilter = zenity.FileFilters{
 		{Name: "3MF and STL (*.3mf, *.stl)", Patterns: []string{"*.3mf", "*.stl"}},

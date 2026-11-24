@@ -446,7 +446,7 @@ func (a *App) renderScene() {
 			continue
 		}
 		col := colBody
-		if c, ok := doc.ParseColor(b.F.Color); ok {
+		if c, ok := doc.ParseColor(doc.ColorOf(b.F, b.K)); ok {
 			col = mgl32.Vec4{float32(c[0]), float32(c[1]), float32(c[2]), 1}
 		}
 		if inSketch {
