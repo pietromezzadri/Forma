@@ -120,6 +120,12 @@ func convex(h1, h2 *brep.HalfEdge, p geom.Vec3) bool {
 }
 
 func straightTool(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool) (*brep.Body, brep.BoolOp, error) {
+	return straightToolSet(e, size, chamfer, k, ext, [2]float64{})
+}
+
+// straightToolSet is straightTool stopping set[i] short of vertex i (where
+// a corner patch takes over).
+func straightToolSet(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool, set [2]float64) (*brep.Body, brep.BoolOp, error) {
 	a, b := e.Verts[0].P, e.Verts[1].P
 	L := a.Dist(b)
 	if L < geom.Tol {
@@ -150,6 +156,8 @@ func straightTool(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool) 
 	if cut && ext[1] {
 		m1 = 2*size + 0.01*L
 	}
+	m0 -= set[0]
+	m1 -= set[1]
 	d0, d1 := -m0, L+m1
 	if fr.Z.Dot(t) < 0 {
 		d0, d1 = -L-m1, m0

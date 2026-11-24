@@ -565,12 +565,75 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 			b := out[i].Body
 			var tools []*brep.Body
 			var opsList []brep.BoolOp
+			// ball corners: where three rounded edges between flat faces meet
+			// (a fillet's, not a chamfer's), the corner is part of the rolling
+			// ball, cut first; the edges' rounds stop where it begins
+			setback := map[[2]any]float64{} // (edge, vertex) → how far short
+			if !chamfer {
+				var verts []*brep.Vertex
+				for v, es := range at {
+					if len(es) == 3 {
+						verts = append(verts, v)
+					}
+				}
+				sort.Slice(verts, func(a, b int) bool { return verts[a].ID < verts[b].ID })
+				type ball struct {
+					v   *brep.Vertex
+					c   ops.Corner
+					set [3]float64
+				}
+				var balls []ball
+				for _, v := range verts {
+					c, ok := ops.BallCornerOf(b, v, at[v])
+					if !ok {
+						continue
+					}
+					_, set, err := c.CornerFrame(size)
+					if err != nil {
+						continue // too sharp: left to mitre
+					}
+					balls = append(balls, ball{v, c, set})
+					for j, e := range at[v] {
+						setback[[2]any{e, v}] = set[j]
+					}
+				}
+				// an edge too short for the corners at its ends keeps mitres
+				short := map[*brep.Vertex]bool{}
+				for _, p := range picks {
+					s := setback[[2]any{p.e, p.e.Verts[0]}] + setback[[2]any{p.e, p.e.Verts[1]}]
+					if s > 0 && s >= p.e.Verts[0].P.Dist(p.e.Verts[1].P)-1e-6 {
+						short[p.e.Verts[0]], short[p.e.Verts[1]] = true, true
+					}
+				}
+				for k, bl := range balls {
+					if short[bl.v] {
+						for _, e := range at[bl.v] {
+							delete(setback, [2]any{e, bl.v})
+						}
+						continue
+					}
+					t, err := ops.CornerTool(bl.c, size, fmt.Sprintf("ball:%d", k+1))
+					if err != nil {
+						return nil, fmt.Errorf("a corner: %v", err)
+					}
+					prefixFaces(t, fmt.Sprintf("f%d/", f.ID))
+					tools = append(tools, t)
+					opsList = append(opsList, brep.Subtract)
+				}
+			}
+			nCorners := len(tools)
 			for _, p := range picks {
 				ext := [2]bool{corner(p.e, p.e.Verts[0]), corner(p.e, p.e.Verts[1])}
 				if p.e.Verts[0] == p.e.Verts[1] {
 					ext = [2]bool{}
 				}
-				t, op, err := ops.EdgeTool(p.e, size, chamfer, p.k+1, ext)
+				set := [2]float64{setback[[2]any{p.e, p.e.Verts[0]}], setback[[2]any{p.e, p.e.Verts[1]}]}
+				for j := range set {
+					if set[j] > 0 {
+						ext[j] = false // the ball takes over there
+					}
+				}
+				t, op, err := ops.EdgeToolSet(p.e, size, chamfer, p.k+1, ext, set)
 				if err != nil {
 					return nil, fmt.Errorf("edge %d: %v", p.k+1, err)
 				}
@@ -581,7 +644,10 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 			for k, t := range tools {
 				r, err := brep.Boolean(b, t, opsList[k])
 				if err != nil {
-					return nil, fmt.Errorf("edge %d: %v", picks[k].k+1, err)
+					if k < nCorners {
+						return nil, fmt.Errorf("a ball corner: %v", err)
+					}
+					return nil, fmt.Errorf("edge %d: %v", picks[k-nCorners].k+1, err)
 				}
 				b = r
 			}
