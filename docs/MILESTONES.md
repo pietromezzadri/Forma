@@ -867,3 +867,18 @@ What each milestone added, in the order they were built. The current gaps are in
   Tests: `doc/fillet_corner_test.go` (a box's every edge and one corner by
   volume, a chamfer, a radius nearly half the box, a prism against the
   exact volume of the rolling-ball shape).
+- **Chamfers by two distances, or a distance and an angle** (chamfer
+  inputs Type, Distance 2, Angle, Swap; `doc.chamferSizes`,
+  `ops.EdgeToolSet` with a distance for each side, `ops.ChamferSecond`):
+  the first distance along the face each edge's reference names first (so
+  it stays put through edits), the second along the other; an angle is
+  the chamfer's from the first face, turned into the second distance by
+  the sine rule with the angle the faces meet at (square faces: d·tan θ);
+  Swap trades the faces for every edge. Chamfers from before have only a
+  Distance and stay equal. Where mitred tools cross at a corner, one can
+  trip the kernel (two passing exactly through the same point of an edge)
+  that goes in cleanly once the others are in, so an edge whose cut fails
+  waits and the rest go on (every edge of a box with two distances).
+  Test: `doc/chamfer_test.go` (2 and 5 cutting ½·2·5·40 mm³, Swap, 30°
+  from a face giving 2·tan 30°, an old chamfer, every edge, a cylinder's
+  edge, an angle the faces can't take).

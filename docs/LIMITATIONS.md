@@ -88,8 +88,10 @@ new ones as features land.
   edge meets it at an angle. Where the face beyond that end is slanted, it
   leaves a sliver of the sharp edge; where it is carried on into a mitre past
   a slanted face, it can cut into it.
-- **F5 Chamfer: equal distances only** (no two distances, no distance and
-  angle). No variable-radius or chord-length fillets.
+- **F5 Chamfers** (partly fixed, M19: two distances, or a distance and an
+  angle, the first along the face each edge's reference names first, Swap
+  for the other way, the same for every edge of the step). No
+  variable-radius or chord-length fillets.
 
 ## Shell (`ops/shell.go`)
 

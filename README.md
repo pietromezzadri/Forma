@@ -71,7 +71,9 @@ as PDF, SVG or DXF.</td>
     clicked, upright along its axis. It can be moved afterwards: offset
     along its normal, turned, moved in its plane, or put on another face.
 - **Features and history.** Extrude and revolve, primitives, holes (simple,
-  counterbored, countersunk), fillet and chamfer, shell, emboss (text
+  counterbored, countersunk), fillet (ball-shaped corners where three
+  rounds meet) and chamfer (equal, two distances, or a distance and an
+  angle), shell, emboss (text
   raised, engraved or inlaid, and wrapped round a cylinder or cone),
   mirror, linear and circular patterns, and moving bodies with a gizmo.
   - Every feature can make a new body, or join, cut or intersect with the
@@ -306,10 +308,11 @@ PNGs to `captures/out/`. The images above come from that script. See
 - **M18 scripted parts** (planned): parts written in Starlark, with
   parameters, as a step in the timeline like any feature.
 - **M19 fillet upgrades** (in progress): ball corners where three rounds
-  meet at a corner of flat faces (done: every edge of a box rounds into the
+  meet at a corner of flat faces, chamfers by two distances or a distance
+  and an angle (done: every edge of a box rounds into the
   rounded box of the textbook). Left: corners of curved faces or of more
-  than three edges, setbacks for unequal radii, more kinds of edges,
-  chamfers by two distances ([F1–F5](docs/LIMITATIONS.md)).
+  than three edges, setbacks for unequal radii, more kinds of edges
+  ([F1–F5](docs/LIMITATIONS.md)).
 - **M20 screws and threaded holes** (planned): a fastener library of
   screws (ISO metric to begin with: socket head, button head, countersunk,
   hex) inserted as components; threaded holes made to fit them, plain,
