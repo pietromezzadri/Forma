@@ -828,3 +828,21 @@ What each milestone added, in the order they were built. The current gaps are in
   (an STL is always broken so). Test: `io/threemf_read_test.go` (our own
   3MFs apart and as components read back by name and volume, loose pieces,
   a build item turned and moved, PrusaSlicer's names, files on the bed).
+- **3MF import into a design** (`doc.NewImport3MF`, an import feature with
+  `Format` 3mf; `ops.MeshSolid`): each part the file puts on the plate a
+  solid body named and coloured as the file has it (base materials,
+  `io.MeshPart.Color`). `MeshSolid` welds the mesh, checks it is closed
+  and manifold (else the part is left out, saying why), merges each flat
+  region of triangles with one outline into one face (a box from our own
+  export comes back with its six faces) and builds a polyhedral B-rep the
+  kernel cuts like any other. The file is kept in the feature (as STEP
+  text is); a model over about 60 MB (300,000 triangles) is refused from
+  the zip's directory at once, pointing to Separate. Colours are now per
+  body (`Feature.BodyColors`, `doc.ColorOf`: a body's own, else its
+  step's, else its 3MF part's). Edges between flat faces meeting at under
+  10° aren't drawn, so a faceted part doesn't look like a wire net. Tests:
+  `ops/meshsolid_test.go` (a box's mesh back to six faces, a faceted
+  cylinder cut by a box, an open mesh refused), `doc/import3mf_test.go`
+  (a design's box and cylinder exported in two colours and imported into
+  another: names, colours, six faces, volumes, split, saved; a picked
+  colour beats the file's).

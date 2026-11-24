@@ -420,14 +420,19 @@ new ones as features land.
   area and volume, but not pickable in the view, not measurable against other
   things, and never turned into a solid for booleans.
 - **E6 OBJ:** export only, no materials.
-- **E8 3MF:** no import into a design (a 3MF can only be separated into STL
-  part files, File menu: names, placements and components read; colours,
-  slicer settings and other extensions ignored); one colour a step, not a face or a
-  body of its own (the bodies a step makes share it), as core base
-  materials; no slicer settings, supports or modifiers in the file. The
-  parts go in as components of one object, so they keep their places:
-  PrusaSlicer 2.x reads the file (checked) but loads the parts as
-  separate objects; Bambu Studio, OrcaSlicer and Cura haven't been tried.
+- **E8 3MF:** import makes each part a solid of flat faces (a mesh, not
+  the curved surfaces it came from: a cylinder comes back faceted, its
+  facet edges not drawn), up to 60,000 triangles a part and 300,000 a
+  file (bigger files are refused: separate them into STL part files
+  instead); an open or non-manifold part is left out, saying why. Only
+  names, placements, components and base-material colours are read;
+  per-triangle colours, textures, slicer settings and other extensions
+  are ignored. Export: colours are base materials, a body each, no slicer
+  settings, supports or modifiers in the file. The parts go in as
+  components of one object, so they keep their places: PrusaSlicer 2.x
+  reads the file (checked) but loads the parts as separate objects; Bambu
+  Studio, OrcaSlicer and Cura haven't been tried. Edges between flat faces
+  meeting at under 10° aren't drawn on any body.
 - **E7 Imports keep the whole file in the design** (`.forma` files grow with
   big imports), and there's no "replace with a newer version of the file":
   import again and delete the old feature.

@@ -133,10 +133,12 @@ as PDF, SVG or DXF.</td>
 - **Exchange.**
   - STEP AP214: export of solids and assemblies, and import of
     AP203/AP214/AP242 solids on analytic surfaces.
-  - STL in (as a reference mesh) and out; OBJ out.
+  - STL in (as a reference mesh) and out; OBJ out; 3MF in: each part a
+    solid of flat faces with its name and colour, to cut, split and
+    combine like any body.
   - 3MF out for slicers: each visible body a part with its colour, the
     parts kept together as one object, millimetres, watertight meshes.
-    Any step can be given a colour in Properties, shown in the view too.
+    Any body can be given a colour in Properties, shown in the view too.
   - Separate a 3MF (or STL) into part files (File menu): each part the
     file puts on the plate written as an STL of its own, named as the file
     names it, turned as it was laid out for printing and stood on the bed;
@@ -294,8 +296,9 @@ PNGs to `captures/out/`. The images above come from that script. See
   views, a parts list with balloons, tolerances and GD&T
   ([DW1–DW12](docs/LIMITATIONS.md)).
 - **Printing** (0.3.0, under way): Split Body and 3MF export with a colour
-  per part, separating a 3MF or STL into part files (done). Left: 3MF
-  import into a design, slicer settings in the file, splitting
+  per part, separating a 3MF or STL into part files, 3MF import as solids
+  (done). Left: curved faces fitted to imported meshes,
+  slicer settings in the file, splitting
   along a sketch or a curved face ([X1, E8](docs/LIMITATIONS.md)).
 - **M17 car dynamics** (planned): rigid-body dynamics and wheel contact, so
   a car run by its Arduino sketch drives on the floor, and loads from the
