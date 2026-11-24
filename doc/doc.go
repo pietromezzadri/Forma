@@ -53,6 +53,7 @@ const (
 	KJoint     = "joint"     // moves a component onto another
 	KEmboss    = "emboss"    // profiles raised, engraved or inlaid on a face
 	KCombine   = "combine"   // bodies joined, cut or intersected with a target body
+	KSplit     = "split"     // a body cut in two by a plane
 )
 
 // KeysPerFeature: a body's key is its feature's ID × KeysPerFeature + its
@@ -127,7 +128,8 @@ type Feature struct {
 	Joint    []JointRef        `json:"joint,omitempty"`  // a joint's fixed and moving ends
 	Circuit  *Circuit          `json:"circuit,omitempty"`
 	Hidden   bool              `json:"hidden,omitempty"`
-	XRay     bool              `json:"xray,omitempty"` // its bodies drawn see-through
+	XRay     bool              `json:"xray,omitempty"`  // its bodies drawn see-through
+	Color    string            `json:"color,omitempty"` // its bodies' colour, "#rrggbb" ("": the default grey)
 	Off      bool              `json:"suppressed,omitempty"`
 
 	// results of the last regeneration
@@ -223,7 +225,7 @@ func (d *Document) uniqueName(base string) string {
 
 var kindLabel = map[string]string{KBox: "Box", KCylinder: "Cylinder", KCone: "Cone", KSphere: "Sphere",
 	KTorus: "Torus", KSketch: "Sketch", KExtrude: "Extrude", KRevolve: "Revolve", KMove: "Move",
-	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell", KEmboss: "Emboss", KCombine: "Combine",
+	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell", KEmboss: "Emboss", KCombine: "Combine", KSplit: "Split",
 	KImport: "Import", KMesh: "Mesh", KComponent: "Component", KJoint: "Joint", KCircuit: "Electronics"}
 
 // KindLabel names a kind for the UI.

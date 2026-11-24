@@ -316,7 +316,7 @@ func (d *Document) build(f *Feature) error {
 		return d.buildComponent(f)
 	case KCircuit:
 		return d.buildCircuit(f)
-	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss, KCombine:
+	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss, KCombine, KSplit:
 		return nil // they work on the bodies there are (modify)
 	default:
 		return fmt.Errorf("unknown feature kind %q", f.Kind)

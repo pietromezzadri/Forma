@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	imgui "github.com/AllenDang/cimgui-go/imgui"
@@ -200,7 +201,7 @@ func (a *App) toolFeature() *doc.Feature {
 		return nil
 	}
 	switch f.Kind {
-	case doc.KSketch, doc.KMove, doc.KMirror, doc.KPattern, doc.KFillet, doc.KChamfer, doc.KShell, doc.KEmboss, doc.KCombine:
+	case doc.KSketch, doc.KMove, doc.KMirror, doc.KPattern, doc.KFillet, doc.KChamfer, doc.KShell, doc.KEmboss, doc.KCombine, doc.KSplit:
 		return nil
 	}
 	return f
@@ -283,6 +284,53 @@ func (a *App) registerModifyCommands(c *Commands) {
 				return
 			}
 			a.newFeature(doc.NewCombine(bs[0], bs[1:]), arg)
+		}})
+	c.add(&Command{ID: "feature.split", Label: "Split body: cut a body in two by a plane or a flat face", Group: "Modify", Icon: icSplit,
+		Enabled: func() bool { return notSketch() && len(a.selectedBodies()) > 0 },
+		Run: func(arg string) {
+			// the body is the first picked; a flat face of another body picked
+			// too is the plane, else the XY plane through the body's middle
+			bs := a.selectedBodies()
+			if len(bs) == 0 {
+				a.notify("Split: pick the body to cut (and, with Ctrl, a flat face to cut it along)")
+				return
+			}
+			target := bs[0]
+			plane := doc.PlaneRef{Std: "xy"}
+			offset := 0.0
+			faceBody, faces := a.selectedFaces()
+			ref, flat := a.planeFor("")
+			other := 0 // a picked body the face isn't on
+			for _, k := range bs {
+				if k != faceBody {
+					other = k
+					break
+				}
+			}
+			if flat && ref.At == nil && len(faces) == 1 && other != 0 {
+				target, plane = other, ref
+			} else if b := a.doc.Body(target); b != nil {
+				offset = b.Body.Bounds().Center().Z
+			}
+			f := doc.NewSplit(target, plane)
+			f.Inputs["Offset"] = strconv.FormatFloat(math.Round(offset*1e4)/1e4, 'f', -1, 64)
+			a.newFeature(f, arg)
+		}})
+	c.add(&Command{ID: "body.color", Label: "Colour of the selected parts (#rrggbb; empty: the default)", Group: "View",
+		Enabled: func() bool { return len(a.selectedBodies()) > 0 },
+		Run: func(arg string) {
+			if arg != "" {
+				if _, ok := doc.ParseColor(arg); !ok {
+					a.notify("Colour: %q isn't a #rrggbb colour (pick one in Properties)", arg)
+					return
+				}
+			}
+			for _, k := range a.selectedBodies() {
+				if b := a.doc.Body(k); b != nil {
+					b.F.Color = arg
+				}
+			}
+			a.doc.Commit()
 		}})
 	c.add(&Command{ID: "feature.shell", Label: "Shell", Group: "Modify", Icon: icShell,
 		Enabled: func() bool { return notSketch() && len(a.selectedBodies()) > 0 },
@@ -432,6 +480,34 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 		if imgui.Checkbox("Keep the tools", &keep) {
 			set("Keep tools", map[bool]string{true: "1", false: "0"}[keep])
 		}
+	case doc.KSplit:
+		targets()
+		cur := "Selected face"
+		if f.Plane != nil && f.Plane.Std != "" {
+			cur = strings.ToUpper(f.Plane.Std)
+		}
+		opts := append(append([]string{}, doc.MirrorPlanes...), "Selected face")
+		if m, ok := a.combo("Plane", cur, opts, nil); ok {
+			if m == "Selected face" {
+				if ref, ok := a.planeFor(""); ok && ref.At == nil {
+					f.Plane = &ref
+					f.Inputs["Offset"] = "0"
+				} else {
+					a.notify("Select a flat face to split along")
+				}
+			} else {
+				f.Plane = &doc.PlaneRef{Std: strings.ToLower(m)}
+			}
+			a.doc.Commit()
+		}
+		a.markItemLeft("prop:Plane")
+		if f.Plane != nil && f.Plane.Std == "" {
+			imgui.TextDisabled(planeText(f.Plane, a.doc.D))
+		}
+		a.exprField(f, "Offset", " mm")
+		imgui.TextDisabled("Moves the plane along its normal (toward the front).")
+		comboIn("Keep", "Keep", doc.SplitKeeps)
+		imgui.TextDisabled("Both: the body keeps the front, the back is a new body.")
 	case doc.KMove:
 		targets()
 		imgui.SeparatorText("Move")

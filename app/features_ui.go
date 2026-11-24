@@ -43,6 +43,8 @@ func kindIcon(k string) rune {
 		return icEmboss
 	case doc.KCombine:
 		return icCombine
+	case doc.KSplit:
+		return icSplit
 	case doc.KImport:
 		return icImport
 	case doc.KMesh:
@@ -466,6 +468,26 @@ func (a *App) bodyInfo(b *BodyItem) {
 		a.doc.Commit()
 	}
 	imgui.SetItemTooltip("Draw it see-through, with its hidden edges dashed; clicks go through it to what is inside")
+	// its colour (the step's: every body the step makes), shown in the
+	// view and written to 3MF for printing in colour
+	col := [3]float32{colBody[0], colBody[1], colBody[2]}
+	if c, ok := doc.ParseColor(b.F.Color); ok {
+		col = [3]float32{float32(c[0]), float32(c[1]), float32(c[2])}
+	}
+	if imgui.ColorEdit3V("Colour##bodycol", &col, imgui.ColorEditFlagsNoInputs) {
+		b.F.Color = doc.FormatColor([3]float64{float64(col[0]), float64(col[1]), float64(col[2])})
+	}
+	if imgui.IsItemDeactivatedAfterEdit() {
+		a.doc.Commit()
+	}
+	imgui.SetItemTooltip("The colour it is drawn in, and printed in from a 3MF export")
+	if b.F.Color != "" {
+		imgui.SameLine()
+		if imgui.SmallButton("Default##bodycol") {
+			b.F.Color = ""
+			a.doc.Commit()
+		}
+	}
 	v, e, f, r, s := b.Body.Counts()
 	imgui.Text(fmt.Sprintf("%d faces · %d edges · %d vertices", f, e, v))
 	imgui.Text(fmt.Sprintf("%d shell · %d rings · genus %d", s, r, brep.Genus(b.Body)))

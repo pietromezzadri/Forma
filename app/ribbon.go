@@ -290,6 +290,7 @@ func (a *App) partRibbon(r *ribbon) {
 	r.cmd("feature.shell", 0xf49e, "Shell", false)
 	r.cmd("feature.emboss", icEmboss, "Emboss", false)
 	r.cmd("feature.combine", icCombine, "Combine", false)
+	r.cmd("feature.split", icSplit, "Split", false)
 	r.cmd("feature.move", icMove, "Move", false)
 	r.end("Modify")
 

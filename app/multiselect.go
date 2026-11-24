@@ -312,3 +312,4 @@ func (a *App) xrayLit() bool {
 }
 
 const icCombine = 0xf248 // object group
+const icSplit = 0xf247   // object ungroup

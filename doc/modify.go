@@ -105,6 +105,18 @@ func NewCombine(target int, tools []int) *Feature {
 	return withInputs(&Feature{Kind: KCombine, Targets: append([]int{target}, tools...)}, CombineInputs)
 }
 
+// Split's inputs: how far the plane is moved along its normal, and which
+// side is kept (both: the body keeps the front, the back is a new body).
+var (
+	SplitKeeps  = []string{"Both", "Front", "Back"}
+	SplitInputs = [][2]string{{"Offset", "0"}, {"Keep", "Both"}}
+)
+
+// NewSplit cuts a body in two by a plane (a standard one or a flat face).
+func NewSplit(target int, plane PlaneRef) *Feature {
+	return withInputs(&Feature{Kind: KSplit, Targets: []int{target}, Plane: &plane}, SplitInputs)
+}
+
 func NewShell(target int, open []FaceRef) *Feature {
 	return withInputs(&Feature{Kind: KShell, Targets: []int{target}, Faces: open}, ShellInputs)
 }
@@ -127,7 +139,7 @@ func fmtNum(x float64) string {
 // adding tool bodies of their own.
 func (f *Feature) modifies() bool {
 	switch f.Kind {
-	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss, KCombine:
+	case KMove, KMirror, KPattern, KFillet, KChamfer, KShell, KJoint, KEmboss, KCombine, KSplit:
 		return true
 	}
 	return false
@@ -266,28 +278,35 @@ func axisOfFace(fc *brep.Face) (geom.Frame, bool) {
 
 // mirrorXform is a mirror feature's plane as a reflection.
 func (d *Document) mirrorXform(f *Feature) (geom.Xform, error) {
-	if f.Plane == nil {
-		return geom.Identity, fmt.Errorf("no mirror plane")
+	fr, err := d.featurePlane(f, "mirror")
+	if err != nil {
+		return geom.Identity, err
 	}
-	var fr geom.Frame
+	return geom.Mirror(fr.O, fr.Z), nil
+}
+
+// featurePlane is the plane a mirror or split feature names: a standard
+// one, or a flat face (what names it, in its messages).
+func (d *Document) featurePlane(f *Feature, what string) (geom.Frame, error) {
+	if f.Plane == nil {
+		return geom.Frame{}, fmt.Errorf("no %s plane", what)
+	}
 	if f.Plane.Std != "" {
 		pl, ok := StdPlane(f.Plane.Std)
 		if !ok {
-			return geom.Identity, fmt.Errorf("unknown plane %q", f.Plane.Std)
+			return geom.Frame{}, fmt.Errorf("unknown plane %q", f.Plane.Std)
 		}
-		fr = pl
-	} else {
-		fc := d.FindFace(f.Plane.Feature, f.Plane.Body, f.Plane.Face)
-		if fc == nil {
-			return geom.Identity, fmt.Errorf("its mirror face is gone")
-		}
-		pl, ok := PlaneOf(fc)
-		if !ok {
-			return geom.Identity, fmt.Errorf("its mirror face isn't flat")
-		}
-		fr = pl
+		return pl, nil
 	}
-	return geom.Mirror(fr.O, fr.Z), nil
+	fc := d.FindFace(f.Plane.Feature, f.Plane.Body, f.Plane.Face)
+	if fc == nil {
+		return geom.Frame{}, fmt.Errorf("its %s face is gone", what)
+	}
+	pl, ok := PlaneOf(fc)
+	if !ok {
+		return geom.Frame{}, fmt.Errorf("its %s face isn't flat", what)
+	}
+	return pl, nil
 }
 
 // opOf is the boolean a body-making feature does with its tools.
@@ -610,6 +629,38 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 		changed(i, s)
 		return out, nil
 
+	case KSplit:
+		if len(f.Targets) != 1 {
+			return nil, fmt.Errorf("pick one body to split")
+		}
+		i, err := target(f.Targets[0])
+		if err != nil {
+			return nil, err
+		}
+		pl, err := d.featurePlane(f, "split")
+		if err != nil {
+			return nil, err
+		}
+		off, err := d.input(f, "Offset")
+		if err != nil {
+			return nil, err
+		}
+		pl.O = pl.O.Add(pl.Z.Scale(off))
+		front, back, err := ops.SplitBody(out[i].Body, pl, fmt.Sprintf("f%d/split", f.ID))
+		if err != nil {
+			return nil, err
+		}
+		switch f.Inputs["Keep"] {
+		case "Front":
+			changed(i, front)
+		case "Back":
+			changed(i, back)
+		default:
+			// the body keeps what is in front; the back is a body of its own
+			changed(i, front)
+			newBody(back)
+		}
+		return out, nil
 	case KJoint:
 		return d.joint(f, out)
 	case KEmboss:
