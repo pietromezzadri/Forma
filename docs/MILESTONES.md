@@ -846,3 +846,24 @@ What each milestone added, in the order they were built. The current gaps are in
   (a design's box and cylinder exported in two colours and imported into
   another: names, colours, six faces, volumes, split, saved; a picked
   colour beats the file's).
+
+## M19: fillet upgrades (in progress)
+
+- **Ball corners** (`ops.CornerTool`, `ops.BallCornerOf`, `EdgeToolSet`):
+  where three rounded edges of one fillet meet at a vertex of three flat
+  faces (straight, convex edges; the vertex has no other edge), the corner
+  is part of the rolling ball, not the mitre the rounds made crossing.
+  The ball's centre C lies r in from all three faces; each edge's round
+  stops at the plane through C square to the edge (where its cross-section
+  is centred on C), and between the vertex and those planes a corner tool
+  is cut first: built directly, not by booleans — three quadrilaterals on
+  the faces, three end faces each with an arc of the ball cut out, and the
+  spherical triangle between the points where the ball touches the faces
+  (it only touches them, which booleans can't find). The rounds' end
+  faces then fall exactly on the corner tool's, and the kernel takes them
+  out. An edge too short for the corners at both its ends keeps mitres;
+  chamfers keep them. Every edge of a box rounded is now the textbook
+  rounded box (26 faces, 8 balls); a triangular prism's 60° corners too.
+  Tests: `doc/fillet_corner_test.go` (a box's every edge and one corner by
+  volume, a chamfer, a radius nearly half the box, a prism against the
+  exact volume of the rolling-ball shape).

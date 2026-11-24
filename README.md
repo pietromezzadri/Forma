@@ -305,10 +305,11 @@ PNGs to `captures/out/`. The images above come from that script. See
   mechanism back on its motors ([EL6](docs/LIMITATIONS.md)).
 - **M18 scripted parts** (planned): parts written in Starlark, with
   parameters, as a step in the timeline like any feature.
-- **M19 fillet upgrades** (planned, next): corner patches where three fillets
-  meet (so every edge of a body, or of several, can be rounded in one
-  step), more kinds of edges, chamfers by two distances
-  ([F1–F5](docs/LIMITATIONS.md)).
+- **M19 fillet upgrades** (in progress): ball corners where three rounds
+  meet at a corner of flat faces (done: every edge of a box rounds into the
+  rounded box of the textbook). Left: corners of curved faces or of more
+  than three edges, setbacks for unequal radii, more kinds of edges,
+  chamfers by two distances ([F1–F5](docs/LIMITATIONS.md)).
 - **M20 screws and threaded holes** (planned): a fastener library of
   screws (ISO metric to begin with: socket head, button head, countersunk,
   hex) inserted as components; threaded holes made to fit them, plain,
