@@ -16,18 +16,18 @@ import (
 	"forma/ui"
 )
 
-// Exchange: export the visible bodies as STEP, STL or OBJ (by the file's
+// Exchange: export the visible bodies as STEP, STL, OBJ or 3MF (by the file's
 // extension); import STEP solids as bodies and STL meshes as references.
 
 func (a *App) registerExchangeCommands(c *Commands) {
-	c.add(&Command{ID: "file.export", Label: "Export… (STEP, STL, OBJ)", Group: "File", Icon: ui.FaDownload, Shortcut: "Ctrl+E",
+	c.add(&Command{ID: "file.export", Label: "Export… (STEP, STL, OBJ, 3MF)", Group: "File", Icon: ui.FaDownload, Shortcut: "Ctrl+E",
 		Run: func(arg string) {
 			if arg != "" {
 				a.exportFile(arg)
 				return
 			}
 			a.pickFile(true, "Export", "Export", a.exportStart(), exportFilter, func(p string) {
-				a.exportFile(withExt(p, ".step", ".step", ".stp", ".stl", ".obj"))
+				a.exportFile(withExt(p, ".step", ".step", ".stp", ".stl", ".obj", ".3mf"))
 			})
 		}})
 	c.add(&Command{ID: "file.import", Label: "Import… (STEP, STL)", Group: "File", Icon: icImport, Shortcut: "Ctrl+I",
@@ -38,6 +38,56 @@ func (a *App) registerExchangeCommands(c *Commands) {
 			}
 			a.pickFile(false, "Import a STEP or STL file", "Import", startIn(a.importPath, ""), importFilter, a.importFile)
 		}})
+}
+
+// registerSeparateCommands: a 3MF's (or STL's) parts written as STL files
+// of their own, for printing one by one; the design is left alone.
+func (a *App) registerSeparateCommands(c *Commands) {
+	for _, loose := range []bool{false, true} {
+		id, label := "file.separate", "Separate a 3MF into part files… (to print them one by one)"
+		if loose {
+			id, label = "file.separate.loose", "Separate a 3MF or STL into its loose pieces…"
+		}
+		c.add(&Command{ID: id, Label: label, Group: "File", Icon: icSplit,
+			Run: func(arg string) {
+				if arg != "" {
+					a.separateFile(arg, loose)
+					return
+				}
+				a.pickFile(false, "Separate a 3MF or STL into its parts", "Separate", startIn(a.importPath, ""), separateFilter,
+					func(p string) { a.separateFile(p, loose) })
+			}})
+	}
+}
+
+// separateFile writes path's parts (and, with loose, each part's loose
+// pieces) as STL files into "<file> parts" beside it, on a goroutine.
+func (a *App) separateFile(path string, loose bool) {
+	if a.separating {
+		a.notify("Still separating the last file: wait for it to finish")
+		return
+	}
+	a.importPath = path
+	dir := filepath.Join(filepath.Dir(path), strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))+" parts")
+	a.separating = true
+	a.notify("Separating %s…", filepath.Base(path))
+	go func() {
+		res, err := fio.SeparateParts(path, dir, loose, func(s string) {
+			a.post(func() { a.toast.show("Separating: " + s) })
+		})
+		a.post(func() {
+			a.separating = false
+			if err != nil {
+				a.notify("Separating %s failed: %v", filepath.Base(path), err)
+				return
+			}
+			tris := 0
+			for _, r := range res {
+				tris += r.Triangles
+			}
+			a.notify("Separated %s into %d %s (%d triangles) in %s", filepath.Base(path), len(res), plural(len(res), "part", "parts"), tris, dir)
+		})
+	}()
 }
 
 const icImport = 0xf093 // upload
@@ -102,8 +152,23 @@ func (a *App) writeExport(path string) error {
 			items = append(items, fio.OBJItem{Name: b.Name, Mesh: fine(b)})
 		}
 		return fio.SaveOBJ(path, items)
+	case ".3mf":
+		// each visible body a part in its step's colour, the parts one object
+		// (a slicer keeps them where they stand to each other)
+		var items []fio.ThreeMFItem
+		for _, b := range a.doc.Bodies {
+			if !b.Visible || b.Body == nil {
+				continue
+			}
+			col := [3]float64{float64(colBody[0]), float64(colBody[1]), float64(colBody[2])}
+			if c, ok := doc.ParseColor(b.F.Color); ok {
+				col = c
+			}
+			items = append(items, fio.ThreeMFItem{Name: b.Name, Mesh: fine(b.Body), Color: col})
+		}
+		return fio.Save3MF(path, name, "Forma "+Version, items, true)
 	}
-	return fmt.Errorf("%q: name the file .step, .stl or .obj", filepath.Ext(path))
+	return fmt.Errorf("%q: name the file .step, .stl, .obj or .3mf", filepath.Ext(path))
 }
 
 func (a *App) importFile(path string) {

@@ -56,6 +56,7 @@ type App struct {
 
 	files      fileDialog
 	dialogOpen bool // a native file dialog is up
+	separating bool // a 3MF is being separated into part files (file.separate)
 	asm        assemblyState
 	m13        m13State
 	sim        simState

@@ -113,6 +113,9 @@ func (c *captureRun) tick() {
 		c.pause--
 		return
 	}
+	if c.app.separating {
+		return // a 3MF being separated on a goroutine: frames don't measure it
+	}
 	sh := c.script.Shots[c.shot]
 	if c.action < len(sh.Do) {
 		c.do(sh.Do[c.action])

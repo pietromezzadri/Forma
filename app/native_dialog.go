@@ -23,11 +23,15 @@ var (
 		{Name: "STEP (*.step, *.stp)", Patterns: []string{"*.step", "*.stp"}},
 		{Name: "STL mesh (*.stl)", Patterns: []string{"*.stl"}},
 		{Name: "Wavefront OBJ (*.obj)", Patterns: []string{"*.obj"}},
+		{Name: "3MF for slicers, in colour (*.3mf)", Patterns: []string{"*.3mf"}},
 	}
 	importFilter = zenity.FileFilters{
 		{Name: "STEP and STL (*.step, *.stp, *.stl)", Patterns: []string{"*.step", "*.stp", "*.stl"}},
 		{Name: "STEP (*.step, *.stp)", Patterns: []string{"*.step", "*.stp"}},
 		{Name: "STL mesh (*.stl)", Patterns: []string{"*.stl"}},
+	}
+	separateFilter = zenity.FileFilters{
+		{Name: "3MF and STL (*.3mf, *.stl)", Patterns: []string{"*.3mf", "*.stl"}},
 	}
 )
 

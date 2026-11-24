@@ -39,6 +39,8 @@ func (a *App) mainMenu() {
 		imgui.Separator()
 		a.menuItem("file.import")
 		a.menuItem("file.export")
+		a.menuItem("file.separate")
+		a.menuItem("file.separate.loose")
 		imgui.Separator()
 		a.menuItem("drawing.open")
 		a.menuItem("drawing.sheet")
