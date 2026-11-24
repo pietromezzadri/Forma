@@ -295,7 +295,7 @@ PNGs to `captures/out/`. The images above come from that script. See
   and a title block, exported as PDF, SVG or DXF. Left: detail and broken
   views, a parts list with balloons, tolerances and GD&T
   ([DW1–DW12](docs/LIMITATIONS.md)).
-- **Printing** (0.3.0, under way): Split Body and 3MF export with a colour
+- **Printing** (0.3.0, mostly done): Split Body and 3MF export with a colour
   per part, separating a 3MF or STL into part files, 3MF import as solids
   (done). Left: curved faces fitted to imported meshes,
   slicer settings in the file, splitting
