@@ -332,6 +332,23 @@ func (a *App) registerModifyCommands(c *Commands) {
 			}
 			a.doc.Commit()
 		}})
+	c.add(&Command{ID: "fillet.ownsize", Label: "Fillet / chamfer: give the selected rounds or edges a size of their own", Group: "Modify",
+		Enabled: func() bool {
+			f := a.selFeature()
+			return f != nil && (f.Kind == doc.KFillet || f.Kind == doc.KChamfer)
+		},
+		Run: func(arg string) {
+			f := a.selFeature()
+			if f == nil || (f.Kind != doc.KFillet && f.Kind != doc.KChamfer) {
+				a.notify("Pick a fillet or chamfer step first")
+				return
+			}
+			if !a.giveOwnSize(f, arg) {
+				a.notify("Select the rounds (or sharp edges to add) that should have a size of their own")
+			} else if f.Err != "" {
+				a.notify("%s: %s", f.Name, f.Err)
+			}
+		}})
 	c.add(&Command{ID: "feature.shell", Label: "Shell", Group: "Modify", Icon: icShell,
 		Enabled: func() bool { return notSketch() && len(a.selectedBodies()) > 0 },
 		Run: func(arg string) {
@@ -606,6 +623,7 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 		}
 		if f.Kind == doc.KFillet {
 			a.exprField(f, "Radius", " mm")
+			a.edgeSetsUI(f)
 		} else {
 			// older chamfers have only a Distance
 			for _, kv := range doc.ChamferInputs {
@@ -628,6 +646,7 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 				}
 				imgui.SetItemTooltip("Which face of each edge the first distance (and the angle) goes along")
 			}
+			a.edgeSetsUI(f)
 		}
 	case doc.KHole:
 		imgui.Text(fmt.Sprintf("%d hole(s) at the points of %s", len(f.Points), featName(a.doc.D, f.Ref)))

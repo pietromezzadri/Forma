@@ -520,23 +520,23 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 
 	case KFillet, KChamfer:
 		chamfer := f.Kind == KChamfer
-		in := "Radius"
-		if chamfer {
-			in = "Distance"
-		}
-		size, err := d.input(f, in)
-		if err != nil {
-			return nil, err
+		// each edge set's size (set 0: the step's own Radius / Distance)
+		sizes := map[int]float64{}
+		for _, r := range f.Edges {
+			if _, ok := sizes[r.Set]; ok {
+				continue
+			}
+			v, err := d.input(f, SizeKey(f, r.Set))
+			if err != nil {
+				return nil, err
+			}
+			sizes[r.Set] = v
 		}
 		if len(f.Edges) == 0 {
 			return nil, fmt.Errorf("no edges")
 		}
 		// the edges, by body
-		type pick struct {
-			e *brep.Edge
-			k int
-		}
-		byBody := map[int][]pick{}
+		byBody := map[int][]edgePick{}
 		var order []int
 		for k, ref := range f.Edges {
 			i, e := d.findEdge(out, ref)
@@ -546,149 +546,85 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 			if _, ok := byBody[i]; !ok {
 				order = append(order, i)
 			}
-			byBody[i] = append(byBody[i], pick{e, k})
+			byBody[i] = append(byBody[i], edgePick{e, k, sizes[ref.Set], ref, false})
 		}
 		for _, i := range order {
 			picks := byBody[i]
-			// carried past a vertex where another picked edge meets it at an
-			// angle (the two then meet in a mitre); stopped square where it
-			// runs on smoothly (a straight edge into the arc of a rounded corner)
-			at := map[*brep.Vertex][]*brep.Edge{}
-			for _, p := range picks {
-				at[p.e.Verts[0]] = append(at[p.e.Verts[0]], p.e)
-				at[p.e.Verts[1]] = append(at[p.e.Verts[1]], p.e)
-			}
-			corner := func(e *brep.Edge, v *brep.Vertex) bool {
-				for _, o := range at[v] {
-					if o != e && awayFrom(e, v).Dot(awayFrom(o, v)) > -0.999 {
-						return true
-					}
-				}
-				return false
-			}
 			b := out[i].Body
-			var tools []*brep.Body
-			var opsList []brep.BoolOp
-			// ball corners: where three rounded edges between flat faces meet
-			// (a fillet's, not a chamfer's), the corner is part of the rolling
-			// ball, cut first; the edges' rounds stop where it begins
-			setback := map[[2]any]float64{} // (edge, vertex) → how far short
-			if !chamfer {
-				var verts []*brep.Vertex
-				for v, es := range at {
-					if len(es) == 3 {
-						verts = append(verts, v)
-					}
-				}
-				sort.Slice(verts, func(a, b int) bool { return verts[a].ID < verts[b].ID })
-				type ball struct {
-					v   *brep.Vertex
-					c   ops.Corner
-					set [3]float64
-				}
-				var balls []ball
-				for _, v := range verts {
-					c, ok := ops.BallCornerOf(b, v, at[v])
-					if !ok {
-						continue
-					}
-					_, set, err := c.CornerFrame(size)
-					if err != nil {
-						continue // too sharp: left to mitre
-					}
-					balls = append(balls, ball{v, c, set})
-					for j, e := range at[v] {
-						setback[[2]any{e, v}] = set[j]
-					}
-				}
-				// an edge too short for the corners at its ends keeps mitres
-				short := map[*brep.Vertex]bool{}
-				for _, p := range picks {
-					s := setback[[2]any{p.e, p.e.Verts[0]}] + setback[[2]any{p.e, p.e.Verts[1]}]
-					if s > 0 && s >= p.e.Verts[0].P.Dist(p.e.Verts[1].P)-1e-6 {
-						short[p.e.Verts[0]], short[p.e.Verts[1]] = true, true
-					}
-				}
-				for k, bl := range balls {
-					if short[bl.v] {
-						for _, e := range at[bl.v] {
-							delete(setback, [2]any{e, bl.v})
-						}
-						continue
-					}
-					t, err := ops.CornerTool(bl.c, size, fmt.Sprintf("ball:%d", k+1))
-					if err != nil {
-						return nil, fmt.Errorf("a corner: %v", err)
-					}
-					prefixFaces(t, fmt.Sprintf("f%d/", f.ID))
-					tools = append(tools, t)
-					opsList = append(opsList, brep.Subtract)
-				}
-			}
-			nCorners := len(tools)
+			// the sizes, largest first: one pass if they're all one size; else
+			// each size a pass of its own, largest first, so smaller rounds
+			// meet the curved faces the larger ones left (their mitres would
+			// touch them along lines, which the kernel can't sort out), and from
+			// the second pass on carry round the arcs those rounds left on the
+			// faces (an upright edge rounded first leaves the top face a curved
+			// corner the top edge's round follows): Fusion's result
+			var ladder []float64
 			for _, p := range picks {
-				ext := [2]bool{corner(p.e, p.e.Verts[0]), corner(p.e, p.e.Verts[1])}
-				if p.e.Verts[0] == p.e.Verts[1] {
-					ext = [2]bool{}
-				}
-				set := [2]float64{setback[[2]any{p.e, p.e.Verts[0]}], setback[[2]any{p.e, p.e.Verts[1]}]}
-				for j := range set {
-					if set[j] > 0 {
-						ext[j] = false // the ball takes over there
+				found := false
+				for _, s := range ladder {
+					if math.Abs(s-p.size) <= 1e-9*(1+s) {
+						found = true
 					}
 				}
-				// a chamfer's two distances: the first along the face the edge's
-				// reference names first (A), the second along the other (Swap: the
-				// other way); EdgeToolSet takes them by the edge's own sides
-				s1, s2 := size, size
-				if chamfer {
-					var err error
-					if s1, s2, err = d.chamferSizes(f, p.e, f.Edges[p.k], size); err != nil {
-						return nil, fmt.Errorf("edge %d: %v", p.k+1, err)
+				if !found {
+					ladder = append(ladder, p.size)
+				}
+			}
+			sort.Sort(sort.Reverse(sort.Float64Slice(ladder)))
+			if len(ladder) == 1 {
+				var err error
+				if b, err = d.roundEdges(f, b, picks, chamfer); err != nil {
+					return nil, err
+				}
+			}
+			for pass := 0; len(ladder) > 1 && pass < len(ladder); pass++ {
+				s := ladder[pass]
+				same := func(x float64) bool { return math.Abs(x-s) <= 1e-9*(1+s) }
+				// this pass's edges and the later passes', found again on the
+				// body as the earlier passes left it
+				var now []edgePick
+				later := map[*brep.Edge]bool{}
+				for _, p := range picks {
+					if p.size > s && !same(p.size) {
+						continue // rounded in an earlier pass
+					}
+					_, e := d.findEdge([]*BodyRef{{Body: b}}, p.ref)
+					if e == nil {
+						return nil, fmt.Errorf("%s is gone after the larger rounds", p.label())
+					}
+					if same(p.size) {
+						now = append(now, edgePick{e, p.k, p.size, p.ref, false})
+					} else if p.size < s {
+						later[e] = true
 					}
 				}
-				t, op, err := ops.EdgeToolSet(p.e, s1, s2, chamfer, p.k+1, ext, set)
-				if err != nil {
-					return nil, fmt.Errorf("edge %d: %v", p.k+1, err)
-				}
-				prefixFaces(t, fmt.Sprintf("f%d/", f.ID))
-				tools = append(tools, t)
-				opsList = append(opsList, op)
-			}
-			// the ball corners first, in order
-			for k := 0; k < nCorners; k++ {
-				r, err := brep.Boolean(b, tools[k], opsList[k])
-				if err != nil {
-					return nil, fmt.Errorf("a ball corner: %v", err)
-				}
-				b = r
-			}
-			// then the edges; where mitred tools cross, one can trip the kernel
-			// (two passing exactly through the same point of an edge) that goes
-			// in cleanly once the others are in: it waits, and the rest go on
-			pending := make([]int, 0, len(tools)-nCorners)
-			for k := nCorners; k < len(tools); k++ {
-				pending = append(pending, k)
-			}
-			for len(pending) > 0 {
-				var later []int
-				var firstErr error
-				firstK := -1
-				for _, k := range pending {
-					r, err := brep.Boolean(b, tools[k], opsList[k])
-					if err != nil {
-						if firstErr == nil {
-							firstErr, firstK = err, k
+				if pass > 0 {
+					in := map[*brep.Edge]bool{}
+					for _, p := range now {
+						in[p.e] = true
+					}
+					extra := len(f.Edges)
+					for _, p := range append([]edgePick(nil), now...) {
+						for _, ce := range brep.TangentChain(b, p.e) {
+							// only edges the kernel can round (a flat face on one side:
+							// one between two curved faces stops the chain there)
+							if in[ce] || later[ce] || !roundable(ce) {
+								continue
+							}
+							ref, ok := RefForEdge(ce, ce.Curve.Eval((ce.T0+ce.T1)/2))
+							if !ok {
+								continue
+							}
+							in[ce] = true
+							now = append(now, edgePick{ce, extra, s, ref, true})
+							extra++
 						}
-						later = append(later, k)
-						continue
 					}
-					b = r
 				}
-				if len(later) == len(pending) {
-					return nil, fmt.Errorf("edge %d: %v", picks[firstK-nCorners].k+1, firstErr)
+				var err error
+				if b, err = d.roundEdges(f, b, now, chamfer); err != nil {
+					return nil, err
 				}
-				pending = later
 			}
 			b.Name = out[i].Body.Name
 			changed(i, b)
@@ -1084,4 +1020,195 @@ func (d *Document) chamferSizes(f *Feature, e *brep.Edge, ref EdgeRef, dist floa
 		return b, a, nil
 	}
 	return a, b, nil
+}
+
+// edgePick is an edge a fillet or chamfer rounds: k its index among the
+// step's edges (its tool's number), size its set's, ref its reference;
+// extra: not one of the step's own, but running on smoothly from them.
+type edgePick struct {
+	e     *brep.Edge
+	k     int
+	size  float64
+	ref   EdgeRef
+	extra bool
+}
+
+func (p edgePick) label() string {
+	if p.extra {
+		return "an edge running on from them"
+	}
+	return fmt.Sprintf("edge %d", p.k+1)
+}
+
+// roundEdges rounds (or chamfers) picks on body b: ball corners where
+// three of one size meet, mitres where picked edges meet at an angle,
+// square ends where one runs on smoothly into another.
+func (d *Document) roundEdges(f *Feature, b *brep.Body, picks []edgePick, chamfer bool) (*brep.Body, error) {
+	// carried past a vertex where another picked edge meets it at an
+	// angle (the two then meet in a mitre); stopped square where it
+	// runs on smoothly (a straight edge into the arc of a rounded corner)
+	sizeOf := map[*brep.Edge]float64{}
+	for _, p := range picks {
+		sizeOf[p.e] = p.size
+	}
+	at := map[*brep.Vertex][]*brep.Edge{}
+	for _, p := range picks {
+		at[p.e.Verts[0]] = append(at[p.e.Verts[0]], p.e)
+		at[p.e.Verts[1]] = append(at[p.e.Verts[1]], p.e)
+	}
+	corner := func(e *brep.Edge, v *brep.Vertex) bool {
+		for _, o := range at[v] {
+			if o != e && awayFrom(e, v).Dot(awayFrom(o, v)) > -0.999 {
+				return true
+			}
+		}
+		return false
+	}
+	var tools []*brep.Body
+	var opsList []brep.BoolOp
+	// ball corners: where three rounded edges between flat faces meet
+	// (a fillet's, not a chamfer's), the corner is part of the rolling
+	// ball, cut first; the edges' rounds stop where it begins
+	setback := map[[2]any]float64{} // (edge, vertex) → how far short
+	if !chamfer {
+		var verts []*brep.Vertex
+		for v, es := range at {
+			if len(es) == 3 {
+				verts = append(verts, v)
+			}
+		}
+		sort.Slice(verts, func(a, b int) bool { return verts[a].ID < verts[b].ID })
+		type ball struct {
+			v   *brep.Vertex
+			c   ops.Corner
+			set [3]float64
+			r   float64
+		}
+		var balls []ball
+		for _, v := range verts {
+			// a ball only where the three rounds are one size (else they
+			// cross in a mitre)
+			es := at[v]
+			r0 := sizeOf[es[0]]
+			if math.Abs(sizeOf[es[1]]-r0) > 1e-9*(1+r0) || math.Abs(sizeOf[es[2]]-r0) > 1e-9*(1+r0) {
+				continue
+			}
+			c, ok := ops.BallCornerOf(b, v, at[v])
+			if !ok {
+				continue
+			}
+			_, set, err := c.CornerFrame(r0)
+			if err != nil {
+				continue // too sharp: left to mitre
+			}
+			balls = append(balls, ball{v, c, set, r0})
+			for j, e := range at[v] {
+				setback[[2]any{e, v}] = set[j]
+			}
+		}
+		// an edge too short for the corners at its ends keeps mitres
+		short := map[*brep.Vertex]bool{}
+		for _, p := range picks {
+			s := setback[[2]any{p.e, p.e.Verts[0]}] + setback[[2]any{p.e, p.e.Verts[1]}]
+			if s > 0 && s >= p.e.Verts[0].P.Dist(p.e.Verts[1].P)-1e-6 {
+				short[p.e.Verts[0]], short[p.e.Verts[1]] = true, true
+			}
+		}
+		for k, bl := range balls {
+			if short[bl.v] {
+				for _, e := range at[bl.v] {
+					delete(setback, [2]any{e, bl.v})
+				}
+				continue
+			}
+			t, err := ops.CornerTool(bl.c, bl.r, fmt.Sprintf("ball:%d", k+1))
+			if err != nil {
+				return nil, fmt.Errorf("a corner: %v", err)
+			}
+			prefixFaces(t, fmt.Sprintf("f%d/", f.ID))
+			tools = append(tools, t)
+			opsList = append(opsList, brep.Subtract)
+		}
+	}
+	nCorners := len(tools)
+	for _, p := range picks {
+		ext := [2]bool{corner(p.e, p.e.Verts[0]), corner(p.e, p.e.Verts[1])}
+		if p.e.Verts[0] == p.e.Verts[1] {
+			ext = [2]bool{}
+		}
+		set := [2]float64{setback[[2]any{p.e, p.e.Verts[0]}], setback[[2]any{p.e, p.e.Verts[1]}]}
+		for j := range set {
+			if set[j] > 0 {
+				ext[j] = false // the ball takes over there
+			}
+		}
+		// a chamfer's two distances: the first along the face the edge's
+		// reference names first (A), the second along the other (Swap: the
+		// other way); EdgeToolSet takes them by the edge's own sides
+		s1, s2 := p.size, p.size
+		if chamfer {
+			var err error
+			if s1, s2, err = d.chamferSizes(f, p.e, p.ref, p.size); err != nil {
+				return nil, fmt.Errorf("%s: %v", p.label(), err)
+			}
+		}
+		t, op, err := ops.EdgeToolSet(p.e, s1, s2, chamfer, p.k+1, ext, set)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %v", p.label(), err)
+		}
+		prefixFaces(t, fmt.Sprintf("f%d/", f.ID))
+		tools = append(tools, t)
+		opsList = append(opsList, op)
+	}
+	// the ball corners first, in order
+	for k := 0; k < nCorners; k++ {
+		r, err := brep.Boolean(b, tools[k], opsList[k])
+		if err != nil {
+			return nil, fmt.Errorf("a ball corner: %v", err)
+		}
+		b = r
+	}
+	// then the edges; where mitred tools cross, one can trip the kernel
+	// (two passing exactly through the same point of an edge) that goes
+	// in cleanly once the others are in: it waits, and the rest go on
+	pending := make([]int, 0, len(tools)-nCorners)
+	for k := nCorners; k < len(tools); k++ {
+		pending = append(pending, k)
+	}
+	for len(pending) > 0 {
+		var later []int
+		var firstErr error
+		firstK := -1
+		for _, k := range pending {
+			r, err := brep.Boolean(b, tools[k], opsList[k])
+			if err != nil {
+				if firstErr == nil {
+					firstErr, firstK = err, k
+				}
+				later = append(later, k)
+				continue
+			}
+			b = r
+		}
+		if len(later) == len(pending) {
+			return nil, fmt.Errorf("%s: %v", picks[firstK-nCorners].label(), firstErr)
+		}
+		pending = later
+	}
+	return b, nil
+}
+
+// roundable: an edge the kernel can round, with a flat face on at least
+// one side (straight between two flat faces, or a circle where one meets a
+// cylinder or cone).
+func roundable(e *brep.Edge) bool {
+	if e.HE[0] == nil || e.HE[1] == nil {
+		return false
+	}
+	for _, h := range e.HE {
+		if _, ok := h.Loop.Face.Surf.(geom.Plane); ok {
+			return true
+		}
+	}
+	return false
 }

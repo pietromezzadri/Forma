@@ -148,3 +148,116 @@ func TestFilletBallCornersSlanted(t *testing.T) {
 	}
 }
 func geomV2(x, y float64) geom.Vec2 { return geom.V2(x, y) }
+
+// Edge sets: a box's every edge rounded, the four upright edges with a
+// radius of their own. Two sets at the same size still make balls; a
+// different size makes the corners mitres (the rounds cross), valid, and
+// the upright rounds take their own radius.
+func TestFilletEdgeSets(t *testing.T) {
+	d := New()
+	bx := d.Insert(NewPrim(KBox))
+	bx.Inputs["Width"], bx.Inputs["Depth"], bx.Inputs["Height"] = "40", "30", "20"
+	d.Regenerate()
+	f := d.Insert(NewFillet(edgeRefs(d, func(*brep.Edge) bool { return true }), false))
+	f.Inputs["Radius"] = "4"
+	var upright []int
+	for i, r := range f.Edges {
+		// an upright edge's middle is at half height
+		if math.Abs(r.P.Z-10) < 1e-9 {
+			upright = append(upright, i)
+		}
+	}
+	if len(upright) != 4 {
+		t.Fatalf("%d upright edges", len(upright))
+	}
+	set := SetEdgeSize(f, upright, nil, "4")
+	if set != 1 || f.Inputs["Radius 2"] != "4" || len(EdgeSets(f)) != 1 {
+		t.Fatalf("set %d, input %q, sets %v", set, f.Inputs["Radius 2"], EdgeSets(f))
+	}
+	d.Regenerate()
+	if f.Err != "" {
+		t.Fatal(f.Err)
+	}
+	if n := ballFaces(d.Bodies[0].Body); n != 8 {
+		t.Fatalf("two sets at 4 mm: %d balls, want 8", n)
+	}
+	// the upright edges at 8 mm: mitres where they meet the 4 mm rounds
+	f.Inputs["Radius 2"] = "8"
+	d.Regenerate()
+	if f.Err != "" {
+		t.Fatal(f.Err)
+	}
+	b := d.Bodies[0].Body
+	if err := brep.Check(b); err != nil {
+		t.Fatal(err)
+	}
+	if n := ballFaces(b); n != 0 {
+		t.Fatalf("mixed radii: %d balls, want 0", n)
+	}
+	// an upright round's radius: its cylinder face's
+	var radii []float64
+	for _, fc := range b.Faces() {
+		if c, ok := fc.Surf.(geom.Cylinder); ok && math.Abs(math.Abs(c.F.Z.Z)-1) < 1e-9 {
+			radii = append(radii, c.R)
+		}
+	}
+	if len(radii) != 4 || math.Abs(radii[0]-8) > 1e-9 {
+		t.Fatalf("upright rounds' radii %v, want four of 8", radii)
+	}
+	// exact: the box with its uprights rounded at 8 (a rounded rectangle
+	// prism), less the 4 mm rims round top and bottom (Pappus round the
+	// arcs: the cut-off region's centroid lies r(10−3π)/(3(4−π)) in)
+	R, r := 8.0, 4.0
+	prism := (1200 - (4-math.Pi)*R*R) * 20
+	cbar := r * (10 - 3*math.Pi) / (3 * (4 - math.Pi))
+	path := 2*(40-2*R) + 2*(30-2*R) + 2*math.Pi*(R-cbar)
+	want := prism - 2*r*r*(1-math.Pi/4)*path
+	v := volume(t, b)
+	t.Logf("mixed: %d faces, volume %.1f, exact %.1f", len(b.Faces()), v, want)
+	if len(b.Faces()) != 26 || math.Abs(v-want) > 0.003*want {
+		t.Fatalf("mixed: %d faces (want 26), volume %.1f (exact %.1f)", len(b.Faces()), v, want)
+	}
+	// and back on the step's own radius: balls again, saved and read back
+	ClearEdgeSet(f, set)
+	d.Regenerate()
+	if f.Err != "" || ballFaces(d.Bodies[0].Body) != 8 || len(EdgeSets(f)) != 0 {
+		t.Fatalf("cleared: %q, %d balls, sets %v", f.Err, ballFaces(d.Bodies[0].Body), EdgeSets(f))
+	}
+	SetEdgeSize(f, upright[:2], nil, "6")
+	d2, err := Unmarshal(d.Marshal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := d2.Feature(f.ID)
+	if g.Err != "" || len(EdgeSets(g)) != 1 || g.Inputs["Radius 2"] != "6" { // a cleared set's number is free again
+		t.Fatalf("reloaded: %q, sets %v, inputs %v", g.Err, EdgeSets(g), g.Inputs)
+	}
+}
+
+// Mixed radii either way round: uprights larger or smaller than the rims,
+// or nearly the same, every combination a valid solid of 26 faces.
+func TestFilletMixedRadii(t *testing.T) {
+	for _, c := range [][2]string{{"8", "2"}, {"4", "3"}, {"3", "4"}} {
+		d := New()
+		bx := d.Insert(NewPrim(KBox))
+		bx.Inputs["Width"], bx.Inputs["Depth"], bx.Inputs["Height"] = "40", "30", "20"
+		d.Regenerate()
+		f := d.Insert(NewFillet(edgeRefs(d, func(*brep.Edge) bool { return true }), false))
+		f.Inputs["Radius"] = c[0]
+		var up []int
+		for i, r := range f.Edges {
+			if math.Abs(r.P.Z-10) < 1e-9 {
+				up = append(up, i)
+			}
+		}
+		SetEdgeSize(f, up, nil, c[1])
+		d.Regenerate()
+		if f.Err != "" {
+			t.Fatalf("rims %s, uprights %s: %s", c[0], c[1], f.Err)
+		}
+		b := d.Bodies[0].Body
+		if err := brep.Check(b); err != nil || len(b.Faces()) != 26 {
+			t.Fatalf("rims %s, uprights %s: %d faces, %v", c[0], c[1], len(b.Faces()), err)
+		}
+	}
+}

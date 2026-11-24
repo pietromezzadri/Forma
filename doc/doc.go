@@ -77,6 +77,9 @@ type EdgeRef struct {
 	A string    `json:"a"`
 	B string    `json:"b"`
 	P geom.Vec3 `json:"p"`
+	// Set: a fillet's or chamfer's edge set (0: the step's own Radius or
+	// Distance; k: its "Radius k+1" / "Distance k+1", a size of its own)
+	Set int `json:"set,omitempty"`
 }
 
 // PlaneRef is where a sketch lies: a standard plane ("xy", "xz", "yz") or a
