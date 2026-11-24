@@ -85,10 +85,12 @@ new ones as features land.
   got). Still mitred too: corners where an edge is curved or a face isn't
   flat, corners of four or more edges, a chamfer's corners, and corners
   whose edges are too short for the ball.
-- **F3 Tangent chains aren't followed** (partly fixed: double-clicking an
-  edge picks its tangent chain, and box selection picks many edges at
-  once). Still: a fillet doesn't carry itself on along tangent edges that
-  weren't picked, as Fusion's does.
+- ~~F3 Tangent chains aren't followed~~ (M19: a fillet or chamfer carries
+  itself on along the edges running on smoothly from the picked ones,
+  "Follow tangent edges", on for new steps; double-clicking an edge still
+  picks its chain). The chain stops at an edge between two curved faces,
+  which the kernel can't round (F1), and steps made before the option keep
+  their shape (it is off for them).
 - **F4 Square ends.** A round stops square at an end where no other picked
   edge meets it at an angle. Where the face beyond that end is slanted, it
   leaves a sliver of the sharp edge; where it is carried on into a mitre past

@@ -899,3 +899,12 @@ What each milestone added, in the order they were built. The current gaps are in
   rounded larger carry round their corners as tori. Tests:
   `TestFilletEdgeSets` (two sets at one size still balls; uprights at 8
   against the exact volume; a set cleared; saved), `TestFilletMixedRadii`.
+- **Tangent chains followed** ("Tangent chain" input, "Follow tangent
+  edges" in the properties; on for new fillets and chamfers, off for steps
+  from before so they keep their shape): a round carries on along the edges
+  running on smoothly from the picked ones (`brep.TangentChain`), those the
+  kernel can round — one top edge of a box with rounded uprights rounds the
+  whole rim. The passes of a mixed-size step and the one-size case are one
+  loop now; the extra edges' rounds are numbered after the step's own.
+  Test: `TestFilletTangentChain` (the rim with the chain, one edge without
+  it or from before the option, a chamfer's chain).

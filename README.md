@@ -71,11 +71,11 @@ as PDF, SVG or DXF.</td>
     clicked, upright along its axis. It can be moved afterwards: offset
     along its normal, turned, moved in its plane, or put on another face.
 - **Features and history.** Extrude and revolve, primitives, holes (simple,
-  counterbored, countersunk), fillet (edge sets with radii of their own;
-  ball-shaped corners where three rounds meet) and chamfer (equal, two
-  distances, or a distance and an angle), shell, emboss (text raised,
-  engraved or inlaid, and wrapped round a cylinder or cone), mirror, linear
-  and circular patterns, and moving bodies with a gizmo.
+  counterbored, countersunk), fillet (following tangent edges; edge sets
+  with radii of their own; ball-shaped corners where three rounds meet) and
+  chamfer (equal, two distances, or a distance and an angle), shell, emboss
+  (text raised, engraved or inlaid, and wrapped round a cylinder or cone),
+  mirror, linear and circular patterns, and moving bodies with a gizmo.
   - Every feature can make a new body, or join, cut or intersect with the
     bodies it touches.
   - Combine joins, cuts or intersects bodies already made: the first body
@@ -309,11 +309,12 @@ PNGs to `captures/out/`. The images above come from that script. See
   parameters, as a step in the timeline like any feature.
 - **M19 fillet upgrades** (in progress): ball corners where three rounds
   meet at a corner of flat faces, chamfers by two distances or a distance
-  and an angle, edge sets with radii of their own (done: every edge of a
-  box rounds into the rounded box of the textbook; with the uprights
-  larger, the rims carry round their corners). Left: blended corners where
-  smaller rounds meet larger ones (mitred now), corners of curved faces or
-  of more than three edges, more kinds of edges ([F1–F5](docs/LIMITATIONS.md)).
+  and an angle, edge sets with radii of their own, rounds that follow
+  tangent edges (done: every edge of a box rounds into the rounded box of
+  the textbook; with the uprights larger, the rims carry round their
+  corners). Left: blended corners where smaller rounds meet larger ones
+  (mitred now), corners of curved faces or of more than three edges, more
+  kinds of edges ([F1–F5](docs/LIMITATIONS.md)).
 - **M20 screws and threaded holes** (planned): a fastener library of
   screws (ISO metric to begin with: socket head, button head, countersunk,
   hex) inserted as components; threaded holes made to fit them, plain,
