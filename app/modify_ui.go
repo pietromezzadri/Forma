@@ -621,6 +621,12 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 				a.doc.Commit()
 			}
 		}
+		follow := f.Inputs["Tangent chain"] == "1"
+		if imgui.Checkbox("Follow tangent edges##chain", &follow) {
+			set("Tangent chain", map[bool]string{true: "1", false: "0"}[follow])
+		}
+		imgui.SetItemTooltip("Carry the round on along the edges that run on smoothly from the picked ones (round a whole rim from one edge)")
+		a.markItemLeft("prop:Follow tangent edges")
 		if f.Kind == doc.KFillet {
 			a.exprField(f, "Radius", " mm")
 			a.edgeSetsUI(f)

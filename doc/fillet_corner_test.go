@@ -1,6 +1,7 @@
 package doc
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -259,5 +260,80 @@ func TestFilletMixedRadii(t *testing.T) {
 		if err := brep.Check(b); err != nil || len(b.Faces()) != 26 {
 			t.Fatalf("rims %s, uprights %s: %d faces, %v", c[0], c[1], len(b.Faces()), err)
 		}
+	}
+}
+
+// Tangent chains: a box with rounded uprights has a top rim of four lines
+// and four arcs running on smoothly; one top edge rounded with the chain
+// followed rounds the whole rim, without it only that edge. A step from
+// before the option (no input) doesn't follow.
+func TestFilletTangentChain(t *testing.T) {
+	build := func(chain string, chamfer bool) (*Document, *Feature) {
+		d := New()
+		bx := d.Insert(NewPrim(KBox))
+		bx.Inputs["Width"], bx.Inputs["Depth"], bx.Inputs["Height"] = "40", "30", "20"
+		d.Regenerate()
+		up := d.Insert(NewFillet(edgeRefs(d, func(e *brep.Edge) bool {
+			return math.Abs(e.Verts[0].P.Z-e.Verts[1].P.Z) > 1 // the uprights
+		}), false))
+		up.Inputs["Radius"] = "6"
+		d.Regenerate()
+		if up.Err != "" {
+			t.Fatal(up.Err)
+		}
+		// one straight top edge (both ends at z = 20, along x at y = 0)
+		f := d.Insert(NewFillet(edgeRefs(d, func(e *brep.Edge) bool {
+			a, b := e.Verts[0].P, e.Verts[1].P
+			_, line := e.Curve.(geom.Line)
+			return math.Abs(a.Z-20) < 1e-9 && math.Abs(b.Z-20) < 1e-9 && math.Abs(a.Y) < 1e-9 && math.Abs(b.Y) < 1e-9 && line
+		}), chamfer))
+		if len(f.Edges) != 1 {
+			t.Fatalf("%d top edges picked", len(f.Edges))
+		}
+		if chamfer {
+			f.Inputs["Distance"] = "2"
+		} else {
+			f.Inputs["Radius"] = "2"
+		}
+		if chain == "" {
+			delete(f.Inputs, "Tangent chain")
+		} else {
+			f.Inputs["Tangent chain"] = chain
+		}
+		d.Regenerate()
+		if f.Err != "" {
+			t.Fatal(f.Err)
+		}
+		if err := brep.Check(d.Bodies[0].Body); err != nil {
+			t.Fatal(err)
+		}
+		return d, f
+	}
+	rounds := func(d *Document, f *Feature, word string) int {
+		n := 0
+		for _, fc := range d.Bodies[0].Body.Faces() {
+			if strings.HasPrefix(fc.Name, fmt.Sprintf("f%d/%s:", f.ID, word)) {
+				n++
+			}
+		}
+		return n
+	}
+	for _, c := range []struct {
+		chain   string
+		chamfer bool
+		want    int
+	}{{"1", false, 8}, {"0", false, 1}, {"", false, 1}, {"1", true, 8}} {
+		d, f := build(c.chain, c.chamfer)
+		word := "round"
+		if c.chamfer {
+			word = "chamfer"
+		}
+		if n := rounds(d, f, word); n != c.want {
+			t.Fatalf("chain %q chamfer %v: %d %s faces, want %d", c.chain, c.chamfer, n, word, c.want)
+		}
+	}
+	// a new step follows by default
+	if NewFillet(nil, false).Inputs["Tangent chain"] != "1" {
+		t.Fatal("a new fillet should follow tangent edges")
 	}
 }

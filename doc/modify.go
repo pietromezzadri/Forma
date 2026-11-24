@@ -82,12 +82,15 @@ func NewPattern(targets, sources []int, circular bool) *Feature {
 	return f
 }
 
-// NewFillet rounds (or chamfers) edges.
+// NewFillet rounds (or chamfers) edges, carrying on along the edges
+// running on smoothly from them ("Tangent chain"; steps from before it
+// was there don't, so they keep their shape).
 func NewFillet(edges []EdgeRef, chamfer bool) *Feature {
+	chain := map[string]string{"Tangent chain": "1"}
 	if chamfer {
-		return withInputs(&Feature{Kind: KChamfer, Edges: edges}, ChamferInputs)
+		return withInputs(&Feature{Kind: KChamfer, Edges: edges, Inputs: chain}, ChamferInputs)
 	}
-	return withInputs(&Feature{Kind: KFillet, Edges: edges}, FilletInputs)
+	return withInputs(&Feature{Kind: KFillet, Edges: edges, Inputs: chain}, FilletInputs)
 }
 
 // NewHole drills holes at points of a sketch on a face.
@@ -571,13 +574,12 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 				}
 			}
 			sort.Sort(sort.Reverse(sort.Float64Slice(ladder)))
-			if len(ladder) == 1 {
-				var err error
-				if b, err = d.roundEdges(f, b, picks, chamfer); err != nil {
-					return nil, err
-				}
-			}
-			for pass := 0; len(ladder) > 1 && pass < len(ladder); pass++ {
+			// tangent chains: a round carries on along the edges running on
+			// smoothly from the picked ones (new steps; older ones only did so
+			// for the arcs a mixed-size step's larger rounds left)
+			follow := f.Inputs["Tangent chain"] == "1"
+			extra := len(f.Edges) // the extra edges' numbers, after the step's own
+			for pass := 0; pass < len(ladder); pass++ {
 				s := ladder[pass]
 				same := func(x float64) bool { return math.Abs(x-s) <= 1e-9*(1+s) }
 				// this pass's edges and the later passes', found again on the
@@ -598,12 +600,11 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 						later[e] = true
 					}
 				}
-				if pass > 0 {
+				if pass > 0 || follow {
 					in := map[*brep.Edge]bool{}
 					for _, p := range now {
 						in[p.e] = true
 					}
-					extra := len(f.Edges)
 					for _, p := range append([]edgePick(nil), now...) {
 						for _, ce := range brep.TangentChain(b, p.e) {
 							// only edges the kernel can round (a flat face on one side:
