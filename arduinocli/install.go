@@ -143,6 +143,9 @@ func (in Installer) Setup(ctx context.Context, progress Progress) (string, error
 // Download fetches the release archive and unpacks the tool into Dir,
 // returning its path.
 func (in Installer) Download(ctx context.Context, progress Progress) (string, error) {
+	if progress == nil {
+		progress = func(string, float64) {}
+	}
 	goos, goarch := in.GOOS, in.GOARCH
 	if goos == "" {
 		goos = runtime.GOOS

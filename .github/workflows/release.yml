@@ -1,8 +1,12 @@
-# A release for every v* tag: the tests, then a self-contained Windows build
-# (tools/release/build.ps1) attached to the GitHub release with its checksum.
-# Tags with a hyphen (v0.2.0-beta.1) are marked as pre-releases.
+# A release for every v* tag: on Windows, Linux and macOS the tests, then a
+# build (tools/release/build.ps1 on Windows, tools/release/build.sh on the
+# others), and the three attached to one GitHub release with their
+# checksums. Tags with a hyphen (v0.2.0-beta.1) are marked as pre-releases.
 #
-#   git tag -a v0.1.0 -m "Forma 0.1.0" && git push origin v0.1.0
+#   git tag -a v0.2.0 -m "Forma 0.2.0" && git push origin v0.2.0
+#
+# Run by hand (workflow_dispatch) it builds all three and keeps them as
+# artifacts, without a release.
 name: Release
 
 on:
@@ -11,12 +15,15 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to build (no release is made; the zip is kept as an artifact)"
+        description: "Version to build (no release is made; the builds are kept as artifacts)"
         required: true
         default: "0.0.0-test"
 
 permissions:
   contents: write
+
+env:
+  VERSION: ${{ github.ref_type == 'tag' && github.ref_name || inputs.version }}
 
 jobs:
   windows:
@@ -42,14 +49,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Version
-        id: v
-        shell: pwsh
-        run: |
-          if ($env:GITHUB_REF_TYPE -eq 'tag') { $v = $env:GITHUB_REF_NAME -replace '^v', '' } else { $v = '${{ inputs.version }}' }
-          "version=$v" >> $env:GITHUB_OUTPUT
-          "pre=$(if ($v -match '-') { 'true' } else { 'false' })" >> $env:GITHUB_OUTPUT
-
       - name: Vet and test
         shell: pwsh
         env:
@@ -60,20 +59,95 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: tools/release/build.ps1 -Version ${{ steps.v.outputs.version }}
+        run: tools/release/build.ps1 -Version ($env:VERSION -replace '^v', '')
 
       - uses: actions/upload-artifact@v7
         with:
-          name: forma-${{ steps.v.outputs.version }}-windows-x64
+          name: windows
           path: dist/*
 
-      - name: Release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v3
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: X11 and OpenGL headers (GLFW)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev \
+            libxinerama-dev libxi-dev libxxf86vm-dev libgl1-mesa-dev
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Vet and test
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          go vet -tags x11 ./...
+          go test -tags x11 ./...
+
+      - name: Build
+        run: bash tools/release/build.sh "${VERSION#v}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux
+          path: dist/*
+
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Vet and test
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Build
+        run: bash tools/release/build.sh "${VERSION#v}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: dist/*
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        id: v
+        run: |
+          cat dist/SHA256SUMS-*.txt > dist/SHA256SUMS.txt
+          cat dist/SHA256SUMS.txt
+          v="${VERSION#v}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if [[ "$v" == *-* ]]; then echo "pre=true" >> "$GITHUB_OUTPUT"; else echo "pre=false" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: softprops/action-gh-release@v3
         with:
           name: Forma ${{ steps.v.outputs.version }}
           prerelease: ${{ steps.v.outputs.pre }}
           generate_release_notes: true
           files: |
             dist/forma-${{ steps.v.outputs.version }}-windows-x64.zip
+            dist/forma-${{ steps.v.outputs.version }}-linux-x64.tar.gz
+            dist/forma-${{ steps.v.outputs.version }}-macos-universal.zip
             dist/SHA256SUMS.txt

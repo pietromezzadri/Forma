@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"unsafe"
 
 	"github.com/ncruces/zenity"
 )
 
 // Native file dialogs: Windows' own Open and Save As windows (zenity: the
-// IFileOpenDialog / IFileSaveDialog COM dialogs), shown on a goroutine of
+// IFileOpenDialog / IFileSaveDialog COM dialogs; on macOS the system's
+// own through osascript, on Linux zenity's or kdialog's), shown on a goroutine of
 // their own and modal to Forma's window, so it keeps drawing; the chosen
 // path comes back to the main loop through post. Captures keep the in-app
 // path box (they must never pop a window up).
@@ -47,9 +47,7 @@ func (a *App) pickFile(save bool, title, button, path string, filters zenity.Fil
 		_ = os.MkdirAll(dir, 0o755) // the dialog falls back elsewhere for a missing folder
 	}
 	opts := []zenity.Option{zenity.Title(title), zenity.Filename(path), filters}
-	if hwnd := a.win.GetWin32Window(); hwnd != nil {
-		opts = append(opts, zenity.Attach(uintptr(unsafe.Pointer(hwnd))))
-	}
+	opts = append(opts, a.dialogOwner()...)
 	if save {
 		opts = append(opts, zenity.ConfirmOverwrite())
 	}

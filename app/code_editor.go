@@ -252,7 +252,10 @@ func vsCode() string {
 	for _, p := range []string{
 		filepath.Join(os.Getenv("LOCALAPPDATA"), "Programs", "Microsoft VS Code", "bin", "code.cmd"),
 		filepath.Join(os.Getenv("ProgramFiles"), "Microsoft VS Code", "bin", "code.cmd"),
-		"/usr/local/bin/code", "/usr/bin/code",
+		"/usr/local/bin/code", "/usr/bin/code", "/snap/bin/code",
+		// a Mac app started from the Finder has no shell PATH
+		"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+		filepath.Join(os.Getenv("HOME"), "Applications", "Visual Studio Code.app", "Contents", "Resources", "app", "bin", "code"),
 	} {
 		if _, err := os.Stat(p); err == nil {
 			return p

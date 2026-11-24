@@ -4,7 +4,7 @@ linked, so it needs no MinGW DLLs) zipped with its fonts and the licence.
 
     tools/release/build.ps1 -Version 0.1.0
 
-writes dist/forma-0.1.0-windows-x64.zip and dist/SHA256SUMS.txt. Run from
+writes dist/forma-0.1.0-windows-x64.zip and dist/SHA256SUMS-windows.txt. Run from
 PowerShell (Git Bash can put the wrong DLLs on the path) with MSYS2's UCRT64
 gcc on PATH. The release workflow (.github/workflows/release.yml) runs it on
 every v* tag.
@@ -45,7 +45,7 @@ Copy-Item LICENSE, README.md $stage
 
 Compress-Archive -Path $stage -DestinationPath "$stage.zip" -CompressionLevel Optimal
 $hash = (Get-FileHash "$stage.zip" -Algorithm SHA256).Hash.ToLower()
-"$hash  $name.zip" | Set-Content -Encoding ascii (Join-Path $dist 'SHA256SUMS.txt')
+"$hash  $name.zip" | Set-Content -Encoding ascii (Join-Path $dist 'SHA256SUMS-windows.txt')
 Remove-Item -Recurse -Force $stage
 
 $size = [math]::Round((Get-Item "$stage.zip").Length / 1MB, 1)

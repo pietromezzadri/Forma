@@ -102,3 +102,39 @@ func TestSetupDownloadsAndInstalls(t *testing.T) {
 		t.Fatalf("missing release: %v", err)
 	}
 }
+
+// The real thing, from Arduino (FORMA_ARDUINO_DOWNLOAD=1; it fetches ~30
+// MB): the release for this system downloaded into an empty folder, as on
+// a fresh machine, and run; and the archives for the other systems Forma
+// is built for are there.
+func TestRealDownload(t *testing.T) {
+	if os.Getenv("FORMA_ARDUINO_DOWNLOAD") == "" {
+		t.Skip("set FORMA_ARDUINO_DOWNLOAD=1 to download arduino-cli from Arduino")
+	}
+	ctx := context.Background()
+	exe, err := Installer{Dir: t.TempDir()}.Download(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTool(ctx, exe, "version")
+	if err != nil || !strings.Contains(string(out), "arduino-cli") {
+		t.Fatalf("%s version: %v %s", exe, err, out)
+	}
+	t.Logf("%s", strings.TrimSpace(string(out)))
+	for _, p := range [][2]string{{"windows", "amd64"}, {"linux", "amd64"}, {"darwin", "arm64"}, {"darwin", "amd64"}} {
+		name, err := Archive(p[0], p[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		req, _ := http.NewRequestWithContext(ctx, "HEAD", BaseURL+"/"+name, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s: %s", name, resp.Status)
+		}
+		t.Logf("%s: %s, %d bytes", name, resp.Status, resp.ContentLength)
+	}
+}
