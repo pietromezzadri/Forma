@@ -882,3 +882,20 @@ What each milestone added, in the order they were built. The current gaps are in
   Test: `doc/chamfer_test.go` (2 and 5 cutting ½·2·5·40 mm³, Swap, 30°
   from a face giving 2·tan 30°, an old chamfer, every edge, a cylinder's
   edge, an angle the faces can't take).
+- **Edge sets with radii of their own** (`EdgeRef.Set`, inputs "Radius 2",
+  "Radius 3"… — "Distance k" for a chamfer; `doc.SetEdgeSize`,
+  `ClearEdgeSet`, `EdgeSets`, `SizeKey`; `app/edgesets_ui.go`, command
+  `fillet.ownsize:<expr>`): a step's edges can be put in sets with a size of
+  their own, picked by their rounds (a rounded edge is gone from the model;
+  its round's face `f<ID>/round:<k>` names it) or as sharp edges added.
+  Ball corners where three edges of one size meet (sets of the same value
+  count as one size). Where sizes differ, the step rounds in passes,
+  largest first (`roundEdges` once a size): their mitres would have touched
+  each other along lines at the corners (both rounds tangent to the same
+  face), which the kernel can't sort out in any order; from the second pass
+  on each edge's round carries on along the edges running smoothly from it
+  that the kernel can round (`brep.TangentChain`, `roundable`), which picks
+  up the arcs the larger rounds left on the faces — rims round uprights
+  rounded larger carry round their corners as tori. Tests:
+  `TestFilletEdgeSets` (two sets at one size still balls; uprights at 8
+  against the exact volume; a set cleared; saved), `TestFilletMixedRadii`.

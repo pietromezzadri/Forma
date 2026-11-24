@@ -74,12 +74,17 @@ new ones as features land.
   curved faces (two cylinders, a cylinder and a sphere), torus or sphere
   edges, a plane meeting a cylinder at a slant, spline edges or the edges
   of revolved or extruded spline faces (M9).
-- **F2 Corner patches** (partly fixed, M19: ball corners): where three
-  rounded edges of one fillet meet at a corner of three flat faces, the
-  corner is the rolling ball's patch, as Fusion makes it. Still mitred:
-  corners where an edge is curved or a face isn't flat, corners of four or
-  more edges, corners of two fillets (radii unequal: no setbacks), a
-  chamfer's corners, and corners whose edges are too short for the ball.
+- **F2 Corner patches** (partly fixed, M19: ball corners; edge sets): where
+  three rounded edges of one size meet at a corner of three flat faces, the
+  corner is the rolling ball's patch, as Fusion makes it. Where sizes
+  differ (edge sets with radii of their own), the larger rounds go first and
+  the smaller carry round the arcs they leave on the faces: uprights larger
+  than the rims give a smooth corner; smaller ones end where they meet the
+  larger rounds, which then meet each other in a mitre (no setback or
+  six-sided vertex blend: that needs a free-form surface the kernel hasn't
+  got). Still mitred too: corners where an edge is curved or a face isn't
+  flat, corners of four or more edges, a chamfer's corners, and corners
+  whose edges are too short for the ball.
 - **F3 Tangent chains aren't followed** (partly fixed: double-clicking an
   edge picks its tangent chain, and box selection picks many edges at
   once). Still: a fillet doesn't carry itself on along tangent edges that
