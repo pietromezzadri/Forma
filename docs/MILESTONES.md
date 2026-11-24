@@ -758,6 +758,14 @@ What each milestone added, in the order they were built. The current gaps are in
 - **A tutorial video** (`captures/tutorial_bowls.json`, recorded with
   FORMA_CAPTURE's `record`): both bowls built in the app's own UI step by
   step with captions; `text.align` (left, centre, right) for scripts.
+- **Linux and macOS builds** (`tools/release/build.sh`, the release workflow's
+  linux and macos jobs and a release job gathering all three): Linux a
+  tar.gz (X11, `-tags x11`), macOS Forma.app with one universal binary
+  (built for arm64 and amd64, joined by lipo), its icon made from the app's
+  PNGs, signed ad hoc, in a zip. The file dialogs' owner window is
+  Windows-only (`dialog_owner_*.go`); VS Code is found in its macOS and
+  Linux places. `arduinocli.TestRealDownload` (`FORMA_ARDUINO_DOWNLOAD=1`)
+  installs arduino-cli from Arduino into an empty folder and runs it.
 - Also: the view cube drew the camera upside down and slid the target off
   the part when a face of it was clicked; the ribbon tightens, drops its
   names, then scrolls in narrow windows; adding an electronics part puts

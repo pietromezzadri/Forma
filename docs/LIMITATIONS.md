@@ -77,8 +77,10 @@ new ones as features land.
 - **F2 No corner patches.** Three rounded edges at one corner meet in mitres
   (the rounds cross), not the ball-shaped corner Fusion makes. Needs a
   spherical (or setback) patch at vertices where three rounds meet.
-- **F3 Tangent chains aren't followed.** Each edge must be picked (picking a
-  face picks all its edges); Fusion follows tangent edges on by itself.
+- **F3 Tangent chains aren't followed** (partly fixed: double-clicking an
+  edge picks its tangent chain, and box selection picks many edges at
+  once). Still: a fillet doesn't carry itself on along tangent edges that
+  weren't picked, as Fusion's does.
 - **F4 Square ends.** A round stops square at an end where no other picked
   edge meets it at an angle. Where the face beyond that end is slanted, it
   leaves a sliver of the sharp edge; where it is carried on into a mitre past
@@ -207,7 +209,8 @@ new ones as features land.
 
 ## App and UI (`app/`)
 
-- ~~U1 No native file dialogs~~ (Windows' own Open / Save As windows now, `app/native_dialog.go`; captures still type paths). Untested on macOS / Linux, where zenity needs zenity or kdialog installed.
+- ~~U1 No native file dialogs~~ (Windows' own Open / Save As windows now, `app/native_dialog.go`; captures still type paths). On macOS they are the system's own (through osascript), on Linux zenity's or kdialog's, which must be installed; off Windows a dialog isn't tied to Forma's window, so it can fall behind it.
+- **U9 macOS and Linux builds are new** (0.2.0). They are built and their tests run on GitHub's runners (macOS on Apple silicon), and the Linux build was run under WSLg; the macOS app hasn't been opened on a real Mac yet. It isn't notarised (right-click → Open the first time). Linux builds are X11 only (Wayland desktops run them through XWayland) and x86-64 only.
 - **U2 Not tried with a real mouse yet:** everything was checked by scripted
   captures; the feel of orbiting, picking, sketching and the gizmo needs a
   real session.

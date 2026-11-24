@@ -144,10 +144,22 @@ What doesn't work yet is listed, with IDs, in
 [docs/LIMITATIONS.md](docs/LIMITATIONS.md). What each milestone added is in
 [docs/MILESTONES.md](docs/MILESTONES.md).
 
+## Downloads
+
+Each [release](https://github.com/pietromezzadri/Forma/releases) has builds
+for Windows (64-bit), macOS (11 or later, one app for Apple silicon and
+Intel) and Linux (x86-64, X11 or XWayland). The macOS app isn't notarised:
+the first time, right-click it and choose Open. On Linux the file dialogs
+need zenity (or kdialog) installed.
+
 ## Building
 
 You need Go 1.26 or newer, a C compiler for cgo (on Windows the MSYS2 MinGW
-gcc works), and OpenGL 4.1.
+gcc works, on macOS Xcode's command line tools), and OpenGL 4.1. On Linux,
+the X11 and OpenGL headers too (Debian and Ubuntu: `libx11-dev libxcursor-dev
+libxrandr-dev libxinerama-dev libxi-dev libxxf86vm-dev libgl1-mesa-dev`), and
+build with `-tags x11` (GLFW builds Wayland support as well unless told
+not to, which wants the Wayland headers).
 
 ```bash
 go run .            # the app
@@ -156,8 +168,9 @@ go vet ./...
 ```
 
 On Windows, run it from PowerShell or cmd. Git Bash can put the wrong DLLs on
-the path. Forma has been developed and tested on Windows only. Native file
-dialogs on macOS and Linux go through zenity and haven't been tried.
+the path. Forma is developed on Windows; the release builds for macOS and
+Linux are made and tested by the release workflow
+(`tools/release/build.sh`), but have had little use yet.
 
 ### Optional checks
 
