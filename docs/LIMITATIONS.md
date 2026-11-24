@@ -107,9 +107,13 @@ new ones as features land.
   piece projected where it lands, so a letter wider than about a sixth of
   the way round sits proud at its edges; on spheres and tori text is only
   projected (a name 30 mm wide on a 40 mm radius is 3–4 % wider at its
-  ends, its walls leaning against the face's normal there). Wrapped
-  raised or engraved letters set so close that their cuts meet fail with
-  a plain message (space them out).
+  ends, its walls leaning against the face's normal there). Each wrapped
+  letter is cut along the normal at its own middle, so neighbours' cuts
+  close in under the surface: engraved neighbours whose cuts meet now go
+  in as one tool, and an inlay's pockets each end at a plane through the
+  axis in the gap between them (a wall stays between them all the way
+  down). Letters kerned so close that one reaches over the other round
+  the face can still fail (with a plain message: space them out).
 - **EM2 One face:** the letters must land on the one face picked; a name
   running over the edge between two faces (a bowl's side and its foot)
   fails ("the letters run off the face").

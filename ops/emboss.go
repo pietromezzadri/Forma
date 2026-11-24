@@ -16,6 +16,7 @@ package ops
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"forma/brep"
@@ -88,8 +89,11 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 	}
 	// each letter's plane and outline: the sketch's own, or wrapped
 	place := func(i int, r sketch.Region, nudge float64) (geom.Frame, sketch.Region, error) { return plane, r, nil }
+	var mid []geom.Vec2
+	var ax geom.Frame
 	if sp.Wrap {
-		ax, ok := revAxisOf(fc.Surf)
+		var ok bool
+		ax, ok = revAxisOf(fc.Surf)
 		if !ok {
 			return nil, nil, fmt.Errorf("wrapping needs a face that goes round an axis (a cylinder, cone, sphere or torus)")
 		}
@@ -98,17 +102,40 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 		}
 		// letters whose outlines (an inlay's pockets: grown) touch go
 		// round together, on one plane at their middle
-		mid := wrapClusters(src, 0, 0)
+		mid = wrapClusters(src, 0, 0)
 		place = func(i int, r sketch.Region, nudge float64) (geom.Frame, sketch.Region, error) {
 			return wrapPlace(fc, ax, plane, r, mid[i], reach, dir, nudge)
 		}
 	}
-	letter := func(i int, r sketch.Region, d0, d1 float64, name string, nudge float64) (*brep.Body, error) {
+	// wrapped, each letter is cut along the normal at its own middle, so
+	// neighbours' cuts close in under the surface; where they would meet,
+	// an inlay's pockets each end at a plane through the axis in the gap
+	// between them (a wall stays between them all the way down), and cut
+	// in letters go in together as one tool (see wrapLimits)
+	var lims []arcLim
+	var meet [][]int
+	rad := 0.0
+	if sp.Wrap && sp.Mode != EmbossRaise && len(src) > 1 {
+		var err error
+		if lims, meet, rad, err = wrapLimits(fc, ax, src, place, sp.Depth+0.2, reach, dir, sp.Mode == EmbossInlay); err != nil {
+			return nil, nil, err
+		}
+	}
+	letter := func(i int, r sketch.Region, d0, d1 float64, name string, nudge, inset float64) (*brep.Body, error) {
 		pl, rr, err := place(i, r, nudge)
 		if err != nil {
 			return nil, err
 		}
-		return letterOn(fc, rr, pl, d0, d1, reach, dir, name)
+		lim := noLim
+		if lims != nil {
+			// an inlay letter keeps its clearance from its pocket's end,
+			// measured where they are closest (at the pocket's floor)
+			lim = lims[i]
+			if ia := inset / math.Max(rad-sp.Depth, 0.5*rad); inset > 0 {
+				lim = arcLim{lim.lo + ia, lim.hi - ia}
+			}
+		}
+		return letterOn(fc, rr, pl, d0, d1, reach, dir, name, lim)
 	}
 	out := b
 	// letters far enough apart go in together, one boolean a group; a group
@@ -128,7 +155,7 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 		d0, d1 := span(0.3*sp.Depth + 0.2)
 		var tools []*brep.Body
 		for _, i := range g {
-			t, err := letter(i, src[i], d0, d1, fmt.Sprintf("letter%d", i+1), 0)
+			t, err := letter(i, src[i], d0, d1, fmt.Sprintf("letter%d", i+1), 0, 0)
 			if err != nil {
 				return nil, nil, fmt.Errorf("letter %d: %v", i+1, err)
 			}
@@ -151,6 +178,50 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 		}
 	}
 	nudges := make([]float64, len(src)) // a wrapped letter's turn round the axis, as it went in
+	{
+		// neighbours whose cuts meet and can't be parted go in as one tool
+		var err error
+		for _, g := range meet {
+			var gerr error
+			ok := false
+			for k, over := range []float64{1, 1.17, 1.41, 1.73} {
+				nudge := float64(k) * 2e-4
+				planes := make([]geom.Frame, len(g))
+				rs := make([]sketch.Region, len(g))
+				for j, i := range g {
+					if planes[j], rs[j], err = place(i, src[i], nudge); err != nil {
+						return nil, nil, fmt.Errorf("letter %d: %v", i+1, err)
+					}
+				}
+				d0, d1 := span(over * (0.3*sp.Depth + 0.2))
+				var t, res *brep.Body
+				if t, gerr = lettersOn(fc, rs, planes, d0, d1, reach, dir, fmt.Sprintf("letter%d", g[0]+1)); gerr != nil {
+					if gerr == ErrOffSide {
+						return nil, nil, fmt.Errorf("letter %d: %v", g[0]+1, gerr)
+					}
+					continue
+				}
+				if res, gerr = brep.Boolean(out, t, op); gerr != nil {
+					continue
+				}
+				out, ok = res, true
+				if done == nil {
+					done = make([]bool, len(src))
+				}
+				for _, i := range g {
+					done[i], nudges[i] = true, nudge
+				}
+				break
+			}
+			if !ok {
+				why := ""
+				if gerr != nil && !strings.HasPrefix(gerr.Error(), "boolean") {
+					why = " (" + gerr.Error() + ")" // a plain reason; the kernel's own failures are no help here
+				}
+				return nil, nil, fmt.Errorf("letters %d to %d: their cuts meet under the face and could not be cut together%s: space the letters out, make them smaller, the clearance or depth smaller, or raise them", g[0]+1, g[len(g)-1]+1, why)
+			}
+		}
+	}
 	for i, r := range src {
 		if done != nil && done[i] {
 			continue
@@ -169,7 +240,10 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 			}
 			d0, d1 := span(over * (0.3*sp.Depth + 0.2))
 			var t, res *brep.Body
-			t, err = letter(i, r, d0, d1, fmt.Sprintf("letter%d", i+1), nudges[i])
+			t, err = letter(i, r, d0, d1, fmt.Sprintf("letter%d", i+1), nudges[i], 0)
+			if err != nil && strings.HasPrefix(err.Error(), "boolean") {
+				continue // the letter itself tripped the kernel: the next try moves it
+			}
 			if err != nil {
 				return nil, nil, fmt.Errorf("letter %d: %v", i+1, err)
 			}
@@ -180,9 +254,9 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 			}
 		}
 		if err != nil && sp.Wrap && sp.Mode != EmbossRaise {
-			// wrapped, each letter is cut along the normal at its own
-			// middle, so a neighbour's cut converges on it in the material
-			return nil, nil, fmt.Errorf("letter %d: its cut meets its neighbour's in the face (wrapped letters are cut along their own normals): space the letters out, make the clearance or depth smaller, or raise them (%v)", i+1, err)
+			// (neighbours whose cuts would meet were parted or cut together
+			// above: what is left is the kernel failing on this letter)
+			return nil, nil, fmt.Errorf("letter %d couldn't be cut into the face (the geometry kernel failed on it): space the letters out a little, change their size or depth, or raise them", i+1)
 		}
 		if err != nil {
 			return nil, nil, fmt.Errorf("letter %d: %v", i+1, err)
@@ -197,7 +271,7 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 		// a letter goes on as its pocket did: grown letters that touch
 		// make one pocket, so the pocket is the one holding its middle
 		k := pocketOf(r, src, i)
-		l, err := letter(k, r, -(sp.Depth - sp.Clearance), 0, fmt.Sprintf("inlay%d", i+1), nudges[k])
+		l, err := letter(k, r, -(sp.Depth - sp.Clearance), 0, fmt.Sprintf("inlay%d", i+1), nudges[k], sp.Clearance)
 		if err != nil {
 			return nil, nil, fmt.Errorf("inlay %d: %v", i+1, err)
 		}
@@ -207,8 +281,9 @@ func EmbossFace(b *brep.Body, fc *brep.Face, regs, grown []sketch.Region, plane 
 }
 
 // letterOn is region r's prism (along plane's normal) within the layer of
-// face fc from d0 to d1 along its outward normal.
-func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, dir float64, name string) (*brep.Body, error) {
+// face fc from d0 to d1 along its outward normal, round a face of
+// revolution only within lim (angles round its axis).
+func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, dir float64, name string, lim arcLim) (*brep.Body, error) {
 	pts := footprint(r)
 	hits, err := landOn(fc, pts, plane, reach, dir)
 	if err != nil {
@@ -226,7 +301,7 @@ func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, d
 			if t, ok := crossAlong(fc.Surf, plane.At2(r.Outer[0].A), plane.Z, guess, reach); ok {
 				l, err := ExtrudeBetween(name, tidyRegion(r, 0.15), plane, s0, s1, t)
 				offSide = err != nil && strings.Contains(err.Error(), "doesn't reach")
-				if err == nil && brep.Check(l) == nil {
+				if err == nil && brep.Check(l) == nil && lim.holds(fc, l) {
 					nameFaces(l, name)
 					return l, nil
 				}
@@ -239,7 +314,7 @@ func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, d
 		return nil, ErrOffSide
 	}
 	// else as the prism cut down to the layer
-	layer, err := faceLayer(fc, hits, d0, d1, margin)
+	layer, err := faceLayer(fc, hits, d0, d1, margin, lim)
 	if err != nil {
 		return nil, err
 	}
@@ -251,11 +326,18 @@ func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, d
 		t := c.Sub(plane.O).Dot(plane.Z)
 		lo, hi = math.Min(lo, t), math.Max(hi, t)
 	}
-	prism, err := Extrude(name, tidyRegion(r, 0.15), plane, lo-1, hi+1)
-	if err != nil {
-		return nil, err
+	// (a boolean can trip where the prism's ends happen to fall: a little
+	// longer moves them)
+	var l *brep.Body
+	for _, ext := range []float64{1, 1.37, 1.83} {
+		var prism *brep.Body
+		if prism, err = Extrude(name, tidyRegion(r, 0.15), plane, lo-ext, hi+ext); err != nil {
+			return nil, err
+		}
+		if l, err = brep.Boolean(prism, layer, brep.Intersect); err == nil || err == brep.ErrEmpty {
+			break
+		}
 	}
-	l, err := brep.Boolean(prism, layer, brep.Intersect)
 	if err == brep.ErrEmpty {
 		return nil, fmt.Errorf("it misses the face")
 	}
@@ -276,17 +358,9 @@ func letterOn(fc *brep.Face, r sketch.Region, plane geom.Frame, d0, d1, reach, d
 // the axis by x / radius, and the letter moved back by x along it.
 func wrapPlace(fc *brep.Face, ax, plane geom.Frame, r sketch.Region, mid geom.Vec2, reach, dir, nudge float64) (geom.Frame, sketch.Region, error) {
 	cx, cy := mid.X, mid.Y
-	// the face's radius where the letter's middle would land (at x = 0)
-	q := plane.At2(geom.V2(0, cy))
-	t, ok := crossAlong(fc.Surf, q, plane.Z.Scale(dir), 0, reach)
-	if !ok {
-		return plane, r, ErrOffSide
-	}
-	hit := q.Add(plane.Z.Scale(dir * t))
-	rel := hit.Sub(ax.O)
-	rad := rel.Sub(ax.Z.Scale(rel.Dot(ax.Z))).Len()
-	if rad < 1e-6 {
-		return plane, r, fmt.Errorf("it lands on the face's axis, where nothing wraps")
+	rad, rel, err := wrapRadius(fc, ax, plane, cy, reach, dir)
+	if err != nil {
+		return plane, r, err
 	}
 	// turning about the axis carries the plane's X along the round: which
 	// way is +X?
@@ -302,6 +376,243 @@ func wrapPlace(fc *brep.Face, ax, plane geom.Frame, r sketch.Region, mid geom.Ve
 	}
 	pl := geom.Frame{O: ax.O.Add(rot(plane.O.Sub(ax.O))), X: rot(plane.X), Y: rot(plane.Y), Z: rot(plane.Z)}
 	return pl, shiftRegion(r, geom.V2(-cx, 0)), nil
+}
+
+// wrapRadius is the face's radius where a point of the sketch at height y
+// on its middle line (x = 0) lands, and the way out to it from the axis.
+func wrapRadius(fc *brep.Face, ax, plane geom.Frame, y, reach, dir float64) (float64, geom.Vec3, error) {
+	q := plane.At2(geom.V2(0, y))
+	t, ok := crossAlong(fc.Surf, q, plane.Z.Scale(dir), 0, reach)
+	if !ok {
+		return 0, geom.Vec3{}, ErrOffSide
+	}
+	hit := q.Add(plane.Z.Scale(dir * t))
+	rel := hit.Sub(ax.O)
+	rad := rel.Sub(ax.Z.Scale(rel.Dot(ax.Z))).Len()
+	if rad < 1e-6 {
+		return 0, rel, fmt.Errorf("it lands on the face's axis, where nothing wraps")
+	}
+	return rad, rel, nil
+}
+
+// lettersOn is one tool for wrapped letters whose cuts meet under the
+// surface: each letter's prism along its own plane's normal, the prisms
+// joined, then cut down to one layer of the face from d0 to d1 under them
+// all. Cut one by one, each letter's floor lay on the same surface as its
+// neighbour's where they met, and the boolean could not sort the two out.
+func lettersOn(fc *brep.Face, rs []sketch.Region, planes []geom.Frame, d0, d1, reach, dir float64, name string) (*brep.Body, error) {
+	var all []geom.Vec3
+	var tool *brep.Body
+	lo := make([]float64, len(rs))
+	hi := make([]float64, len(rs))
+	for i, r := range rs {
+		pl := planes[i]
+		hits, err := landOn(fc, footprint(r), pl, reach, dir)
+		if err != nil {
+			return nil, err
+		}
+		if err := onFace(fc, hits); err != nil {
+			return nil, err
+		}
+		all = append(all, hits...)
+		// along its normal from past the layer's outside to past its inside
+		// (the plane touches the face at the letter: never near its far side)
+		lo[i], hi[i] = math.Inf(1), math.Inf(-1)
+		for _, h := range hits {
+			t := h.Sub(pl.O).Dot(pl.Z)
+			lo[i], hi[i] = math.Min(lo[i], t), math.Max(hi[i], t)
+		}
+	}
+	// letters put round together share a plane: their prisms reach just as
+	// far, so their ends are one plane (prisms ending a hair apart don't join)
+	for i := range rs {
+		for j := range rs {
+			if planes[i].O.Dist(planes[j].O) < 1e-9 && planes[i].Z.Dist(planes[j].Z) < 1e-9 {
+				lo[i], hi[i] = math.Min(lo[i], lo[j]), math.Max(hi[i], hi[j])
+			}
+		}
+	}
+	for i, r := range rs {
+		a := math.Abs(d0) + math.Abs(d1) + 1
+		p, err := Extrude(name, tidyRegion(r, 0.15), planes[i], lo[i]-a, hi[i]+a)
+		if err != nil {
+			return nil, err
+		}
+		if tool == nil {
+			tool = p
+			continue
+		}
+		if tool, err = brep.Boolean(tool, p, brep.Union); err != nil {
+			return nil, err
+		}
+	}
+	// inward the prisms spread round by about depth / radius of their width:
+	// a margin of the depth is plenty (a wide one went too far round small faces)
+	layer, err := faceLayer(fc, all, d0, d1, (d1-d0)+0.5, noLim)
+	if err != nil {
+		return nil, err
+	}
+	l, err := brep.Boolean(tool, layer, brep.Intersect)
+	if err != nil {
+		return nil, err
+	}
+	l.Name = name
+	nameFaces(l, name)
+	return l, nil
+}
+
+// arcLim bounds a letter round a face of revolution: the angles round its
+// axis (as faceLayer measures them) it stays within.
+type arcLim struct{ lo, hi float64 }
+
+var noLim = arcLim{math.Inf(-1), math.Inf(1)}
+
+// holds: body l stays within the limits (always, with none).
+func (lim arcLim) holds(fc *brep.Face, l *brep.Body) bool {
+	if math.IsInf(lim.lo, -1) && math.IsInf(lim.hi, 1) {
+		return true
+	}
+	ax, ok := revAxisOf(fc.Surf)
+	if !ok {
+		return true
+	}
+	mid := lim.lo
+	if math.IsInf(mid, -1) {
+		mid = lim.hi
+	} else if !math.IsInf(lim.hi, 1) {
+		mid = (lim.lo + lim.hi) / 2
+	}
+	m := brep.Tessellate(l, brep.DefaultMeshOptions(l))
+	for _, p := range m.Pos {
+		q := ax.ToLocal(p)
+		th := mid + math.Remainder(math.Atan2(q.Y, q.X)-mid, 2*math.Pi)
+		if th < lim.lo-1e-9 || th > lim.hi+1e-9 {
+			return false
+		}
+	}
+	return true
+}
+
+// wrapLimits finds, for wrapped letters cut into a face, the neighbours
+// whose cuts (each along the normal at its own middle) would close in on
+// each other within into of the surface by more than half the gap between
+// them. With part, each such pair is parted at the middle of the gap: each
+// letter ends a quarter of the gap short of it, at a plane through the
+// axis (a radial wall stays between them, and their cuts never cross);
+// neighbours one of which reaches over the other round the face (kerned
+// close) can't be parted so. Those, and without part all such neighbours,
+// are returned as groups to cut as one tool (the kernel joins two plain
+// letters' crossing cuts more surely; an inlay's grown pockets it parts
+// more surely). rad is the face's mean radius under the letters.
+func wrapLimits(fc *brep.Face, ax geom.Frame, rs []sketch.Region, place func(int, sketch.Region, float64) (geom.Frame, sketch.Region, error), into, reach, dir float64, part bool) ([]arcLim, [][]int, float64, error) {
+	n := len(rs)
+	lo := make([]float64, n)
+	hi := make([]float64, n)
+	ok := make([]bool, n)
+	sx := make([]float64, n) // where each is along the sketch's X
+	rsum, rn := 0.0, 0
+	for i, r := range rs {
+		pl, rr, err := place(i, r, 0)
+		if err != nil {
+			continue // letterOn says what is wrong with it
+		}
+		hits, err := landOn(fc, footprint(rr), pl, reach, dir)
+		if err != nil {
+			continue
+		}
+		// angles round the axis measured on from the letter's own first
+		// point, so one lying across the back (where they jump by a turn)
+		// stays in one piece
+		th0, have := 0.0, false
+		lo[i], hi[i] = math.Inf(1), math.Inf(-1)
+		for _, h := range hits {
+			l := ax.ToLocal(h)
+			th := math.Atan2(l.Y, l.X)
+			if !have {
+				th0, have = th, true
+			}
+			th = th0 + math.Remainder(th-th0, 2*math.Pi)
+			lo[i], hi[i] = math.Min(lo[i], th), math.Max(hi[i], th)
+			rsum += math.Hypot(l.X, l.Y)
+			rn++
+		}
+		ok[i] = len(hits) > 0
+		for _, p := range footprint(r) {
+			sx[i] += p.X / float64(len(footprint(r)))
+		}
+	}
+	lims := make([]arcLim, n)
+	for i := range lims {
+		lims[i] = noLim
+	}
+	if rn == 0 {
+		return lims, nil, 0, nil
+	}
+	rad := rsum / float64(rn)
+	// the letters in the sketch's order, each turned by whole turns to
+	// follow on from the one before (text can go more than half round)
+	var seq []int
+	for i := range rs {
+		if ok[i] {
+			seq = append(seq, i)
+		}
+	}
+	sort.Slice(seq, func(a, b int) bool { return sx[seq[a]] < sx[seq[b]] })
+	for k := 1; k < len(seq); k++ {
+		p, i := seq[k-1], seq[k]
+		cp, ci := (lo[p]+hi[p])/2, (lo[i]+hi[i])/2
+		sh := cp + math.Remainder(ci-cp, 2*math.Pi) - ci
+		lo[i], hi[i] = lo[i]+sh, hi[i]+sh
+	}
+	var order []int
+	for i := range rs {
+		if ok[i] {
+			order = append(order, i)
+		}
+	}
+	sort.Slice(order, func(a, b int) bool { return lo[order[a]]+hi[order[a]] < lo[order[b]]+hi[order[b]] })
+	parent := make([]int, n)
+	for i := range parent {
+		parent[i] = i
+	}
+	find := func(i int) int {
+		for parent[i] != i {
+			i = parent[i]
+		}
+		return i
+	}
+	for k := 0; k+1 < len(order); k++ {
+		a, b := order[k], order[k+1]
+		gap := (lo[b] - hi[a]) * rad                           // round the face, at the surface
+		dc := ((lo[b] + hi[b]) - (lo[a] + hi[a])) / 2          // how far apart their normals turn
+		closes := into * math.Tan(math.Min(math.Abs(dc), 1.3)) // how far their cuts close in, that deep
+		if closes <= 0.5*gap {
+			continue
+		}
+		if gap < 0.05 || !part {
+			parent[find(a)] = find(b)
+			continue
+		}
+		m, q := (hi[a]+lo[b])/2, (lo[b]-hi[a])/4
+		lims[a].hi = math.Min(lims[a].hi, m-q)
+		lims[b].lo = math.Max(lims[b].lo, m+q)
+	}
+	groups := map[int][]int{}
+	var roots []int
+	for i := range rs {
+		r := find(i)
+		if _, seen := groups[r]; !seen {
+			roots = append(roots, r)
+		}
+		groups[r] = append(groups[r], i)
+	}
+	var meet [][]int
+	for _, r := range roots {
+		if len(groups[r]) > 1 {
+			meet = append(meet, groups[r])
+		}
+	}
+	return lims, meet, rad, nil
 }
 
 // pocketOf is the index of the pocket (a grown region) that holds letter
@@ -342,6 +653,28 @@ func inPoly(p geom.Vec2, poly []geom.Vec2) bool {
 // of radius rad, each along the normal at its middle, would meet.
 func wrapClusters(rs []sketch.Region, into, rad float64) []geom.Vec2 {
 	n := len(rs)
+	root, lo, hi := nearRoots(rs, into, rad)
+	clo, chi := map[int]geom.Vec2{}, map[int]geom.Vec2{}
+	for i := 0; i < n; i++ {
+		c := root[i]
+		if _, ok := clo[c]; !ok {
+			clo[c], chi[c] = lo[i], hi[i]
+		}
+		clo[c] = geom.V2(math.Min(clo[c].X, lo[i].X), math.Min(clo[c].Y, lo[i].Y))
+		chi[c] = geom.V2(math.Max(chi[c].X, hi[i].X), math.Max(chi[c].Y, hi[i].Y))
+	}
+	out := make([]geom.Vec2, n)
+	for i := 0; i < n; i++ {
+		c := root[i]
+		out[i] = clo[c].Add(chi[c]).Scale(0.5)
+	}
+	return out
+}
+
+// nearRoots joins the regions near each other: each one's group (a root
+// index) and its box.
+func nearRoots(rs []sketch.Region, into, rad float64) ([]int, []geom.Vec2, []geom.Vec2) {
+	n := len(rs)
 	polys := make([][]geom.Vec2, n)
 	lo := make([]geom.Vec2, n)
 	hi := make([]geom.Vec2, n)
@@ -371,7 +704,7 @@ func wrapClusters(rs []sketch.Region, into, rad float64) []geom.Vec2 {
 			near := touch
 			if into > 0 && rad > 0 {
 				dth := math.Abs((lo[i].X+hi[i].X)/2-(lo[j].X+hi[j].X)/2) / rad
-				near += into * dth
+				near += into * math.Tan(math.Min(dth, 1.3)) // the normals d θ apart close in by about tan θ a unit
 			}
 			if lo[i].X > hi[j].X+near || lo[j].X > hi[i].X+near || lo[i].Y > hi[j].Y+near || lo[j].Y > hi[i].Y+near {
 				continue
@@ -381,21 +714,11 @@ func wrapClusters(rs []sketch.Region, into, rad float64) []geom.Vec2 {
 			}
 		}
 	}
-	clo, chi := map[int]geom.Vec2{}, map[int]geom.Vec2{}
-	for i := 0; i < n; i++ {
-		c := find(i)
-		if _, ok := clo[c]; !ok {
-			clo[c], chi[c] = lo[i], hi[i]
-		}
-		clo[c] = geom.V2(math.Min(clo[c].X, lo[i].X), math.Min(clo[c].Y, lo[i].Y))
-		chi[c] = geom.V2(math.Max(chi[c].X, hi[i].X), math.Max(chi[c].Y, hi[i].Y))
+	root := make([]int, n)
+	for i := range root {
+		root[i] = find(i)
 	}
-	out := make([]geom.Vec2, n)
-	for i := 0; i < n; i++ {
-		c := find(i)
-		out[i] = clo[c].Add(chi[c]).Scale(0.5)
-	}
-	return out
+	return root, lo, hi
 }
 
 // polysTouch: two closed polygons come within d of each other (or one
@@ -623,7 +946,7 @@ func landOn(fc *brep.Face, pts []geom.Vec2, plane geom.Frame, reach, dir float64
 // faceLayer is the solid between face fc's surface moved d0 and d1 along
 // its outward normal, over the patch round the points (on it) and margin
 // more.
-func faceLayer(fc *brep.Face, hits []geom.Vec3, d0, d1, margin float64) (*brep.Body, error) {
+func faceLayer(fc *brep.Face, hits []geom.Vec3, d0, d1, margin float64, lim arcLim) (*brep.Body, error) {
 	sign := 1.0
 	if fc.Reversed {
 		sign = -1
@@ -676,6 +999,15 @@ func faceLayer(fc *brep.Face, hits []geom.Vec3, d0, d1, margin float64) (*brep.B
 	du := margin / math.Max(rmin, margin)
 	dv := margin / math.Max(sv, 1e-9)
 	u0, u1 = u0-du, u1+du
+	if !math.IsInf(lim.lo, -1) {
+		u0 = math.Max(u0, us[0]+math.Remainder(lim.lo-us[0], 2*math.Pi))
+	}
+	if !math.IsInf(lim.hi, 1) {
+		u1 = math.Min(u1, us[0]+math.Remainder(lim.hi-us[0], 2*math.Pi))
+	}
+	if u1 <= u0 {
+		return nil, fmt.Errorf("no room for it between its neighbours")
+	}
 	if u1-u0 > 1.7*math.Pi {
 		return nil, fmt.Errorf("the letters go too far round the face")
 	}
