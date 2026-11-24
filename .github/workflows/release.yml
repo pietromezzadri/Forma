@@ -98,7 +98,10 @@ jobs:
           path: dist/*
 
   macos:
-    runs-on: macos-latest
+    # an Intel Mac: GitHub's Apple-silicon runners are short and a job
+    # waiting for one is dropped after 15 minutes; build.sh makes the arm64
+    # half of the universal binary there too (clang targets both)
+    runs-on: macos-15-intel
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
