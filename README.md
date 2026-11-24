@@ -100,6 +100,13 @@ as PDF, SVG or DXF.</td>
 - **Assemblies.** Components from other `.forma` files; rigid, revolute,
   slider and cylindrical joints with motion and limits; grounding;
   interference checks; a bill of materials (CSV) and an exploded view.
+- **Screws.** ISO metric screws as components: socket head cap (ISO 4762),
+  button head (ISO 7380), countersunk (ISO 10642) and hex head (ISO 4017),
+  M2 to M12 at their standard lengths, built from the standards' tables;
+  their size and length are changed in Properties. With a hole's rim
+  selected, a screw goes into that hole. Holes can be made for a screw:
+  clearance (close, normal or loose, ISO 273) or tapped, counterbored or
+  countersunk to take the screw's head.
 - **Inspect.** Measuring, mass properties and section views.
 - **Stress analysis.** A part meshed with 10-node tetrahedra, faces held
   fixed or loaded by a force or a pressure, a material from a list, and
@@ -315,13 +322,12 @@ PNGs to `captures/out/`. The images above come from that script. See
   corners). Left: blended corners where smaller rounds meet larger ones
   (mitred now), corners of curved faces or of more than three edges, more
   kinds of edges ([F1–F5](docs/LIMITATIONS.md)).
-- **M20 screws and threaded holes** (planned): a fastener library of
-  screws (ISO metric to begin with: socket head, button head, countersunk,
-  hex) inserted as components; threaded holes made to fit them, plain,
-  counterbored or countersunk (the countersink's angle chosen), with the
-  thread modelled or shown as a cosmetic thread; a screw dropped into a
-  hole is placed and jointed in it, and shown on drawings as a hole
-  callout ([H1](docs/LIMITATIONS.md)).
+- **M20 screws and threaded holes** (in progress): ISO metric screws (socket
+  head, button head, countersunk, hex) as components, M2 to M12, and holes
+  made for them — clearance or tapped, counterbored or countersunk for the
+  head — with a screw placed in a selected hole (done). Left: the screw
+  jointed in its hole, threads shown on drawings with a hole callout, modelled
+  threads, washers and nuts ([H1, FS1–FS4](docs/LIMITATIONS.md)).
 
 ## Stack
 

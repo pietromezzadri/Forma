@@ -167,6 +167,7 @@ new ones as features land.
 
 - **H1 Holes:** no threads (cosmetic or modelled; planned in M20), the countersink is always
   90° and the drill point 118°; holes go square into the sketch's face only.
+  A hole made for a screw takes its diameters from the tables (FS3).
 - **P1 Linear patterns** run along X, Y or Z only (not along an edge or a
   sketch line); no pattern along a path; no skipping instances.
 - **P2 Feature patterns and mirrors** repeat features that add or cut a shape
@@ -175,6 +176,24 @@ new ones as features land.
   jump near a 90° turn about Y (gimbal lock); the gizmo works in world axes
   only. Scale is uniform (a body scaled unevenly would turn circles into
   ellipses), and components can't be scaled.
+
+## Screws (`doc/fasteners.go`, `app/fasteners_ui.go`; M20)
+
+- **FS1 No threads:** a screw's shank is a plain cylinder at the nominal
+  diameter, and a tapped hole is drilled at the tap size: no thread is
+  modelled or drawn yet (planned: cosmetic threads and hole callouts on
+  drawings, then modelled threads).
+- **FS2 Placed, not jointed:** a screw put in a selected hole is moved and
+  turned there once; it isn't jointed, so it doesn't follow the hole if the
+  part moves or the hole is edited (planned).
+- **FS3 Sizes and shapes:** ISO metric coarse M2 to M12 only (button and
+  countersunk heads from M3); heads are simplified — a hex head without its
+  chamfer or washer face, a button head a spherical cap, a socket's bottom
+  flat — and lengths are the standard ones. Counterbores are DIN 974-1's
+  diameter and the head's height plus 0.4 mm deep; countersinks the
+  countersunk head's diameter plus 0.2 mm, 90°.
+- **FS4 Only screws:** no washers, nuts, inserts, inch sizes or other
+  standards yet.
 
 ## Measure, mass properties, section
 

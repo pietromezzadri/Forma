@@ -908,3 +908,29 @@ What each milestone added, in the order they were built. The current gaps are in
   loop now; the extra edges' rounds are numbered after the step's own.
   Test: `TestFilletTangentChain` (the rim with the chain, one edge without
   it or from before the option, a chamfer's chain).
+
+## M20: screws and threaded holes (in progress)
+
+- **Screws** (`doc/fasteners.go`: `ScrewStds`, `ScrewSpec`, `ScrewDesign`,
+  `NewScrew`; `app/fasteners_ui.go`, command `assemble.screw[:<std>,<size>,
+  <length>]`, the Screw button in Assemble): ISO 4762 socket head cap, ISO
+  7380 button head, ISO 10642 countersunk and ISO 4017 hex head screws, M2
+  to M12 (coarse pitch) at their standard lengths, dimensions from the
+  standards' tables. A screw is a component whose design is generated from
+  its inputs (Screw, Size, Length; `buildComponent` rebuilds it), so editing
+  them in Properties rebuilds it, and joints, explodes and the parts list
+  take it as they are (two of the same are one row). Its frame: the axis
+  along Z, the bearing face at z = 0 (a countersunk head: its top), the
+  shank down to −Length. With a hole's rim selected (a circle with a flat
+  face beside it), the screw is placed there, along the face's normal, and
+  takes the size the hole was made for.
+- **Holes for screws** (hole inputs Screw, Fit; `ScrewHoleSizes`): a hole
+  made for a size takes its diameter from the tables — clearance close /
+  normal / loose (ISO 273) or the tap drill (nominal less one pitch) — and
+  a counterbore or countersink sized for the screw's head.
+- Tests: `doc/fasteners_test.go` (64 screws, every standard and size at two
+  lengths, valid and as big as their parts; a screw component named,
+  moved, resized and counted in the parts list; an M5 counterbored hole
+  cutting the tables' volume with an M5×16 sitting in it touching nothing,
+  a tapped and a countersunk hole's sizes). Capture: two countersunk screws
+  dropped into countersunk holes.
