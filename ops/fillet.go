@@ -22,7 +22,15 @@ import (
 // rounded edge meets it, so the two meet in a mitre); elsewhere it stops
 // square at the end.
 func EdgeTool(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool) (*brep.Body, brep.BoolOp, error) {
-	if size <= geom.Tol {
+	return EdgeToolSet(e, size, size, chamfer, k, ext, [2]float64{})
+}
+
+// EdgeToolSet is EdgeTool with a chamfer's two distances — size back along
+// the face of e.HE[0], size2 along the face of e.HE[1] (a round uses size)
+// — and the round stopping set[i] short of vertex i (a ball corner takes
+// over there; only straight edges can stop short).
+func EdgeToolSet(e *brep.Edge, size, size2 float64, chamfer bool, k int, ext [2]bool, set [2]float64) (*brep.Body, brep.BoolOp, error) {
+	if size <= geom.Tol || (chamfer && size2 <= geom.Tol) {
 		return nil, 0, fmt.Errorf("size must be more than 0")
 	}
 	if e.HE[0] == nil || e.HE[1] == nil {
@@ -38,9 +46,12 @@ func EdgeTool(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool) (*br
 	case ok1 && ok2:
 		_ = p1
 		_ = p2
-		return straightTool(e, size, chamfer, k, ext)
+		return straightToolSet(e, size, size2, chamfer, k, ext, set)
 	case ok1 || ok2:
-		return circleTool(e, size, chamfer, k, ext)
+		if set != [2]float64{} {
+			return nil, 0, fmt.Errorf("edge %d: only straight edges can stop short of a corner", e.ID)
+		}
+		return circleTool(e, size, size2, chamfer, k, ext)
 	}
 	return nil, 0, fmt.Errorf("only edges where a flat face meets a flat face, a cylinder or a cone can be %s", verb(chamfer))
 }
@@ -83,8 +94,9 @@ func nearAngle(c geom.Circle, e *brep.Edge, p geom.Vec3) float64 {
 }
 
 // cornerRegion is the 2D region between the corner p, the two faces'
-// directions u1, u2 (unit, at angle α < π) and the round (or chamfer).
-func cornerRegion(p, u1, u2 geom.Vec2, size float64, chamfer bool, src int) (sketch.Region, error) {
+// directions u1, u2 (unit, at angle α < π) and the round (or chamfer: size
+// back along u1, size2 along u2; a round uses size).
+func cornerRegion(p, u1, u2 geom.Vec2, size, size2 float64, chamfer bool, src int) (sketch.Region, error) {
 	cos := u1.Dot(u2)
 	alpha := math.Acos(math.Max(-1, math.Min(1, cos)))
 	if alpha < 1e-3 || alpha > math.Pi-1e-3 {
@@ -93,10 +105,11 @@ func cornerRegion(p, u1, u2 geom.Vec2, size float64, chamfer bool, src int) (ske
 	ccw := u1.Cross(u2) > 0
 	if !ccw {
 		u1, u2 = u2, u1
+		size, size2 = size2, size
 	}
 	var segs []sketch.Seg
 	if chamfer {
-		t1, t2 := p.Add(u1.Scale(size)), p.Add(u2.Scale(size))
+		t1, t2 := p.Add(u1.Scale(size)), p.Add(u2.Scale(size2))
 		segs = []sketch.Seg{{A: p, B: t1, Src: src}, {A: t1, B: t2, Src: src + 1}, {A: t2, B: p, Src: src + 2}}
 	} else {
 		d := size / math.Tan(alpha/2)
@@ -120,12 +133,12 @@ func convex(h1, h2 *brep.HalfEdge, p geom.Vec3) bool {
 }
 
 func straightTool(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool) (*brep.Body, brep.BoolOp, error) {
-	return straightToolSet(e, size, chamfer, k, ext, [2]float64{})
+	return straightToolSet(e, size, size, chamfer, k, ext, [2]float64{})
 }
 
 // straightToolSet is straightTool stopping set[i] short of vertex i (where
 // a corner patch takes over).
-func straightToolSet(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool, set [2]float64) (*brep.Body, brep.BoolOp, error) {
+func straightToolSet(e *brep.Edge, size, size2 float64, chamfer bool, k int, ext [2]bool, set [2]float64) (*brep.Body, brep.BoolOp, error) {
 	a, b := e.Verts[0].P, e.Verts[1].P
 	L := a.Dist(b)
 	if L < geom.Tol {
@@ -143,7 +156,7 @@ func straightToolSet(e *brep.Edge, size float64, chamfer bool, k int, ext [2]boo
 	X := u1
 	Y := u2.Sub(X.Scale(u2.Dot(X))).Norm()
 	fr := geom.Frame{O: a, X: X, Y: Y, Z: X.Cross(Y)}
-	reg, err := cornerRegion(geom.Vec2{}, geom.V2(1, 0), geom.V2(u2.Dot(X), u2.Dot(Y)), size, chamfer, 1)
+	reg, err := cornerRegion(geom.Vec2{}, geom.V2(1, 0), geom.V2(u2.Dot(X), u2.Dot(Y)), size, size2, chamfer, 1)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -185,7 +198,7 @@ func lineDist(a, b, p geom.Vec3) float64 {
 
 // circleTool rounds the circle (or arc) where a flat face meets a cylinder
 // or cone whose axis is square to it.
-func circleTool(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool) (*brep.Body, brep.BoolOp, error) {
+func circleTool(e *brep.Edge, size, size2 float64, chamfer bool, k int, ext [2]bool) (*brep.Body, brep.BoolOp, error) {
 	var axis geom.Frame
 	var plane geom.Plane
 	var curved geom.Surface
@@ -226,7 +239,7 @@ func circleTool(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool) (*
 	u1 := to2(sideDir(e.HE[0], mid))
 	u2 := to2(sideDir(e.HE[1], mid))
 	cut := convex(e.HE[0], e.HE[1], mid)
-	reg, err := cornerRegion(geom.V2(R, 0), u1, u2, size, chamfer, 1)
+	reg, err := cornerRegion(geom.V2(R, 0), u1, u2, size, size2, chamfer, 1)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -301,4 +314,25 @@ func nameTool(b *brep.Body, chamfer bool, k int) {
 			f.Name = fmt.Sprintf("tool:%d:%s", k, f.Name)
 		}
 	}
+}
+
+// ChamferSecond is the second distance of a chamfer given by a distance d
+// along the face of e.HE[0] and the angle th (radians) the chamfer makes
+// with that face: by the sine rule in the triangle the chamfer cuts off,
+// with α the angle between the faces at the edge, d·sin θ / sin(α + θ).
+func ChamferSecond(e *brep.Edge, d, th float64) (float64, error) {
+	if e.HE[0] == nil || e.HE[1] == nil {
+		return 0, fmt.Errorf("edge %d is open", e.ID)
+	}
+	if th <= 0 || th >= math.Pi {
+		return 0, fmt.Errorf("the angle must be between 0° and 180°")
+	}
+	mid := e.Curve.Eval((e.T0 + e.T1) / 2)
+	u1, u2 := sideDir(e.HE[0], mid), sideDir(e.HE[1], mid)
+	alpha := math.Acos(math.Max(-1, math.Min(1, u1.Dot(u2))))
+	s := math.Sin(alpha + th)
+	if alpha+th >= math.Pi-1e-6 || s <= 1e-9 {
+		return 0, fmt.Errorf("at %.0f° the chamfer doesn't meet the other face (the faces meet at %.0f°)", th*180/math.Pi, alpha*180/math.Pi)
+	}
+	return d * math.Sin(th) / s, nil
 }

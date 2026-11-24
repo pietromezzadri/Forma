@@ -607,7 +607,27 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 		if f.Kind == doc.KFillet {
 			a.exprField(f, "Radius", " mm")
 		} else {
+			// older chamfers have only a Distance
+			for _, kv := range doc.ChamferInputs {
+				if _, ok := f.Inputs[kv[0]]; !ok {
+					f.Inputs[kv[0]] = kv[1]
+				}
+			}
+			comboIn("Type", "Type", doc.ChamferTypes)
 			a.exprField(f, "Distance", " mm")
+			switch f.Inputs["Type"] {
+			case doc.ChamferTypes[1]:
+				a.exprField(f, "Distance 2", " mm")
+			case doc.ChamferTypes[2]:
+				a.exprField(f, "Angle", "°")
+			}
+			if f.Inputs["Type"] != doc.ChamferTypes[0] {
+				swap := f.Inputs["Swap"] == "1"
+				if imgui.Checkbox("Swap the faces##chswap", &swap) {
+					set("Swap", map[bool]string{true: "1", false: "0"}[swap])
+				}
+				imgui.SetItemTooltip("Which face of each edge the first distance (and the angle) goes along")
+			}
 		}
 	case doc.KHole:
 		imgui.Text(fmt.Sprintf("%d hole(s) at the points of %s", len(f.Points), featName(a.doc.D, f.Ref)))

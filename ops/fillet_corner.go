@@ -232,15 +232,3 @@ func BallCornerOf(b *brep.Body, v *brep.Vertex, es []*brep.Edge) (Corner, bool) 
 	}
 	return c, true
 }
-
-// EdgeToolSet is EdgeTool with the round stopping set[i] short of vertex i
-// (a ball corner takes over there); only straight edges can stop short.
-func EdgeToolSet(e *brep.Edge, size float64, chamfer bool, k int, ext [2]bool, set [2]float64) (*brep.Body, brep.BoolOp, error) {
-	if set == [2]float64{} {
-		return EdgeTool(e, size, chamfer, k, ext)
-	}
-	if size <= geom.Tol {
-		return nil, 0, fmt.Errorf("size must be more than 0")
-	}
-	return straightToolSet(e, size, chamfer, k, ext, set)
-}

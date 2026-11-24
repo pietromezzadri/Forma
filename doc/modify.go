@@ -18,18 +18,22 @@ var (
 	LinearInputs   = [][2]string{{"Count", "3"}, {"Spacing", "20"}, {"Count 2", "1"}, {"Spacing 2", "20"}}
 	CircularInputs = [][2]string{{"Count", "6"}, {"Angle", "360"}, {"Center X", "0"}, {"Center Y", "0"}, {"Center Z", "0"}}
 	FilletInputs   = [][2]string{{"Radius", "3"}}
-	ChamferInputs  = [][2]string{{"Distance", "2"}}
+	ChamferInputs  = [][2]string{{"Type", "Equal distance"}, {"Distance", "2"}, {"Distance 2", "1"}, {"Angle", "30"}, {"Swap", "0"}}
 	HoleInputs     = [][2]string{{"Diameter", "6"}, {"Depth", "10"}, {"Bore diameter", "11"}, {"Bore depth", "4"}, {"Sink diameter", "12"}}
 	ShellInputs    = [][2]string{{"Thickness", "1"}}
 )
 
 // Choices for the modelling features' combo inputs.
 var (
-	PatternTypes  = []string{"Linear", "Circular"}
-	Axes          = []string{"X", "Y", "Z"}
-	Axes2         = []string{"None", "X", "Y", "Z"}
-	CopyModes     = []string{"Join", "New body"}
-	HoleTypes     = []string{"Simple", "Counterbore", "Countersink"}
+	PatternTypes = []string{"Linear", "Circular"}
+	Axes         = []string{"X", "Y", "Z"}
+	Axes2        = []string{"None", "X", "Y", "Z"}
+	CopyModes    = []string{"Join", "New body"}
+	HoleTypes    = []string{"Simple", "Counterbore", "Countersink"}
+	// a chamfer: the same distance back along both faces, two distances (the
+	// first along one face of each edge, the second along the other; Swap
+	// swaps them), or a distance and the angle from that face
+	ChamferTypes  = []string{"Equal distance", "Two distances", "Distance and angle"}
 	HoleExtents   = []string{"Distance", "Through all"}
 	HoleBottoms   = []string{"Drill point", "Flat"}
 	MirrorPlanes  = []string{"YZ", "XZ", "XY"}
@@ -633,7 +637,17 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 						ext[j] = false // the ball takes over there
 					}
 				}
-				t, op, err := ops.EdgeToolSet(p.e, size, chamfer, p.k+1, ext, set)
+				// a chamfer's two distances: the first along the face the edge's
+				// reference names first (A), the second along the other (Swap: the
+				// other way); EdgeToolSet takes them by the edge's own sides
+				s1, s2 := size, size
+				if chamfer {
+					var err error
+					if s1, s2, err = d.chamferSizes(f, p.e, f.Edges[p.k], size); err != nil {
+						return nil, fmt.Errorf("edge %d: %v", p.k+1, err)
+					}
+				}
+				t, op, err := ops.EdgeToolSet(p.e, s1, s2, chamfer, p.k+1, ext, set)
 				if err != nil {
 					return nil, fmt.Errorf("edge %d: %v", p.k+1, err)
 				}
@@ -641,15 +655,40 @@ func (d *Document) modify(f *Feature, state []*BodyRef) ([]*BodyRef, error) {
 				tools = append(tools, t)
 				opsList = append(opsList, op)
 			}
-			for k, t := range tools {
-				r, err := brep.Boolean(b, t, opsList[k])
+			// the ball corners first, in order
+			for k := 0; k < nCorners; k++ {
+				r, err := brep.Boolean(b, tools[k], opsList[k])
 				if err != nil {
-					if k < nCorners {
-						return nil, fmt.Errorf("a ball corner: %v", err)
-					}
-					return nil, fmt.Errorf("edge %d: %v", picks[k-nCorners].k+1, err)
+					return nil, fmt.Errorf("a ball corner: %v", err)
 				}
 				b = r
+			}
+			// then the edges; where mitred tools cross, one can trip the kernel
+			// (two passing exactly through the same point of an edge) that goes
+			// in cleanly once the others are in: it waits, and the rest go on
+			pending := make([]int, 0, len(tools)-nCorners)
+			for k := nCorners; k < len(tools); k++ {
+				pending = append(pending, k)
+			}
+			for len(pending) > 0 {
+				var later []int
+				var firstErr error
+				firstK := -1
+				for _, k := range pending {
+					r, err := brep.Boolean(b, tools[k], opsList[k])
+					if err != nil {
+						if firstErr == nil {
+							firstErr, firstK = err, k
+						}
+						later = append(later, k)
+						continue
+					}
+					b = r
+				}
+				if len(later) == len(pending) {
+					return nil, fmt.Errorf("edge %d: %v", picks[firstK-nCorners].k+1, firstErr)
+				}
+				pending = later
 			}
 			b.Name = out[i].Body.Name
 			changed(i, b)
@@ -1001,4 +1040,48 @@ next:
 func grow(b geom.Box, m float64) geom.Box {
 	d := geom.V3(m, m, m)
 	return geom.Box{Min: b.Min.Sub(d), Max: b.Max.Add(d)}
+}
+
+// chamferSizes are a chamfer's distances back along the faces of e.HE[0]
+// and e.HE[1], from its type: the same distance both ways; Distance along
+// the face its reference names first (A) and Distance 2 along the other;
+// or Distance along A and the angle from A. Swap trades the faces.
+func (d *Document) chamferSizes(f *Feature, e *brep.Edge, ref EdgeRef, dist float64) (float64, float64, error) {
+	typ := f.Inputs["Type"]
+	if typ == "" || typ == ChamferTypes[0] {
+		return dist, dist, nil
+	}
+	// a and b: along face A and face B
+	a, b := dist, dist
+	switch typ {
+	case ChamferTypes[1]:
+		v, err := d.input(f, "Distance 2")
+		if err != nil {
+			return 0, 0, err
+		}
+		b = v
+	case ChamferTypes[2]:
+		deg, err := d.input(f, "Angle")
+		if err != nil {
+			return 0, 0, err
+		}
+		// the angle is the chamfer's from face A; the sine rule gives the
+		// same distance along B whichever of the edge's sides A is
+		if b, err = ops.ChamferSecond(e, dist, deg*math.Pi/180); err != nil {
+			return 0, 0, err
+		}
+	default:
+		return 0, 0, fmt.Errorf("unknown chamfer type %q", typ)
+	}
+	if f.Inputs["Swap"] == "1" {
+		a, b = b, a
+	}
+	if b <= geom.Tol {
+		return 0, 0, fmt.Errorf("the second distance must be more than 0")
+	}
+	// the edge's first side is face A unless the reference names it B
+	if e.HE[0] != nil && e.HE[0].Loop.Face.Name != ref.A {
+		return b, a, nil
+	}
+	return a, b, nil
 }
