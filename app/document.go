@@ -24,7 +24,8 @@ type Document struct {
 	bodies   map[int]*BodyItem
 	sketches map[int]*SketchItem
 	meshes   map[int]*MeshItem
-	changed  bool // regenerate before the next frame
+	changed  bool    // regenerate before the next frame
+	soon     float64 // seconds left before a held-back regeneration (typing), 0: none
 	Path     string
 	saved    []byte // the design as last saved (for the title's ●)
 }
@@ -100,6 +101,28 @@ func (d *Document) Regenerate() {
 	d.D.Regenerate()
 	d.sync()
 	d.changed = false
+	d.soon = 0
+}
+
+// typingPause is how long the design waits after the last keystroke in a
+// text before it is rebuilt: an emboss of a few letters can take a second,
+// and rebuilding on every key froze the window while typing.
+const typingPause = 0.6
+
+// changeSoon regenerates once the user stops typing for typingPause.
+func (d *Document) changeSoon() { d.soon = typingPause }
+
+// tick counts a held-back regeneration down and runs it when due.
+func (d *Document) tick(dt float64) {
+	if d.changed {
+		d.Regenerate()
+		return
+	}
+	if d.soon > 0 {
+		if d.soon -= dt; d.soon <= 0 {
+			d.Regenerate()
+		}
+	}
 }
 
 // Commit regenerates and records an undo step.

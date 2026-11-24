@@ -34,9 +34,11 @@ func (a *App) textProperties(s *SketchItem) {
 		return
 	}
 	imgui.SeparatorText(ui.Icon(0xf031, "Text"))
+	// the sketch redraws at once; the design (an emboss of it) is rebuilt
+	// when the typing pauses, or at once on leaving the field (commit)
 	edited := func() {
-		s.markDirty()
-		a.doc.changed = true
+		s.dirty = true // not markDirty: that rebuilds the design next frame
+		a.doc.changeSoon()
 		if a.sk != nil && a.sk.item == s {
 			s.S.Solve()
 		}

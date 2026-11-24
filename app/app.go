@@ -18,9 +18,11 @@ import (
 	"forma/ui"
 )
 
-// Version shows in the title bar. Release builds set it from the tag
-// (tools/release/build.ps1: -ldflags "-X forma/app.Version=…").
-var Version = "0.1.0-dev"
+// Version shows in the title bar: the release being worked toward, with
+// -dev, in a build from source. Release builds set it from the tag
+// (tools/release/build.ps1 and build.sh: -ldflags "-X forma/app.Version=…");
+// after a release this moves on to the next one's -dev.
+var Version = "0.2.0-dev"
 
 type App struct {
 	win     *glfw.Window
@@ -190,9 +192,7 @@ func (a *App) frame() {
 	}
 	a.cam.Tick(dt)
 	a.toast.tick(dt)
-	if a.doc.changed {
-		a.doc.Regenerate()
-	}
+	a.doc.tick(dt)
 	a.autosave(dt)
 	if a.titleT += dt; a.titleT > 0.5 {
 		a.titleT = 0
