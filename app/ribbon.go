@@ -302,6 +302,7 @@ func (a *App) partRibbon(r *ribbon) {
 
 	r.group()
 	r.cmd("assemble.component", icComponent, "Component", false)
+	r.cmd("assemble.screw", icScrew, "Screw", false)
 	r.cmd("assemble.copy", icCopy, "Copy", false)
 	r.cmd("assemble.joint", icJoint, "Joint", false)
 	r.cmd("assemble.interference", icInterference, "Clash", a.asm.showClashes)

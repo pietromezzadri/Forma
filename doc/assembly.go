@@ -127,6 +127,16 @@ type subDesign struct {
 }
 
 func (d *Document) buildComponent(f *Feature) error {
+	// a screw: its design from its standard, size and length (so an edit of
+	// them rebuilds it)
+	if spec, ok := ScrewOf(f); ok && f.Ref == 0 {
+		data, err := ScrewData(spec)
+		if err != nil {
+			return err
+		}
+		f.Data = data
+		f.Inputs["File"] = spec.Label() + ".forma"
+	}
 	data, err := d.componentData(f)
 	if err != nil {
 		return err

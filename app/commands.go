@@ -308,6 +308,7 @@ func (a *App) registerCommands() *Commands {
 	a.registerDrawingCommands(c)
 	a.registerExchangeCommands(c)
 	a.registerSeparateCommands(c)
+	a.registerFastenerCommands(c)
 	a.registerAssemblyCommands(c)
 	a.registerInspectCommands(c)
 	a.registerSnapCommands(c)

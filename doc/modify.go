@@ -806,6 +806,20 @@ func (d *Document) buildHole(f *Feature) error {
 			return err
 		}
 	}
+	// made for a screw: its diameters from the tables (the fields left be)
+	if size := f.Inputs["Screw"]; size != "" {
+		dia, bore, boreDepth, sink, err := ScrewHoleSizes(size, f.Inputs["Fit"])
+		if err != nil {
+			return err
+		}
+		spec.Diameter = dia
+		switch f.Inputs["Type"] {
+		case "Counterbore":
+			spec.BoreDiameter, spec.BoreDepth = bore, boreDepth
+		case "Countersink":
+			spec.SinkDiameter = sink
+		}
+	}
 	s := sk.Sketch
 	pl := s.Plane
 	through := f.Inputs["Extent"] == "Through all"

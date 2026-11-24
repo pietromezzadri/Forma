@@ -664,14 +664,16 @@ func (a *App) modifyProperties(f *doc.Feature) bool {
 			}
 		}
 		comboIn("Type", "Type", doc.HoleTypes)
-		a.exprField(f, "Diameter", " mm")
-		switch f.Inputs["Type"] {
-		case "Counterbore":
-			a.exprField(f, "Bore diameter", " mm")
-			a.exprField(f, "Bore depth", " mm")
-		case "Countersink":
-			a.exprField(f, "Sink diameter", " mm")
-			imgui.TextDisabled("90° countersink")
+		if !a.holeScrewProperties(f) {
+			a.exprField(f, "Diameter", " mm")
+			switch f.Inputs["Type"] {
+			case "Counterbore":
+				a.exprField(f, "Bore diameter", " mm")
+				a.exprField(f, "Bore depth", " mm")
+			case "Countersink":
+				a.exprField(f, "Sink diameter", " mm")
+				imgui.TextDisabled("90° countersink")
+			}
 		}
 		comboIn("Extent", "Extent", doc.HoleExtents)
 		if f.Inputs["Extent"] != "Through all" {
