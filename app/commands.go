@@ -266,9 +266,17 @@ func (a *App) registerCommands() *Commands {
 	}})
 	c.add(&Command{ID: "view.layout", Label: "Reset panel layout", Group: "View",
 		Run: func(string) { a.layoutSet, a.layoutReset = false, true }})
-	c.add(&Command{ID: "view.xray", Label: "X-ray: see through the selected parts", Group: "View", Icon: icXRay,
-		Enabled: func() bool { return len(a.selectedBodies()) > 0 },
+	c.add(&Command{ID: "view.xray", Label: "X-ray: see through the selected parts (nothing selected: all solid again)", Group: "View", Icon: icXRay,
+		Enabled: func() bool { return len(a.selectedBodies()) > 0 || a.anyXRay() },
 		Run: func(arg string) {
+			if len(a.selectedBodies()) == 0 {
+				// nothing picked: every see-through part solid again
+				for _, b := range a.doc.Bodies {
+					b.F.XRay = false
+				}
+				a.doc.Commit()
+				return
+			}
 			// all on if any is off, else all off
 			on := false
 			for _, k := range a.selectedBodies() {

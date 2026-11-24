@@ -32,6 +32,7 @@ type Paint struct {
 	OnTop      bool       // drawn over everything (no depth test)
 	NoDepth    bool       // faces: drawn without writing depth (see-through: what is behind still shows)
 	CullBack   bool       // faces: their backs left out (a see-through body's far side isn't drawn red)
+	Behind     bool       // faces: drawn at the far plane, so only where nothing else is (a see-through body in the ID buffer)
 	Offset     mgl32.Vec3 // moves what is drawn (a component in an exploded view)
 }
 
@@ -193,7 +194,13 @@ func (r *Renderer) DrawFaces(v View, m *TriMesh, p Paint, pick bool) {
 		gl.Enable(gl.CULL_FACE)
 		gl.CullFace(gl.BACK)
 	}
+	if p.Behind {
+		gl.DepthRange(1, 1)
+	}
 	m.Draw()
+	if p.Behind {
+		gl.DepthRange(0, 1)
+	}
 	if p.CullBack {
 		gl.Disable(gl.CULL_FACE)
 	}

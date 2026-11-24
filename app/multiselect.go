@@ -287,9 +287,22 @@ func (a *App) multiProperties(fs []*doc.Feature) {
 
 const icXRay = 0xf5fd // layers: see-through
 
-// xrayLit: the selected parts are all see-through.
+// anyXRay: some part is see-through.
+func (a *App) anyXRay() bool {
+	for _, b := range a.doc.Bodies {
+		if b.F.XRay {
+			return true
+		}
+	}
+	return false
+}
+
+// xrayLit: the selected parts are all see-through (nothing selected: any is).
 func (a *App) xrayLit() bool {
 	keys := a.selectedBodies()
+	if len(keys) == 0 {
+		return a.anyXRay()
+	}
 	for _, k := range keys {
 		if b := a.doc.Body(k); b == nil || !b.F.XRay {
 			return false

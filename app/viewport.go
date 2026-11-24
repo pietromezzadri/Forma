@@ -533,6 +533,12 @@ func (a *App) renderScene() {
 	r.BeginPick()
 	// bodies are picked outside sketches, and in one while projecting
 	if !inSketch || a.sk.tool == toolProject {
+		type xrayPick struct {
+			b    *BodyItem
+			off  mgl32.Vec3
+			slot int
+		}
+		var seeThrough []xrayPick
 		for _, b := range a.doc.Bodies {
 			if !b.Visible || b.gpu == nil {
 				continue
@@ -543,9 +549,16 @@ func (a *App) renderScene() {
 			// (its edges and corners still pick)
 			if !b.F.XRay {
 				r.DrawFaces(v, b.gpu.faces, render.Paint{Offset: off, IDBase: idBase(KindFace, slot)}, true)
+			} else {
+				seeThrough = append(seeThrough, xrayPick{b, off, slot})
 			}
 			r.DrawLines(v, b.gpu.edges, render.Paint{Offset: off, IDBase: idBase(KindEdge, slot), Width: 7 * px, DepthBias: 1e-5}, true)
 			r.DrawPoints(v, b.gpu.verts, render.Paint{Offset: off, IDBase: idBase(KindVertex, slot), Width: 12 * px, DepthBias: 2e-5}, true)
+		}
+		// ...but where nothing is behind them, they pick themselves, so a
+		// see-through body can still be clicked (and turned solid again)
+		for _, x := range seeThrough {
+			r.DrawFaces(v, x.b.gpu.faces, render.Paint{Offset: x.off, IDBase: idBase(KindFace, x.slot), Behind: true, CullBack: true}, true)
 		}
 	}
 	for _, s := range a.doc.Sketches {
