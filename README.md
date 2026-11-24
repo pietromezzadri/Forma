@@ -78,6 +78,9 @@ as PDF, SVG or DXF.</td>
     bodies it touches.
   - Combine joins, cuts or intersects bodies already made: the first body
     picked is the target, the others the tools, kept or used up.
+  - Split cuts a body in two along a plane (XY, XZ, YZ, moved along its
+    normal, or a flat face of another body), keeping both halves or one:
+    a part too big for the printer, or a two-colour print in halves.
   - A parameters table drives the dimensions.
   - The timeline has a rollback marker, regeneration is incremental, and undo
     and redo work for every step.
@@ -131,6 +134,15 @@ as PDF, SVG or DXF.</td>
   - STEP AP214: export of solids and assemblies, and import of
     AP203/AP214/AP242 solids on analytic surfaces.
   - STL in (as a reference mesh) and out; OBJ out.
+  - 3MF out for slicers: each visible body a part with its colour, the
+    parts kept together as one object, millimetres, watertight meshes.
+    Any step can be given a colour in Properties, shown in the view too.
+  - Separate a 3MF (or STL) into part files (File menu): each part the
+    file puts on the plate written as an STL of its own, named as the file
+    names it, turned as it was laid out for printing and stood on the bed;
+    optionally broken into its loose pieces. A slicer project of a detailed
+    figure (34 parts, 12 million triangles, 1 GB of XML) takes about ten
+    seconds. The design is left alone.
   - STEP output is checked against OpenCASCADE in the tests.
 - **App.** A ribbon toolbar that fits any window (names, then icons only,
   then scrolling as it narrows), a Ctrl+K command palette, native file dialogs,
@@ -201,7 +213,7 @@ Linux are made and tested by the release workflow
 | Shift+E / Shift+R | Extrude / revolve the selected profile |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Ctrl+S / Ctrl+O | Save / open a `.forma` design |
-| Ctrl+I / Ctrl+E | Import / export (STEP, STL, OBJ) |
+| Ctrl+I / Ctrl+E | Import (STEP, STL) / export (STEP, STL, OBJ, 3MF) |
 | G | Grid snap on / off (Ctrl held while dragging: free; Shift: fine) |
 | B (in a sketch) | Spline tool |
 | Drawing (File group) | The design's drawing sheet: wheel zooms, middle drag pans, drag a view, dimension or note to move it, Finish goes back |
@@ -239,7 +251,7 @@ PNGs to `captures/out/`. The images above come from that script. See
 | `sketch/` | sketch entities, constraints, solver, region detection |
 | `expr/` | expressions with units |
 | `doc/` | the design: parameters, feature history, regeneration, references, assemblies, `.forma` files |
-| `io/` | STEP reader and writer, STL, OBJ |
+| `io/` | STEP reader and writer, STL, OBJ, 3MF |
 | `render/` | shaders, viewport target, grid, ID-buffer picking |
 | `app/`, `ui/` | commands, tools, panels, ribbon, capture scripts |
 
@@ -281,6 +293,10 @@ PNGs to `captures/out/`. The images above come from that script. See
   and a title block, exported as PDF, SVG or DXF. Left: detail and broken
   views, a parts list with balloons, tolerances and GD&T
   ([DW1–DW12](docs/LIMITATIONS.md)).
+- **Printing** (0.3.0, under way): Split Body and 3MF export with a colour
+  per part, separating a 3MF or STL into part files (done). Left: 3MF
+  import into a design, slicer settings in the file, splitting
+  along a sketch or a curved face ([X1, E8](docs/LIMITATIONS.md)).
 - **M17 car dynamics** (planned): rigid-body dynamics and wheel contact, so
   a car run by its Arduino sketch drives on the floor, and loads from the
   mechanism back on its motors ([EL6](docs/LIMITATIONS.md)).

@@ -141,6 +141,16 @@ new ones as features land.
   no "each with each" or splitting a body by another into pieces kept
   apart. It is as robust as the booleans (K-limits).
 
+## Split (`ops/split.go`, `doc/modify.go`)
+
+- **X1 Split by a plane only:** XY, XZ, YZ (moved along the normal) or a
+  flat face of another body; not by a sketch's lines, a curved face or
+  another body. Where the plane cuts a body into several pieces on one
+  side (across a U's arms), those stay one body (several lumps).
+- **X2 Keeps by key:** with Both, the body keeps the front and the back
+  is a new body of the split step; an edit upstream that changes which
+  side is the front swaps them (C1 applies to what refers to them).
+
 ## Holes, patterns, mirror, move
 
 - **H1 Holes:** no threads (cosmetic or modelled; planned in M20), the countersink is always
@@ -410,6 +420,14 @@ new ones as features land.
   area and volume, but not pickable in the view, not measurable against other
   things, and never turned into a solid for booleans.
 - **E6 OBJ:** export only, no materials.
+- **E8 3MF:** no import into a design (a 3MF can only be separated into STL
+  part files, File menu: names, placements and components read; colours,
+  slicer settings and other extensions ignored); one colour a step, not a face or a
+  body of its own (the bodies a step makes share it), as core base
+  materials; no slicer settings, supports or modifiers in the file. The
+  parts go in as components of one object, so they keep their places:
+  PrusaSlicer 2.x reads the file (checked) but loads the parts as
+  separate objects; Bambu Studio, OrcaSlicer and Cura haven't been tried.
 - **E7 Imports keep the whole file in the design** (`.forma` files grow with
   big imports), and there's no "replace with a newer version of the file":
   import again and delete the old feature.

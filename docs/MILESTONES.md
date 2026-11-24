@@ -783,3 +783,48 @@ What each milestone added, in the order they were built. The current gaps are in
   letters on the back), `arduinocli/install_test.go` (the download and set-up
   against a local server); captures `combine.json`, `xray.json`,
   `press.json`, `wrap.json`, `installcli.json`.
+
+## 0.3.0: printing
+
+- **Split Body** (`ops.SplitBody`, `doc` kind `split`, `feature.split`):
+  a body cut in two by a plane — XY, XZ or YZ moved along its normal (the
+  command starts on XY through the body's middle), or a flat face of
+  another body picked with it — keeping both (the body keeps the front, the
+  back is a new body of the step) or one side. The halves are the body
+  intersected with a half-space box each side of the plane; the new faces
+  are named `f<ID>/split/front` and `/back`. A plane that misses the body
+  or only touches a face says so. Mirror and Split share the plane lookup
+  (`featurePlane`).
+- **Colours:** any step has a colour (`Feature.Color`, `#rrggbb`, saved),
+  picked in a body's Properties or set by `body.color:<#rrggbb>`, and
+  drawn in the view.
+- **3MF export** (`io.Write3MF`, File → Export… with a `.3mf` name): each
+  visible body a part with its step's colour (core base materials), the
+  parts one object of components so they keep their places, millimetres,
+  each mesh's vertices welded within a micrometre so it is watertight.
+  PrusaSlicer reads it (`--info`: manifold, the right volumes).
+- Also in 0.2.x: X-ray parts can be clicked again (and the X-ray button
+  with nothing selected turns every part solid); typing in a text rebuilds
+  the design when the typing pauses; wrapped letters whose cuts meet under
+  the surface are cut as one tool (engraved) or parted by a wall through
+  the axis (inlaid).
+- Tests: `ops/split_test.go` (a box split straight both ways, a cylinder
+  slanting, a plane on a face or past the body refused),
+  `doc/split_test.go` (Both / Front / Back, by another body's face, saved
+  and read back, a colour saved), `io/threemf_test.go` (two bodies in two
+  colours: the package's parts, names, colours, every mesh closed and as
+  big as its solid), `ops/emboss_wrap_test.go`.
+- **Separating a 3MF into part files** (`io.Read3MFParts`, `io.SeparateParts`,
+  File → "Separate a 3MF into part files…" and "…into its loose pieces…"):
+  the parts a 3MF's build puts on the plate (each object holding a mesh a
+  part, an object of components a part for each, the build items' and
+  components' transforms applied, names from the object or PrusaSlicer's
+  `Slic3r_PE_model.config`), each stood on the bed and centred, written as
+  binary STL into "<file> parts" beside it, on a goroutine with progress in
+  a toast (captures wait for it). The model is scanned tag by tag (Go's XML
+  decoder was far too slow for a gigabyte), meshes kept in float32: a
+  PrusaSlicer project of 34 parts and 12.2 million triangles reads in about
+  10 s. `LoosePieces` breaks a mesh into the pieces that share no vertex
+  (an STL is always broken so). Test: `io/threemf_read_test.go` (our own
+  3MFs apart and as components read back by name and volume, loose pieces,
+  a build item turned and moved, PrusaSlicer's names, files on the bed).
