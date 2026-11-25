@@ -847,7 +847,7 @@ What each milestone added, in the order they were built. The current gaps are in
   another: names, colours, six faces, volumes, split, saved; a picked
   colour beats the file's).
 
-## M19: fillet upgrades (in progress)
+## M19: fillet upgrades (mostly done, in 0.4.0)
 
 - **Ball corners** (`ops.CornerTool`, `ops.BallCornerOf`, `EdgeToolSet`):
   where three rounded edges of one fillet meet at a vertex of three flat
@@ -909,7 +909,7 @@ What each milestone added, in the order they were built. The current gaps are in
   Test: `TestFilletTangentChain` (the rim with the chain, one edge without
   it or from before the option, a chamfer's chain).
 
-## M20: screws and threaded holes (in progress)
+## M20: screws and threaded holes (in progress; screws and screw holes in 0.4.0)
 
 - **Screws** (`doc/fasteners.go`: `ScrewStds`, `ScrewSpec`, `ScrewDesign`,
   `NewScrew`; `app/fasteners_ui.go`, command `assemble.screw[:<std>,<size>,

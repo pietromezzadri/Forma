@@ -315,8 +315,8 @@ PNGs to `captures/out/`. The images above come from that script. See
   mechanism back on its motors ([EL6](docs/LIMITATIONS.md)).
 - **M18 scripted parts** (planned): parts written in Starlark, with
   parameters, as a step in the timeline like any feature.
-- **M19 fillet upgrades** (in progress): ball corners where three rounds
-  meet at a corner of flat faces, chamfers by two distances or a distance
+- **M19 fillet upgrades** (0.4.0, mostly done): ball corners where three
+  rounds meet at a corner of flat faces, chamfers by two distances or a distance
   and an angle, edge sets with radii of their own, rounds that follow
   tangent edges (done: every edge of a box rounds into the rounded box of
   the textbook; with the uprights larger, the rims carry round their
@@ -326,9 +326,9 @@ PNGs to `captures/out/`. The images above come from that script. See
 - **M20 screws and threaded holes** (in progress): ISO metric screws (socket
   head, button head, countersunk, hex) as components, M2 to M12, and holes
   made for them — clearance or tapped, counterbored or countersunk for the
-  head — with a screw jointed into each selected hole (done). Left: threads
-  shown on drawings with a hole callout, modelled threads, washers and nuts
-  ([H1, FS1–FS4](docs/LIMITATIONS.md)).
+  head — with a screw jointed into each selected hole (done, in 0.4.0).
+  Left: threads shown on drawings with a hole callout, modelled threads,
+  washers and nuts ([H1, FS1–FS4](docs/LIMITATIONS.md)).
 
 ## Stack
 
