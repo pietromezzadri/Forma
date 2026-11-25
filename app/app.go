@@ -22,7 +22,7 @@ import (
 // -dev, in a build from source. Release builds set it from the tag
 // (tools/release/build.ps1 and build.sh: -ldflags "-X forma/app.Version=…");
 // after a release this moves on to the next one's -dev.
-var Version = "0.5.0-dev"
+var Version = "0.6.0-dev"
 
 type App struct {
 	win     *glfw.Window
