@@ -78,6 +78,7 @@ type App struct {
 
 	capture  *captureRun
 	btnRects map[string]imgui.Vec2 // centres of named widgets (for capture scripts)
+	marked   map[string]bool       // names marked this frame (the first of a name wins)
 	quit     bool
 	last     time.Time
 }
@@ -133,7 +134,7 @@ func Run() error {
 	} else if cap.script.Ini != "" {
 		ini = cap.script.Ini
 	}
-	a := &App{win: win, doc: NewDocument(), cam: NewCamera(), showGrid: true, capture: cap, last: time.Now(), btnRects: map[string]imgui.Vec2{}, density: "7.85"}
+	a := &App{win: win, doc: NewDocument(), cam: NewCamera(), showGrid: true, capture: cap, last: time.Now(), btnRects: map[string]imgui.Vec2{}, marked: map[string]bool{}, density: "7.85"}
 	a.backend = ui.Init(win, ini)
 	defer a.backend.Shutdown()
 	scale := float32(1)
@@ -201,6 +202,7 @@ func (a *App) frame() {
 	}
 
 	a.backend.NewFrame()
+	clear(a.marked)
 	a.buildUI()
 	a.renderScene()
 
@@ -275,6 +277,10 @@ func (a *App) animate() bool { return a.capture == nil || a.capture.script.Recor
 // markItem records the last widget's centre under a name, so capture
 // scripts can move the cursor to it.
 func (a *App) markItem(name string) {
+	if a.marked[name] {
+		return // two of a name (two joints both "… in its hole"): the first drawn
+	}
+	a.marked[name] = true
 	mn, mx := imgui.ItemRectMin(), imgui.ItemRectMax()
 	a.btnRects[name] = imgui.Vec2{X: (mn.X + mx.X) / 2, Y: (mn.Y + mx.Y) / 2}
 }

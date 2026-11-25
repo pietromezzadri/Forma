@@ -373,6 +373,7 @@ func (a *App) motionSlider(f *doc.Feature, input string) {
 			a.asm.animJoint, a.asm.animLast, a.asm.animDir = f.ID, time.Now(), 1
 		}
 	}
+	a.markItem("btn:joint.play")
 }
 
 // animate steps the animated joint: a revolute one turns at 90°/s, a
