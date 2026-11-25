@@ -130,6 +130,9 @@ type ScrewSpec struct {
 	Std    string
 	Size   string
 	Length float64
+	// Modelled: its thread is modelled (a helical solid of facets) instead
+	// of a plain shank drawn with thread lines
+	Modelled bool
 }
 
 // Label is how it is called in a parts list: "ISO 4762 M5×16".
@@ -218,13 +221,24 @@ func ScrewDesign(s ScrewSpec) (*Document, error) {
 		head.Name = "Head"
 		in(head, "Radius", h.dk/2, "Height", h.k, "X", 0.0, "Y", 0.0, "Z", 0.0)
 	}
-	shank := d.Insert(NewPrim(KCylinder))
-	shank.Name = "Shank"
 	top := 0.0
 	if std.Sunk {
 		top = -h.k
 	}
-	in(shank, "Radius", r, "Height", s.Length+top, "X", 0.0, "Y", 0.0, "Z", -s.Length, "Operation", "Join")
+	plain := s.Length + top // the shank under the head
+	if s.Modelled {
+		// the thread from the tip, the plain shank above it
+		b := s.ThreadLength()
+		th := d.Insert(NewPrim(KThread))
+		th.Name = "Thread"
+		in(th, "Diameter", m.d, "Pitch", m.pitch, "Height", b, "X", 0.0, "Y", 0.0, "Z", -s.Length, "Operation", "Join")
+		plain -= b
+	}
+	if plain > 1e-9 {
+		shank := d.Insert(NewPrim(KCylinder))
+		shank.Name = "Shank"
+		in(shank, "Radius", r, "Height", plain, "X", 0.0, "Y", 0.0, "Z", top-plain, "Operation", "Join")
+	}
 	if !std.Hex {
 		// the hex key's socket, down from the head's top
 		headTop := h.k
@@ -271,6 +285,9 @@ func NewScrew(s ScrewSpec) (*Feature, error) {
 	f := NewComponent(s.Label()+".forma", []byte(data))
 	f.Name = s.Label()
 	f.Inputs["Screw"], f.Inputs["Size"], f.Inputs["Length"] = s.Std, s.Size, num(s.Length)
+	if s.Modelled {
+		f.Inputs["Thread"] = "Modelled"
+	}
 	return f, nil
 }
 
@@ -283,7 +300,7 @@ func ScrewOf(f *Feature) (ScrewSpec, bool) {
 	if err != nil {
 		return ScrewSpec{}, false
 	}
-	return ScrewSpec{Std: f.Inputs["Screw"], Size: f.Inputs["Size"], Length: l}, true
+	return ScrewSpec{Std: f.Inputs["Screw"], Size: f.Inputs["Size"], Length: l, Modelled: f.Inputs["Thread"] == "Modelled"}, true
 }
 
 // Holes for screws: a hole step's "Screw" input (a size) sizes it from the
@@ -346,35 +363,7 @@ func (d *Document) ScrewInHole(screw *Feature, key int, rim *brep.Edge) (*Featur
 	if _, ok := ScrewOf(screw); !ok {
 		return nil, fmt.Errorf("%s isn't a screw", screw.Name)
 	}
-	var body *brep.Body
-	for _, r := range d.Bodies {
-		if r.Key == key {
-			body = r.Body
-		}
-	}
-	if body == nil {
-		return nil, fmt.Errorf("the hole's body is gone")
-	}
-	c, ok := rim.Curve.(geom.Circle)
-	if !ok {
-		return nil, fmt.Errorf("pick a hole's round rim")
-	}
-	if _, ok := rimNormal(rim); !ok {
-		return nil, fmt.Errorf("the rim has no flat face beside it")
-	}
-	seat := d.holeSeat(body, rim)
-	if seat != rim {
-		c = seat.Curve.(geom.Circle)
-	}
-	hole, err := d.JointRefFor(key, nil, seat, nil, c.Eval(seat.T0))
-	if err != nil {
-		return nil, err
-	}
-	hole.Out = true
-	fr := square(geom.Vec3{}, geom.ZAxis.Neg(), geom.XAxis)
-	j := NewJoint(hole, JointRef{Feature: screw.ID, Key: BodyKey(screw.ID, 0), Frame: &fr}, "Revolute")
-	j.Name = screw.Name + " in its hole"
-	return j, nil
+	return d.FastenerInHole(screw, key, rim)
 }
 
 // HoleScrew is the screw size the hole step that made an edge's faces was
@@ -430,4 +419,22 @@ func (d *Document) holeSeat(b *brep.Body, rim *brep.Edge) *brep.Edge {
 		}
 	}
 	return best
+}
+
+// ThreadLength is how much of the shank is threaded, from the tip: b = 2d +
+// 12 on socket and countersunk heads (all of it when the screw is shorter
+// than that), all of it on button and hex heads.
+func (s ScrewSpec) ThreadLength() float64 {
+	std, m, h, err := s.check()
+	if err != nil {
+		return 0
+	}
+	shank := s.Length
+	if std.Sunk {
+		shank -= h.k
+	}
+	if s.Std == "ISO 4762" || s.Std == "ISO 10642" {
+		return math.Min(shank, 2*m.d+12)
+	}
+	return shank
 }

@@ -17,7 +17,7 @@ func TestScrewDesigns(t *testing.T) {
 		for _, size := range std.Sizes() {
 			ls := std.Lengths(size)
 			for _, l := range []float64{ls[0], ls[len(ls)/2]} {
-				spec := ScrewSpec{std.ID, size, l}
+				spec := ScrewSpec{Std: std.ID, Size: size, Length: l}
 				d, err := ScrewDesign(spec)
 				if err != nil {
 					t.Fatalf("%s: %v", spec.Label(), err)
@@ -62,12 +62,12 @@ func TestScrewDesigns(t *testing.T) {
 // row of the parts list.
 func TestScrewComponent(t *testing.T) {
 	d := New()
-	f, err := NewScrew(ScrewSpec{"ISO 4762", "M5", 16})
+	f, err := NewScrew(ScrewSpec{Std: "ISO 4762", Size: "M5", Length: 16})
 	if err != nil {
 		t.Fatal(err)
 	}
 	d.Insert(f)
-	g, _ := NewScrew(ScrewSpec{"ISO 4762", "M5", 16})
+	g, _ := NewScrew(ScrewSpec{Std: "ISO 4762", Size: "M5", Length: 16})
 	g.Inputs["Move X"] = "20"
 	d.Insert(g)
 	d.Regenerate()
@@ -135,7 +135,7 @@ func TestScrewHoles(t *testing.T) {
 	if math.Abs(cut-want) > 0.01*want {
 		t.Fatalf("cut %.2f, want %.2f", cut, want)
 	}
-	s, err := NewScrew(ScrewSpec{"ISO 4762", "M5", 16})
+	s, err := NewScrew(ScrewSpec{Std: "ISO 4762", Size: "M5", Length: 16})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestScrewInHole(t *testing.T) {
 		if got := d.HoleScrew(rim); got != "M5" {
 			t.Fatalf("%s: the hole is for %q", tc.typ, got)
 		}
-		s, err := NewScrew(ScrewSpec{tc.std, "M5", 16})
+		s, err := NewScrew(ScrewSpec{Std: tc.std, Size: "M5", Length: 16})
 		if err != nil {
 			t.Fatal(err)
 		}

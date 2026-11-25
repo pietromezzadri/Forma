@@ -282,6 +282,7 @@ func (a *App) assemblyProperties(f *doc.Feature) bool {
 		}
 		imgui.TextDisabled(src)
 		a.screwProperties(f)
+		a.fastenerProperties(f)
 		a.groundedProperty(f)
 		if j := a.jointedBy(f.ID); j != 0 {
 			imgui.TextWrapped(fmt.Sprintf("Placed by %s (its placement here comes first).", a.featName(j)))

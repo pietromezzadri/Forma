@@ -13,6 +13,7 @@ import (
 	"forma/drawing"
 	"forma/expr"
 	"forma/geom"
+	"forma/ops"
 	"forma/sketch"
 )
 
@@ -37,6 +38,7 @@ const (
 	KCone      = "cone"
 	KSphere    = "sphere"
 	KTorus     = "torus"
+	KThread    = "thread" // a threaded rod (a modelled thread), joined or cut
 	KSketch    = "sketch"
 	KExtrude   = "extrude"
 	KRevolve   = "revolve"
@@ -155,7 +157,9 @@ type Feature struct {
 	// (where the ends met, and the fixed end's Z) in the design
 	Moved     int        `json:"-"`
 	JointAxis geom.Frame `json:"-"`
-	sig       uint64
+	// Threads are the modelled threads a hole step cut (as last built)
+	Threads []ops.ThreadSpec `json:"-"`
+	sig     uint64
 }
 
 // Document is a design.
@@ -232,7 +236,7 @@ func (d *Document) uniqueName(base string) string {
 }
 
 var kindLabel = map[string]string{KBox: "Box", KCylinder: "Cylinder", KCone: "Cone", KSphere: "Sphere",
-	KTorus: "Torus", KSketch: "Sketch", KExtrude: "Extrude", KRevolve: "Revolve", KMove: "Move",
+	KTorus: "Torus", KThread: "Thread", KSketch: "Sketch", KExtrude: "Extrude", KRevolve: "Revolve", KMove: "Move",
 	KMirror: "Mirror", KPattern: "Pattern", KFillet: "Fillet", KChamfer: "Chamfer", KHole: "Hole", KShell: "Shell", KEmboss: "Emboss", KCombine: "Combine", KSplit: "Split",
 	KImport: "Import", KMesh: "Mesh", KComponent: "Component", KJoint: "Joint", KCircuit: "Electronics"}
 
@@ -336,6 +340,7 @@ var PrimInputs = map[string][][2]string{
 	KCone:     {{"Base radius", "15"}, {"Top radius", "5"}, {"Height", "30"}, {"X", "0"}, {"Y", "0"}, {"Z", "0"}},
 	KSphere:   {{"Radius", "15"}, {"X", "0"}, {"Y", "0"}, {"Z", "15"}},
 	KTorus:    {{"Major radius", "25"}, {"Tube radius", "6"}, {"X", "0"}, {"Y", "0"}, {"Z", "6"}},
+	KThread:   {{"Diameter", "5"}, {"Pitch", "0.8"}, {"Height", "10"}, {"Internal", "0"}, {"X", "0"}, {"Y", "0"}, {"Z", "0"}},
 }
 
 // Extrude and revolve inputs, in display order.

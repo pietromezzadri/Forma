@@ -793,6 +793,14 @@ func (d *Document) buildHole(f *Feature) error {
 		return err
 	}
 	s := sk.Sketch
+	f.Threads = nil
+	var thread *ops.ThreadSpec
+	if ModelledThread(f) {
+		// drilled a hair under the thread's crests, then the thread cut
+		m := metrics[f.Inputs["Screw"]]
+		thread = &ops.ThreadSpec{D: m.d, P: m.pitch, Internal: true}
+		spec.Diameter = 2 * (thread.Crest() - 0.01)
+	}
 	pl := s.Plane
 	through := f.Inputs["Extent"] == "Through all"
 	var all geom.Box
@@ -820,8 +828,48 @@ func (d *Document) buildHole(f *Feature) error {
 		}
 		b.Name = f.Name
 		f.Bodies = append(f.Bodies, b)
+		if thread != nil {
+			// from over the face to through the far side (as far as the
+			// design reaches along the hole), or a pitch short of the depth
+			dir := pl.Z.Neg()
+			t := *thread
+			t.F = geom.FrameZ(at, dir, pl.X)
+			t.Z0 = -math.Max(1, 2*t.P)
+			if through {
+				far := 0.0
+				for i := 0; i < 8; i++ {
+					c := geom.V3(pickBox(i&1, all.Min.X, all.Max.X), pickBox(i&2, all.Min.Y, all.Max.Y), pickBox(i&4, all.Min.Z, all.Max.Z))
+					far = math.Max(far, c.Sub(at).Dot(dir))
+				}
+				t.Z1 = far + 2*t.P
+			} else {
+				t.Z1 = h.Depth - t.P
+			}
+			if t.Z1 > t.P {
+				rod, err := ops.ThreadedRod(t)
+				if err != nil {
+					return err
+				}
+				rod.Name = f.Name
+				f.Bodies = append(f.Bodies, rod)
+				f.Threads = append(f.Threads, t)
+			}
+		}
 	}
 	return nil
+}
+
+// ModelledThread: a hole step tapped for a screw, its thread modelled.
+func ModelledThread(f *Feature) bool {
+	_, ok := metrics[f.Inputs["Screw"]]
+	return ok && f.Inputs["Fit"] == "Tapped" && f.Inputs["Thread"] == "Modelled"
+}
+
+func pickBox(bit int, a, b float64) float64 {
+	if bit != 0 {
+		return b
+	}
+	return a
 }
 
 // holeSpec is a hole step's diameters (not its depth).

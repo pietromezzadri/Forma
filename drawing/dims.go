@@ -130,7 +130,10 @@ func (b *Built) resolveSil(a Anchor) (geo, error) {
 	bd := math.Inf(1)
 	for i := range b.Proj.Curves {
 		c := &b.Proj.Curves[i]
-		if c.Body != a.Body || c.Edge != nil || c.Face == nil || c.Face.Name != a.A {
+		if c.Body != a.Body || c.Edge != nil || c.Thread {
+			continue
+		}
+		if (c.Face == nil || c.Face.Name != a.A) && (c.Face != nil || c.Name != a.A) {
 			continue
 		}
 		for _, p := range c.P3 {
@@ -141,6 +144,10 @@ func (b *Built) resolveSil(a Anchor) (geo, error) {
 	}
 	if best == nil {
 		return geo{}, fmt.Errorf("its outline is gone")
+	}
+	if best.Arc != nil && best.Face == nil {
+		// a modelled thread's outline seen end on: a circle
+		return geo{kind: gCircle, p: b.Sheet(best.Arc.C), r: best.Arc.R * b.Scale}, nil
 	}
 	pts := make([]geom.Vec2, len(best.Pts))
 	for i, p := range best.Pts {
@@ -217,7 +224,7 @@ func (b *Built) Pick(p geom.Vec2, tol float64) (Anchor, bool) {
 	bd := math.Inf(1)
 	for i := range b.Proj.Curves {
 		c := &b.Proj.Curves[i]
-		if c.Edge == nil && c.Face == nil {
+		if c.Edge == nil && c.Face == nil && c.Name == "" {
 			continue // a thread's line
 		}
 		for k := 0; k+1 < len(c.Pts); k++ {
@@ -247,7 +254,11 @@ func (b *Built) Pick(p geom.Vec2, tol float64) (Anchor, bool) {
 	}
 	m := best.P3[bi].Lerp(best.P3[bi+1], t)
 	if best.Edge == nil {
-		a := Anchor{Body: best.Body, A: best.Face.Name, Sil: true, P: m}
+		name := best.Name // a modelled thread's outline
+		if best.Face != nil {
+			name = best.Face.Name
+		}
+		a := Anchor{Body: best.Body, A: name, Sil: true, P: m}
 		ends := []geom.Vec2{b.Sheet(best.Pts[0]), b.Sheet(best.Pts[len(best.Pts)-1])}
 		for _, e := range ends {
 			if e.Dist(p) <= tol {

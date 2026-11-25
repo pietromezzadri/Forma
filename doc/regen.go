@@ -289,7 +289,7 @@ func (d *Document) signature(f *Feature, sigs map[int]uint64) uint64 {
 
 func (d *Document) build(f *Feature) error {
 	switch f.Kind {
-	case KBox, KCylinder, KCone, KSphere, KTorus:
+	case KBox, KCylinder, KCone, KSphere, KTorus, KThread:
 		b, err := d.buildPrim(f)
 		if err != nil {
 			return err
@@ -349,6 +349,8 @@ func (d *Document) buildPrim(f *Feature) (*brep.Body, error) {
 		b, err = ops.Sphere(at, v["Radius"])
 	case KTorus:
 		b, err = ops.Torus(fr, v["Major radius"], v["Tube radius"])
+	case KThread:
+		b, err = ops.ThreadedRod(ops.ThreadSpec{F: fr, D: v["Diameter"], P: v["Pitch"], Z0: 0, Z1: v["Height"], Internal: v["Internal"] != 0})
 	}
 	if b != nil {
 		b.Name = f.Name

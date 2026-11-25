@@ -27,7 +27,7 @@ func TestThreadsAndCallouts(t *testing.T) {
 	tap.Inputs["Extent"], tap.Inputs["Screw"], tap.Inputs["Fit"] = "Through all", "M5", "Tapped"
 	cb := d.Insert(NewHole(sk.ID, []int{p1, p2}))
 	cb.Inputs["Type"], cb.Inputs["Extent"], cb.Inputs["Screw"], cb.Inputs["Fit"] = "Counterbore", "Through all", "M5", "Normal"
-	s, err := NewScrew(ScrewSpec{"ISO 4762", "M5", 30})
+	s, err := NewScrew(ScrewSpec{Std: "ISO 4762", Size: "M5", Length: 30})
 	if err != nil {
 		t.Fatal(err)
 	}

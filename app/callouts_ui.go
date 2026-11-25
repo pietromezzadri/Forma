@@ -46,13 +46,13 @@ func (a *App) addCallouts() {
 	var order []string
 	for i := range b.Proj.Curves {
 		c := &b.Proj.Curves[i]
-		if c.Arc == nil || c.Edge == nil || c.Hidden || c.Thread {
+		if c.Arc == nil || c.Hidden || c.Thread || (c.Edge == nil && c.Name == "") {
 			continue
 		}
 		key := ""
-		for _, h := range c.Edge.HE {
-			if h != nil && holeOf(h.Loop.Face.Name) != "" && a.doc.D.HoleCallout(h.Loop.Face.Name) != nil {
-				key = holeOf(h.Loop.Face.Name)
+		for _, n := range curveFaces(c) {
+			if holeOf(n) != "" && a.doc.D.HoleCallout(n) != nil {
+				key = holeOf(n)
 			}
 		}
 		if key == "" || have[key] {
@@ -75,8 +75,13 @@ func (a *App) addCallouts() {
 	sort.SliceStable(order, func(i, j int) bool { return best[order[i]].c.Arc.C.X < best[order[j]].c.Arc.C.X })
 	for k, key := range order {
 		c := best[key].c
-		centre := c.Edge.Curve.(geom.Circle).F.O
-		an := drawing.Anchor{Body: c.Body, A: c.Edge.HE[0].Loop.Face.Name, B: c.Edge.HE[1].Loop.Face.Name, P: centre.Add(c.Edge.Curve.(geom.Circle).F.X.Scale(c.Arc.R))}
+		var an drawing.Anchor
+		if c.Edge != nil {
+			centre := c.Edge.Curve.(geom.Circle).F.O
+			an = drawing.Anchor{Body: c.Body, A: c.Edge.HE[0].Loop.Face.Name, B: c.Edge.HE[1].Loop.Face.Name, P: centre.Add(c.Edge.Curve.(geom.Circle).F.X.Scale(c.Arc.R))}
+		} else {
+			an = drawing.Anchor{Body: c.Body, A: c.Name, Sil: true, P: c.P3[0]} // a modelled thread's outline
+		}
 		at := b.Sheet(c.Arc.C)
 		// over the view, out to the side of its middle the hole is on
 		side := 1.0
@@ -99,7 +104,24 @@ func (a *App) addCallouts() {
 func holeOf(face string) string {
 	i := strings.Index(face, "/hole:")
 	if i < 0 {
+		i = strings.Index(face, "/thread/face ")
+	}
+	if i < 0 {
 		return ""
 	}
 	return face[:i]
+}
+
+// curveFaces are the names of the faces a curve on a view belongs to.
+func curveFaces(c *drawing.Curve) []string {
+	if c.Edge != nil {
+		var out []string
+		for _, h := range c.Edge.HE {
+			if h != nil {
+				out = append(out, h.Loop.Face.Name)
+			}
+		}
+		return out
+	}
+	return []string{c.Name}
 }

@@ -14,6 +14,7 @@ import (
 	"math"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 
 	"forma/brep"
@@ -65,6 +66,10 @@ type Thread struct {
 	External bool
 	Face     string  // an external thread's face (the cylinder it lies in, which can't hide it)
 	Limit    float64 // > 0: a wide line across at A, this far either side of the axis (where the thread stops)
+	// Outline > 0: a modelled thread's outline at this radius, wide (its
+	// facets' edges aren't drawn): side on two lines along it, end on a
+	// whole circle at its ends (an external thread's free end)
+	Outline float64
 }
 
 // Arc is a circle (or a piece of one) in 2D.
@@ -84,6 +89,7 @@ type Curve struct {
 	Face    *brep.Face // a silhouette's face (Edge nil)
 	Arc     *Arc       // the piece lies on this circle (an edge seen end on)
 	Thread  bool       // a thread's thin line (no edge or face of the model)
+	Name    string     // a modelled thread's outline: its face's name (for a hole callout)
 }
 
 // Region is a face cut by a section's plane, to be hatched: its loops in
@@ -134,6 +140,7 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 		own      int32   // a silhouette's face (in the occluder's count)
 		far      float64 // how far in front its own face must be to hide it (< 0: it can't)
 		thread   bool
+		name     string
 		external bool // a screw's thread: none of it drawn hidden
 	}
 	var cands []cand
@@ -143,8 +150,17 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 		faces := map[int]*brep.Face{}
 		own := map[int]int32{}
 		ownByName := map[string]int32{}
+		threadOwn := int32(0) // a modelled thread's facets count as one face
 		for _, f := range b.Body.Faces() {
 			faces[f.ID] = f
+			if ThreadFacet(f.Name) {
+				if threadOwn == 0 {
+					nOwn++
+					threadOwn = nOwn
+				}
+				own[f.ID], ownByName[f.Name] = threadOwn, threadOwn
+				continue
+			}
 			nOwn++
 			own[f.ID] = nOwn
 			ownByName[f.Name] = nOwn
@@ -155,6 +171,9 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 				continue
 			}
 			fa, fb := e.HE[0].Loop.Face, e.HE[1].Loop.Face
+			if ThreadFacet(fa.Name) || ThreadFacet(fb.Name) {
+				continue // a modelled thread: drawn by its lines
+			}
 			tan := smooth(e, fa, fb)
 			if fa == fb && tan {
 				continue // a seam
@@ -174,6 +193,9 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 			cands = append(cands, c)
 		}
 		for _, s := range silhouettes(m, faces, fr, diag) {
+			if ThreadFacet(s.face.Name) {
+				continue
+			}
 			// the silhouette is found on the facets, a hair inside the true
 			// outline, where the face's facets nearer the viewer stand far
 			// in front of it (the face is seen edge on): a cylinder, cone or
@@ -190,7 +212,7 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 		if !opt.NoThread {
 			for _, t := range b.Threads {
 				for _, tc := range threadLines(t, fr, diag) {
-					c := cand{pts: tc.pts, body: b.Key, arc: tc.arc, thread: !tc.limit}
+					c := cand{pts: tc.pts, body: b.Key, arc: tc.arc, thread: !tc.limit, name: tc.name}
 					if t.External {
 						c.own, c.far = ownByName[t.Face], -1
 					}
@@ -220,7 +242,7 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 					if run.hidden && c.external {
 						continue
 					}
-					cv := Curve{P3: run.pts, Hidden: run.hidden, Tangent: c.tangent, Body: c.body, Edge: c.edge, Face: c.face, Arc: c.arc, Thread: c.thread}
+					cv := Curve{P3: run.pts, Hidden: run.hidden, Tangent: c.tangent, Body: c.body, Edge: c.edge, Face: c.face, Arc: c.arc, Thread: c.thread, Name: c.name}
 					cv.Pts = make([]geom.Vec2, len(run.pts))
 					for k, p := range run.pts {
 						cv.Pts[k] = fr.P(p)
@@ -731,6 +753,7 @@ type threadLine struct {
 	pts   []geom.Vec3
 	arc   *Arc
 	limit bool
+	name  string // an outline's face name
 }
 
 // threadLines are a thread's lines as fr sees it: side on, its two thin
@@ -754,6 +777,12 @@ func threadLines(t Thread, fr Frame, diag float64) []threadLine {
 		if t.Limit > 0 {
 			out = append(out, threadLine{pts: []geom.Vec3{t.A.Sub(w.Scale(t.Limit)), t.A.Add(w.Scale(t.Limit))}, limit: true})
 		}
+		if t.Outline > 0 {
+			for _, s := range []float64{-1, 1} {
+				o := w.Scale(s * t.Outline)
+				out = append(out, threadLine{pts: []geom.Vec3{t.A.Add(o), t.B.Add(o)}, limit: true, name: t.Face})
+			}
+		}
 		return out
 	}
 	ends := []geom.Vec3{t.B}
@@ -769,5 +798,22 @@ func threadLines(t Thread, fr Frame, diag float64) []threadLine {
 		}
 		out = append(out, threadLine{pts: pts, arc: &Arc{C: fr.P(c), R: t.R}})
 	}
+	if t.Outline > 0 {
+		for _, c := range ends {
+			m := max(24, int(math.Ceil(t.Outline*2*math.Pi/(diag/200))))
+			pts := make([]geom.Vec3, m+1)
+			for i := range pts {
+				a := 2 * math.Pi * float64(i) / float64(m)
+				pts[i] = c.Add(fr.R.Scale(t.Outline * math.Cos(a))).Add(fr.U.Scale(t.Outline * math.Sin(a)))
+			}
+			out = append(out, threadLine{pts: pts, arc: &Arc{C: fr.P(c), R: t.Outline}, limit: true, name: t.Face})
+		}
+	}
 	return out
+}
+
+// ThreadFacet: a face of a modelled thread (a facet of ops.ThreadedRod's,
+// "…thread/face <n>"), whose edges a drawing leaves out.
+func ThreadFacet(name string) bool {
+	return strings.HasPrefix(name, "thread/face ") || strings.Contains(name, "/thread/face ")
 }

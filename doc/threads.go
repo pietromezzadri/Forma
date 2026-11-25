@@ -48,6 +48,11 @@ func (d *Document) threadsOf(r *BodyRef) []drawing.Thread {
 			screw = &s
 		}
 	}
+	// modelled threads: their thin lines and outlines
+	out = append(out, d.modelledThreads(r)...)
+	if screw != nil && screw.Modelled {
+		screw = nil // its plain shank isn't threaded
+	}
 	for _, f := range r.Body.Faces() {
 		cy, ok := f.Surf.(geom.Cylinder)
 		if !ok {
@@ -59,7 +64,7 @@ func (d *Document) threadsOf(r *BodyRef) []drawing.Thread {
 		}
 		a, b := cy.F.O.Add(cy.F.Z.Scale(t0)), cy.F.O.Add(cy.F.Z.Scale(t1))
 		// a tapped hole: the drill's wall, its thread at the nominal size
-		if step := d.holeStepOfFace(f.Name); step != nil && step.Inputs["Fit"] == "Tapped" {
+		if step := d.holeStepOfFace(f.Name); step != nil && step.Inputs["Fit"] == "Tapped" && !ModelledThread(step) {
 			if m, ok := metrics[step.Inputs["Screw"]]; ok {
 				dia, _, _, _, err := ScrewHoleSizes(step.Inputs["Screw"], "Tapped")
 				if err == nil && math.Abs(cy.R-dia/2) < 1e-6 {
@@ -112,7 +117,7 @@ func faceSpan(f *brep.Face, fr geom.Frame) (float64, float64) {
 // holeStepOfFace is the hole step that made a face of this design (by its
 // name, "f<step>/hole:…"), nil for any other face.
 func (d *Document) holeStepOfFace(name string) *Feature {
-	if !strings.Contains(name, "/hole:") {
+	if !strings.Contains(name, "/hole:") && !drawing.ThreadFacet(name) {
 		return nil
 	}
 	if f := d.Feature(nameFeature(name)); f != nil && f.Kind == KHole {
@@ -163,4 +168,87 @@ func (d *Document) HoleCallout(face string) []string {
 // callNum is a size in a callout: two decimals at most, trailing zeros off.
 func callNum(v float64) string {
 	return strconv.FormatFloat(math.Round(v*100)/100, 'f', -1, 64)
+}
+
+// modelledThreads are a body's modelled threads as a drawing shows them:
+// a thin line where the cosmetic thread's would be and a wide outline
+// where the plain hole's or shank's edges would be (the thread's facets'
+// edges aren't drawn).
+func (d *Document) modelledThreads(r *BodyRef) []drawing.Thread {
+	var out []drawing.Thread
+	facet := ""
+	for _, f := range r.Body.Faces() {
+		if drawing.ThreadFacet(f.Name) {
+			facet = f.Name
+			break
+		}
+	}
+	if facet == "" {
+		return nil
+	}
+	if c := d.Feature(r.Comp); c != nil {
+		switch {
+		case func() bool { s, ok := ScrewOf(c); return ok && s.Modelled }():
+			s, _ := ScrewOf(c)
+			m := metrics[s.Size]
+			tip := r.Place.Pt(geom.V3(0, 0, -s.Length))
+			b := s.ThreadLength()
+			t := drawing.Thread{A: r.Place.Pt(geom.V3(0, 0, -s.Length+b)), B: tip, R: (m.d - 1.22687*m.pitch) / 2,
+				External: true, Outline: m.d / 2, Face: facet}
+			if _, _, h, err := s.check(); err == nil {
+				shank := s.Length
+				if ScrewStdByID(s.Std).Sunk {
+					shank -= h.k
+				}
+				if b < shank-1e-6 {
+					t.Limit = m.d / 2
+				}
+			}
+			out = append(out, t)
+		case func() bool { p, ok := FastenerOf(c); return ok && p.Kind == "nut" && p.Modelled }():
+			p, _ := FastenerOf(c)
+			m := metrics[p.Size]
+			out = append(out, drawing.Thread{A: r.Place.Pt(geom.Vec3{}), B: r.Place.Pt(geom.V3(0, 0, p.Thickness())), R: m.d / 2,
+				Outline: m.d/2 - 0.541266*m.pitch, Face: facet})
+		}
+		return out
+	}
+	// tapped holes of this design: each thread's span is its facets'
+	byStep := map[int][]*brep.Face{}
+	for _, f := range r.Body.Faces() {
+		if drawing.ThreadFacet(f.Name) {
+			if s := d.holeStepOfFace(f.Name); s != nil {
+				byStep[s.ID] = append(byStep[s.ID], f)
+			}
+		}
+	}
+	for id, faces := range byStep {
+		step := d.Feature(id)
+		for _, t := range step.Threads {
+			R := t.D / 2
+			lo, hi := math.Inf(1), math.Inf(-1)
+			name := ""
+			for _, f := range faces {
+				for _, l := range f.Loops {
+					for _, h := range l.HalfEdges() {
+						p := h.Edge.Verts[0].P.Sub(t.F.O)
+						z := p.Dot(t.F.Z)
+						if p.Sub(t.F.Z.Scale(z)).Len() > R+1e-6 {
+							continue
+						}
+						lo, hi = math.Min(lo, z), math.Max(hi, z)
+						if name == "" {
+							name = f.Name
+						}
+					}
+				}
+			}
+			if hi <= lo {
+				continue
+			}
+			out = append(out, drawing.Thread{A: t.F.O.Add(t.F.Z.Scale(lo)), B: t.F.O.Add(t.F.Z.Scale(hi)), R: R,
+				Outline: R - 0.541266*t.P, Face: name})
+		}
+	}
+	return out
 }

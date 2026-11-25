@@ -13,10 +13,11 @@ import (
 	"forma/geom"
 )
 
-// Screws (M20): the Screw command puts an ISO screw in the design as a
-// component — in the hole whose rim is selected, its head on the rim's
-// face and its shank down the hole — and a screw's properties pick its
-// standard, size and length. A hole's properties size it for a screw.
+// Screws, washers and nuts (M20): the Screw, Washer and Nut commands put an
+// ISO part in the design as a component on each selected hole rim, jointed
+// there onto whatever is already stacked on it (a washer under a screw's
+// head, a washer and a nut where the screw comes out); their properties
+// pick the standard and size. A hole's properties size it for a screw.
 
 const icScrew = 0xf54a // screwdriver
 
@@ -32,66 +33,108 @@ func (a *App) registerFastenerCommands(c *Commands) {
 					given = &doc.ScrewSpec{Std: strings.TrimSpace(p[0]), Size: strings.TrimSpace(p[1]), Length: l}
 				}
 			}
-			rims := a.selectedRims()
-			if len(rims) == 0 {
-				rims = []rimSel{{}} // one at the origin
-			}
-			var screws, joints []*doc.Feature
-			for _, rim := range rims {
-				spec := doc.ScrewSpec{Std: "ISO 4762", Size: "M5", Length: 16}
-				if rim.edge != nil {
-					if size := a.doc.D.HoleScrew(rim.edge); size != "" {
-						spec.Size = size
-					}
-				}
+			a.placeFasteners("screw", func(size string) (*doc.Feature, error) {
+				spec := doc.ScrewSpec{Std: "ISO 4762", Size: size, Length: 16}
 				if given != nil {
 					spec = *given
 				}
-				f, err := doc.NewScrew(spec)
-				if err != nil {
-					a.notify("Screw: %v", err)
-					return
-				}
-				if rim.edge != nil {
-					// head on the rim's face, shank along the hole (into the
-					// part), where it stays if the joint can't be made
-					o, n := rim.place.O, rim.place.Z
-					rx := -math.Asin(math.Max(-1, math.Min(1, n.Y)))
-					ry := math.Atan2(n.X, n.Z)
-					f.Inputs["Move X"], f.Inputs["Move Y"], f.Inputs["Move Z"] = fnum(o.X), fnum(o.Y), fnum(o.Z)
-					f.Inputs["Rotate X"], f.Inputs["Rotate Y"] = fnum(rx*180/math.Pi), fnum(ry*180/math.Pi)
-				}
-				a.doc.D.Insert(f)
-				screws = append(screws, f)
-				if rim.edge == nil {
-					continue
-				}
-				// jointed into the hole, so it follows the hole
-				j, err := a.doc.D.ScrewInHole(f, rim.key, rim.edge)
-				if err != nil {
-					a.notify("%s isn't jointed: %v", f.Name, err)
-					continue
-				}
-				a.doc.D.Insert(j)
-				joints = append(joints, j)
-			}
-			a.doc.Commit()
-			for _, j := range joints {
-				if j.Err != "" { // the screw stays where it was put
-					a.notify("%s: %s", j.Name, j.Err)
-					a.doc.Remove(j.ID)
-				}
-			}
-			last := screws[len(screws)-1]
-			a.sel = a.sel[:0]
-			a.browserSel, a.multi = bodyKey(last.ID, 0), nil
-			switch {
-			case last.Err != "":
-				a.notify("%s: %s", last.Name, last.Err)
-			case len(screws) > 1:
-				a.notify("%d screws put in their holes", len(screws))
-			}
+				return doc.NewScrew(spec)
+			})
 		}})
+	for _, k := range []struct{ kind, label, std string }{
+		{"washer", "Washer: an ISO washer (on each hole rim selected, under a screw's head or a nut)", "ISO 7089"},
+		{"nut", "Nut: an ISO hex nut (on each hole rim selected, where the screw comes out)", "ISO 4032"},
+	} {
+		k := k
+		c.add(&Command{ID: "assemble." + k.kind, Label: k.label, Group: "Assemble", Icon: map[string]rune{"washer": icWasher, "nut": icNut}[k.kind],
+			Enabled: func() bool { return a.sk == nil },
+			Run: func(arg string) {
+				// arg: "ISO 7089,M5" (else the default standard at the hole's size)
+				std, size := k.std, ""
+				if p := strings.Split(arg, ","); len(p) == 2 {
+					std, size = strings.TrimSpace(p[0]), strings.TrimSpace(p[1])
+				}
+				a.placeFasteners(k.kind, func(hole string) (*doc.Feature, error) {
+					if size != "" {
+						hole = size
+					}
+					return doc.NewFastener(doc.PartSpec{Kind: k.kind, Std: std, Size: hole})
+				})
+			}})
+	}
+}
+
+const (
+	icWasher = 0xf192 // dot-circle
+	icNut    = 0xf013 // gear
+)
+
+// placeFasteners puts a screw, washer or nut (made by make, given the size
+// the hole was made for, M5 if none) on each selected hole rim, jointed
+// onto what is already stacked there; with no rim selected, one at the
+// origin.
+func (a *App) placeFasteners(kind string, make func(size string) (*doc.Feature, error)) {
+	rims := a.selectedRims()
+	if len(rims) == 0 {
+		rims = []rimSel{{}}
+	}
+	var placed, joints []*doc.Feature
+	for _, rim := range rims {
+		size := "M5"
+		if rim.edge != nil {
+			if s := a.doc.D.HoleScrew(rim.edge); s != "" {
+				size = s
+			}
+		}
+		f, err := make(size)
+		if err != nil {
+			a.notify("%s: %v", strings.ToUpper(kind[:1])+kind[1:], err)
+			return
+		}
+		if rim.edge != nil {
+			// on the rim's face, along the hole (into the part), where it
+			// stays if the joint can't be made
+			o, n := rim.place.O, rim.place.Z
+			rx := -math.Asin(math.Max(-1, math.Min(1, n.Y)))
+			ry := math.Atan2(n.X, n.Z)
+			f.Inputs["Move X"], f.Inputs["Move Y"], f.Inputs["Move Z"] = fnum(o.X), fnum(o.Y), fnum(o.Z)
+			f.Inputs["Rotate X"], f.Inputs["Rotate Y"] = fnum(rx*180/math.Pi), fnum(ry*180/math.Pi)
+		}
+		a.doc.D.Insert(f)
+		if rim.edge == nil {
+			placed = append(placed, f)
+			continue
+		}
+		// jointed into the hole (or onto what is on it), so it follows it
+		j, err := a.doc.D.FastenerInHole(f, rim.key, rim.edge)
+		if err != nil {
+			a.notify("%s: %v", f.Name, err)
+			a.doc.D.Remove(f.ID)
+			continue
+		}
+		a.doc.D.Insert(j)
+		placed = append(placed, f)
+		joints = append(joints, j)
+	}
+	a.doc.Commit()
+	if len(placed) == 0 {
+		return
+	}
+	for _, j := range joints {
+		if j.Err != "" { // it stays where it was put
+			a.notify("%s: %s", j.Name, j.Err)
+			a.doc.Remove(j.ID)
+		}
+	}
+	last := placed[len(placed)-1]
+	a.sel = a.sel[:0]
+	a.browserSel, a.multi = bodyKey(last.ID, 0), nil
+	switch {
+	case last.Err != "":
+		a.notify("%s: %s", last.Name, last.Err)
+	case len(placed) > 1:
+		a.notify("%d %ss put on their holes", len(placed), kind)
+	}
 }
 
 func fnum(x float64) string {
@@ -202,7 +245,8 @@ func (a *App) screwProperties(f *doc.Feature) {
 		set("Length", m)
 	}
 	a.markItemLeft("prop:Length")
-	imgui.TextDisabled("Length in mm; the thread isn't modelled.")
+	a.threadChoice(f)
+	imgui.TextDisabled("Length in mm.")
 }
 
 // holeScrewProperties: a hole made for a screw — the size and fit, and the
@@ -239,6 +283,9 @@ func (a *App) holeScrewProperties(f *doc.Feature) bool {
 		set("Fit", m)
 	}
 	a.markItemLeft("prop:Fit")
+	if fit == "Tapped" {
+		a.threadChoice(f)
+	}
 	dia, bore, boreDepth, sink, err := doc.ScrewHoleSizes(f.Inputs["Screw"], fit)
 	if err != nil {
 		imgui.TextColored(colErr, err.Error())
@@ -280,4 +327,72 @@ func nearest(ls []float64, l float64) float64 {
 func mustFloat(s string) float64 {
 	v, _ := strconv.ParseFloat(s, 64)
 	return v
+}
+
+// fastenerProperties draws a washer's or nut's standard and size.
+func (a *App) fastenerProperties(f *doc.Feature) {
+	p, ok := doc.FastenerOf(f)
+	if !ok {
+		return
+	}
+	imgui.SeparatorText(map[string]string{"washer": "Washer", "nut": "Nut"}[p.Kind])
+	ids, labels := p.Stds()
+	var opts []string
+	cur := ""
+	for i, id := range ids {
+		opts = append(opts, id+" "+labels[i])
+		if id == p.Std {
+			cur = opts[i]
+		}
+	}
+	input := map[string]string{"washer": "Washer", "nut": "Nut"}[p.Kind]
+	apply := func(n doc.PartSpec) {
+		f.Inputs[input], f.Inputs["Size"] = n.Std, n.Size
+		f.Name = n.Label()
+		a.doc.Commit()
+		if f.Err != "" {
+			a.notify("%s: %s", f.Name, f.Err)
+		}
+	}
+	if m, ok := a.combo("Standard", cur, opts, nil); ok {
+		for i, o := range opts {
+			if o == m {
+				n := doc.PartSpec{Kind: p.Kind, Std: ids[i], Size: p.Size}
+				if sizes := n.Sizes(); !contains(sizes, n.Size) {
+					n.Size = sizes[len(sizes)/2]
+				}
+				apply(n)
+			}
+		}
+	}
+	a.markItemLeft("prop:Standard")
+	if m, ok := a.combo("Size", p.Size, p.Sizes(), nil); ok {
+		apply(doc.PartSpec{Kind: p.Kind, Std: p.Std, Size: m})
+	}
+	a.markItemLeft("prop:Size")
+	if p.Kind == "nut" {
+		a.threadChoice(f)
+	}
+}
+
+// threadChoice: a screw's, nut's or tapped hole's thread drawn (thin lines
+// on drawings, a plain shank or bore) or modelled (a helical solid).
+func (a *App) threadChoice(f *doc.Feature) {
+	cur := "Cosmetic"
+	if f.Inputs["Thread"] == "Modelled" {
+		cur = "Modelled"
+	}
+	if m, ok := a.combo("Thread", cur, []string{"Cosmetic", "Modelled"}, nil); ok && m != cur {
+		if m == "Modelled" {
+			f.Inputs["Thread"] = "Modelled"
+		} else {
+			delete(f.Inputs, "Thread")
+		}
+		a.doc.Commit()
+		if f.Err != "" {
+			a.notify("%s: %s", f.Name, f.Err)
+		}
+	}
+	a.markItemLeft("prop:Thread")
+	imgui.SetItemTooltip("Cosmetic: a plain shank or bore, the thread drawn on drawings.\nModelled: the thread as a solid (for 3D printing); slower, thousands of facets.")
 }

@@ -144,6 +144,14 @@ func (d *Document) buildComponent(f *Feature) error {
 		f.Data = data
 		f.Inputs["File"] = spec.Label() + ".forma"
 	}
+	if p, ok := FastenerOf(f); ok && f.Ref == 0 {
+		data, err := FastenerData(p)
+		if err != nil {
+			return err
+		}
+		f.Data = data
+		f.Inputs["File"] = p.Label() + ".forma"
+	}
 	data, err := d.componentData(f)
 	if err != nil {
 		return err
