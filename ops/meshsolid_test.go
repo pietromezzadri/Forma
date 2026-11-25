@@ -2,6 +2,7 @@ package ops
 
 import (
 	"math"
+	"math/rand"
 	"strings"
 	"testing"
 
@@ -61,5 +62,56 @@ func TestMeshSolid(t *testing.T) {
 	// open: a triangle taken out
 	if _, err := MeshSolid("open", pos, tris[1:]); err == nil || !strings.Contains(err.Error(), "closed") {
 		t.Fatalf("open mesh: %v", err)
+	}
+}
+
+// The faceted cylinder cut whichever corner each face's loop starts at:
+// the cut's plane x = 0 runs through two corners of the top cap, and where
+// the cap's loop starts (its plane's frame) moved the rounding there, so
+// the cut crossed the cap's boundary at a corner twice or not at all.
+func TestMeshSolidCutAnyLoopStart(t *testing.T) {
+	cyl, _ := Cylinder(geom.World, 10, 25)
+	pos, tris := meshOf(cyl, 0.05)
+	c, err := MeshSolid("cyl", pos, tris)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idx := map[*brep.Vertex]int{}
+	var pts []geom.Vec3
+	var faces [][]int
+	for _, f := range c.Faces() {
+		var loop []int
+		for _, h := range f.Loops[0].HalfEdges() {
+			v := h.Edge.Verts[0]
+			if !h.Fwd {
+				v = h.Edge.Verts[1]
+			}
+			i, ok := idx[v]
+			if !ok {
+				i = len(pts)
+				idx[v] = i
+				pts = append(pts, v.P)
+			}
+			loop = append(loop, i)
+		}
+		faces = append(faces, loop)
+	}
+	rng := rand.New(rand.NewSource(7))
+	for run := 0; run < 12; run++ {
+		rot := make([][]int, len(faces))
+		for i, f := range faces {
+			k := rng.Intn(len(f))
+			rot[i] = append(append([]int{}, f[k:]...), f[:k]...)
+		}
+		b, err := Polyhedron("cyl", pts, rot, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cut, _ := Box(geom.V3(0, -20, 10), geom.V3(20, 20, 30))
+		r, err := brep.Boolean(b, cut, brep.Subtract)
+		if err != nil {
+			t.Fatalf("run %d: %v", run, err)
+		}
+		checkSolid(t, r)
 	}
 }

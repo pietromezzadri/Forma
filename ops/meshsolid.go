@@ -75,9 +75,11 @@ func MeshSolid(name string, pos []geom.Vec3, tris [][3]int) (*brep.Body, error) 
 			edge[e] = i
 		}
 	}
-	for e := range edge {
-		if _, ok := edge[[2]int{e[1], e[0]}]; !ok {
-			return nil, fmt.Errorf("it isn't closed (an open edge near %v): not a solid", pts[e[0]])
+	for _, t := range ts { // in the triangles' order: the same edge named every run
+		for k := 0; k < 3; k++ {
+			if _, ok := edge[[2]int{t.v[(k+1)%3], t.v[k]}]; !ok {
+				return nil, fmt.Errorf("it isn't closed (an open edge near %v): not a solid", pts[t.v[k]])
+			}
 		}
 	}
 	// flat regions: neighbours across an edge whose points all lie on the
@@ -170,10 +172,13 @@ func outline(members []int, verts func(int) [3]int, region []int, edge map[[2]in
 	if len(next) < 3 {
 		return nil, false
 	}
-	var start int
+	// start at the lowest vertex, so the face is the same every run (a
+	// map's order is not)
+	start := -1
 	for v := range next {
-		start = v
-		break
+		if start < 0 || v < start {
+			start = v
+		}
 	}
 	loop := []int{start}
 	for v := next[start]; v != start; v = next[v] {

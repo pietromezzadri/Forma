@@ -901,9 +901,22 @@ type crossing struct {
 }
 
 // crossings of segment a→b with the face boundary, in order along it.
+//
+// Where a→b goes through a corner of the boundary (a cut through a
+// polygon's vertex), rounding can put the hit on both segments meeting
+// there or on neither, so the curve would cross twice or not at all. Hits
+// that close to a segment's end are gathered with the other segments' hits
+// at that point, and the boundary is crossed there once if the points
+// just before and after it are on opposite sides, else not at all (the
+// curve only touches the corner).
 func (f *bface) crossings(a, b geom.Vec2) []crossing {
-	var xs []crossing
+	type hit struct {
+		crossing
+		ok bool // within the segment by the strict rule
+	}
+	var hs []hit
 	d := b.Sub(a)
+	const re = 1e-9 // how near a segment's end a hit may be to count as at it
 	for _, s := range f.segs {
 		e := s.b.Sub(s.a)
 		den := d.Cross(e)
@@ -913,11 +926,59 @@ func (f *bface) crossings(a, b geom.Vec2) []crossing {
 		w := s.a.Sub(a)
 		t := w.Cross(e) / den
 		r := w.Cross(d) / den
-		if t > 0 && t <= 1 && r >= 0 && r < 1 {
-			xs = append(xs, crossing{s: t, seg: s, r: r})
+		if t > 0 && t <= 1 && r >= -re && r < 1+re {
+			hs = append(hs, hit{crossing{s: t, seg: s, r: r}, r >= 0 && r < 1})
 		}
 	}
-	sort.Slice(xs, func(i, j int) bool { return xs[i].s < xs[j].s })
+	sort.SliceStable(hs, func(i, j int) bool { return hs[i].s < hs[j].s })
+	size := math.Max(f.hi.X-f.lo.X+f.hi.Y-f.lo.Y, 1e-9)
+	dl := d.Len()
+	at := func(s float64) geom.Vec2 { return a.Add(d.Scale(s)) }
+	var xs []crossing
+	for i := 0; i < len(hs); {
+		// the hits at one point (a corner and its two segments)
+		j := i + 1
+		for j < len(hs) && at(hs[j].s).Dist(at(hs[i].s)) <= 1e-10*size {
+			j++
+		}
+		g := hs[i:j]
+		i = j
+		corner := false
+		for _, h := range g {
+			if h.r < re || h.r > 1-re {
+				corner = true
+			}
+		}
+		if !corner || len(g) == 1 {
+			// a plain crossing, or crossings on segments meeting nowhere
+			// near their ends: kept as the strict rule takes them
+			for _, h := range g {
+				if h.ok {
+					xs = append(xs, h.crossing)
+				}
+			}
+			continue
+		}
+		// through a corner: crossed once or not at all
+		s := g[0].s
+		ds := 1e-7 * size / math.Max(dl, 1e-300)
+		first := g[0].crossing
+		for _, h := range g {
+			if h.ok {
+				first = h.crossing
+				break
+			}
+		}
+		if s-ds <= 0 || s+ds >= 1 {
+			// at an end of a→b: one crossing (the polyline's next segment
+			// tells a touch from a crossing, clip's touch test)
+			xs = append(xs, first)
+			continue
+		}
+		if f.inside(at(s-ds)) != f.inside(at(s+ds)) {
+			xs = append(xs, first)
+		}
+	}
 	return xs
 }
 
