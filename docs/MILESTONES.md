@@ -950,6 +950,31 @@ What each milestone added, in the order they were built. The current gaps are in
   countersunk screws dropped into countersunk holes; two socket head screws
   jointed into counterbored holes in one go, following them when the block
   and the hole's sketch are raised.
+- **Threads on drawings** (`doc/threads.go` `threadsOf`, `drawing.Thread`,
+  `threadLines`; a view's Threads box, `View.NoThread`): ISO 6410's thin
+  lines, worked out from the faces — a tapped hole's drill wall (a hole
+  step with Fit Tapped) gets its thread at the nominal diameter, a screw's
+  shank its thread at the minor diameter (d − 1.22687 P) from its tip, 2d +
+  12 long on socket and countersunk heads with a wide line across where it
+  stops. Side on, two lines along the thread; end on, three quarters of a
+  circle open at the upper right. They go through the projection's hidden
+  line test like edges (an internal thread is hidden in a plain view and
+  shown in a section through it; an external one is never drawn hidden),
+  and a section keeps only the part of a thread on its side.
+- **Hole callouts** (dimension kind `hole`, the Hole tool in Annotate;
+  Callouts puts one on every hole step seen end on in the selected view,
+  over the view; `Document.HoleCallout`, `drawing/callout.go`): a leader
+  to the hole's rim and a shoulder with its description — "2× Ø5.5 THRU",
+  "Ø4.2 THRU" and "M5×0.8 THRU" for a tapped hole, "⌴ Ø10 ↧5.4" under a
+  counterbore, "⌵ Ø11.4 × 90°" under a countersink, a depth "↧10" for a
+  blind hole. The depth, counterbore and countersink symbols aren't in
+  Helvetica, so they are drawn as lines (`richText`); a dimension's text
+  replaces the callout, "<>" standing for it. Tests:
+  `doc/threads_test.go` (the threads a block's tapped hole and a loose
+  M5×30 get; the callouts; what top, front and section views show of
+  them; callouts drawn on the sheet). Capture: a block with a tapped and
+  two counterbored holes, a screw in one, its standard views, Callouts on
+  the top view and a section through the tapped hole.
 - **A video of what's new since 0.3.0** (`captures/whats_new.json`, recorded
   with FORMA_CAPTURE's `record`): two-distance and distance-and-angle
   chamfers, rounds with sizes of their own, tangent chains, holes made for

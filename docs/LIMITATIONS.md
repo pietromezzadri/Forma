@@ -165,8 +165,9 @@ new ones as features land.
 
 ## Holes, patterns, mirror, move
 
-- **H1 Holes:** no threads (cosmetic or modelled; planned in M20), the countersink is always
-  90° and the drill point 118°; holes go square into the sketch's face only.
+- **H1 Holes:** threads only drawn, not modelled (FS1), the countersink is
+  always 90° and the drill point 118°; holes go square into the sketch's
+  face only.
   A hole made for a screw takes its diameters from the tables (FS3).
 - **P1 Linear patterns** run along X, Y or Z only (not along an edge or a
   sketch line); no pattern along a path; no skipping instances.
@@ -179,10 +180,16 @@ new ones as features land.
 
 ## Screws (`doc/fasteners.go`, `app/fasteners_ui.go`; M20)
 
-- **FS1 No threads:** a screw's shank is a plain cylinder at the nominal
-  diameter, and a tapped hole is drilled at the tap size: no thread is
-  modelled or drawn yet (planned: cosmetic threads and hole callouts on
-  drawings, then modelled threads).
+- **FS1 Threads drawn, not modelled** (partly fixed, M20: threads on
+  drawings): a screw's shank is a plain cylinder at the nominal diameter
+  and a tapped hole is drilled at the tap size; drawings show the threads
+  as ISO 6410's thin lines (a tapped hole's at the nominal diameter, a
+  screw's at the minor, 1.22687 × pitch under it), but the solid has no
+  thread (planned: modelled threads). A tapped hole is threaded all the
+  way down its drill (no thread depth of its own), a socket or countersunk
+  head screw for 2d + 12 up from its tip (button and hex heads all the
+  way); a screw's thread isn't drawn where it is hidden, and a screw in a
+  section is cut like any body (drawings usually leave screws uncut).
 - ~~**FS2 Placed, not jointed:**~~ (M20: a screw put in a selected hole is
   jointed there and follows it.) A screw put in a hole is seated on its
   rim (or a counterbore's floor) at the face, never deeper; one placed with
@@ -398,11 +405,13 @@ new ones as features land.
   - Horizontal, vertical, aligned, radius, diameter and angle only. No
     ordinate, baseline or chain dimensions, no arc lengths.
   - Tolerances only as typed text, no GD&T frames or datums.
-  - Nothing is dimensioned automatically.
+  - Nothing is dimensioned automatically but hole callouts (Callouts).
   - The text sits on the line (no horizontal text on a vertical
     dimension). No snapping of a dimension's place to others.
-- **DW4 Annotations:** no automatic hole callouts, no balloons or parts
-  list for an assembly, no surface finish or weld symbols, no revision
+- **DW4 Annotations:** hole callouts only for holes made by a Hole step of
+  this design (not a component's, nor a hole cut by an extrude); a
+  callout's text is the step's sizes, not a thread class or tolerance
+  (no "6H"). No balloons or parts list for an assembly, no surface finish or weld symbols, no revision
   table.
 - **DW5 One sheet per export:** each sheet is its own PDF, SVG or DXF (no
   multi-page PDF).

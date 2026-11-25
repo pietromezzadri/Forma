@@ -139,6 +139,9 @@ as PDF, SVG or DXF.</td>
     lined up with the view they come from.
   - Horizontal, vertical, aligned, radius, diameter and angle dimensions,
     tied to the edges they measure, so they follow an edit. Notes.
+  - Hole callouts (size, depth, thread, counterbore or countersink, with
+    the symbols), one at a time or on every hole of a view, and threads
+    drawn as thin lines on tapped holes and screws.
   - Exported as PDF, SVG or DXF R12. The sheets are saved in the design.
 - **Exchange.**
   - STEP AP214: export of solids and assemblies, and import of
@@ -326,8 +329,8 @@ PNGs to `captures/out/`. The images above come from that script. See
 - **M20 screws and threaded holes** (in progress): ISO metric screws (socket
   head, button head, countersunk, hex) as components, M2 to M12, and holes
   made for them — clearance or tapped, counterbored or countersunk for the
-  head — with a screw jointed into each selected hole (done, in 0.4.0).
-  Left: threads shown on drawings with a hole callout, modelled threads,
+  head — with a screw jointed into each selected hole (done, in 0.4.0);
+  threads on drawings and hole callouts (done). Left: modelled threads,
   washers and nuts ([H1, FS1–FS4](docs/LIMITATIONS.md)).
 
 ## Stack
