@@ -1017,6 +1017,12 @@ What each milestone added, in the order they were built. The current gaps are in
   with no facet edges, outlines and thin lines in a top view and a
   section; a callout on the outline). Capture: an M8 modelled screw, nut
   and tapped plate, and their drawing.
+- Also: edges no longer show through faces in close-ups (the near plane as
+  far out as the scene in view allows, `Camera.near`, and lines pulled
+  toward the camera by a fraction of their distance, `render.depthBias`);
+  a boolean cut through a face's corner crosses it once or not at all, and
+  `MeshSolid` builds the same faces every run (`TestMeshSolid` failed now
+  and then).
 - **A video of what's new since 0.3.0** (`captures/whats_new.json`, recorded
   with FORMA_CAPTURE's `record`): two-distance and distance-and-angle
   chamfers, rounds with sizes of their own, tangent chains, holes made for
