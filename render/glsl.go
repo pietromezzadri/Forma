@@ -97,6 +97,7 @@ in float gDist[];
 uniform vec2 uViewport;
 uniform float uWidth;
 uniform float uDepthBias;
+uniform float uDepthNear;
 flat out uint vID;
 out float vDist;
 void main() {
@@ -119,7 +120,7 @@ void main() {
 	for (int i = 0; i < 4; i++) {
 		vec4 p = i < 2 ? a : b;
 		vec2 o = off[i] / (uViewport * 0.5) * p.w;
-		gl_Position = vec4(p.xy + o, p.z - uDepthBias * p.w, p.w);
+		gl_Position = vec4(p.xy + o, p.z - uDepthBias * p.w - uDepthNear, p.w);
 		vID = gID[0];
 		vDist = i < 2 ? da : db;
 		gl_ClipDistance[0] = i < 2 ? ca : cb;
@@ -160,6 +161,7 @@ in float gDist[];
 uniform vec2 uViewport;
 uniform float uWidth;
 uniform float uDepthBias;
+uniform float uDepthNear;
 flat out uint vID;
 out vec2 vCorner;
 void main() {
@@ -168,7 +170,7 @@ void main() {
 	vec2 c[4] = vec2[4](vec2(-1, -1), vec2(1, -1), vec2(-1, 1), vec2(1, 1));
 	for (int i = 0; i < 4; i++) {
 		vec2 o = c[i] * uWidth * 0.5 / (uViewport * 0.5) * p.w;
-		gl_Position = vec4(p.xy + o, p.z - uDepthBias * p.w, p.w);
+		gl_Position = vec4(p.xy + o, p.z - uDepthBias * p.w - uDepthNear, p.w);
 		vID = gID[0];
 		vCorner = c[i];
 		gl_ClipDistance[0] = gl_in[0].gl_ClipDistance[0];

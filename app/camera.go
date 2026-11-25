@@ -78,11 +78,97 @@ func (c *Camera) Proj(aspect float64, scene geom.Box) mgl32.Mat4 {
 		w := h * aspect
 		return mgl32.Ortho(float32(-w), float32(w), float32(-h), float32(h), float32(-far), float32(far))
 	}
-	near := math.Max(math.Min(d-r*2, c.Dist*0.5), far*1e-5)
-	if near <= 0 {
-		near = far * 1e-5
+	return mgl32.Perspective(float32(c.FovY), float32(aspect), float32(c.near(aspect, scene, far)), float32(far))
+}
+
+// near is the perspective near plane. Depth precision goes with far / near
+// (and the edges' depth bias with it), so it is as far out as it can be
+// without cutting into anything: the nearest point of the scene's box that
+// is in view, up to half way to the target. With the camera inside the box
+// that could be anywhere, so it falls back to a hundredth of the way to the
+// target, which never clips the target however small the part or large the
+// assembly round it (a hundred-thousandth of the far plane, the old floor,
+// let edges show through faces in close-ups). Never under far × 1e-5.
+func (c *Camera) near(aspect float64, scene geom.Box, far float64) float64 {
+	n := c.Dist * 0.01
+	if !scene.Empty() {
+		if z, ok := c.nearestInView(aspect, scene); ok && z*0.98 > n {
+			n = math.Min(z*0.98, math.Max(c.Dist*0.5, n))
+		}
 	}
-	return mgl32.Perspective(float32(c.FovY), float32(aspect), float32(near), float32(far))
+	return math.Max(n, far*1e-5)
+}
+
+// nearestInView is the least view depth of the part of box b inside the
+// view frustum, false when none of it is in view or the eye is inside it
+// (then anything up to the eye is).
+func (c *Camera) nearestInView(aspect float64, b geom.Box) (float64, bool) {
+	eye := c.Eye()
+	if b.Contains(eye) {
+		return 0, false
+	}
+	f, rt, up := c.Basis()
+	th := math.Tan(c.FovY / 2)
+	tw := th * aspect
+	cam := func(p geom.Vec3) geom.Vec3 {
+		q := p.Sub(eye)
+		return geom.V3(q.Dot(rt), q.Dot(up), q.Dot(f))
+	}
+	// the frustum's sides as planes through the eye (inside: ≥ 0)
+	planes := [4]func(p geom.Vec3) float64{
+		func(p geom.Vec3) float64 { return tw*p.Z - p.X },
+		func(p geom.Vec3) float64 { return tw*p.Z + p.X },
+		func(p geom.Vec3) float64 { return th*p.Z - p.Y },
+		func(p geom.Vec3) float64 { return th*p.Z + p.Y },
+	}
+	corner := func(i int) geom.Vec3 {
+		p := b.Min
+		if i&1 != 0 {
+			p.X = b.Max.X
+		}
+		if i&2 != 0 {
+			p.Y = b.Max.Y
+		}
+		if i&4 != 0 {
+			p.Z = b.Max.Z
+		}
+		return cam(p)
+	}
+	faces := [6][4]int{{0, 2, 6, 4}, {1, 3, 7, 5}, {0, 1, 5, 4}, {2, 3, 7, 6}, {0, 1, 3, 2}, {4, 5, 7, 6}}
+	best, found := math.Inf(1), false
+	// the least depth over box ∩ frustum is at one of its vertices: with the
+	// eye outside the box, all of them lie on the box's faces clipped by the
+	// frustum
+	for _, fc := range faces {
+		poly := make([]geom.Vec3, 0, 8)
+		for _, i := range fc {
+			poly = append(poly, corner(i))
+		}
+		for _, pl := range planes {
+			if len(poly) == 0 {
+				break
+			}
+			out := make([]geom.Vec3, 0, len(poly)+2)
+			for i, a := range poly {
+				bb := poly[(i+1)%len(poly)]
+				da, db := pl(a), pl(bb)
+				if da >= 0 {
+					out = append(out, a)
+				}
+				if (da >= 0) != (db >= 0) {
+					t := da / (da - db)
+					out = append(out, a.Add(bb.Sub(a).Scale(t)))
+				}
+			}
+			poly = out
+		}
+		for _, p := range poly {
+			if p.Z < best {
+				best, found = p.Z, true
+			}
+		}
+	}
+	return best, found
 }
 
 // Ray from a viewport point (normalised device coordinates).
