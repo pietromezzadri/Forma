@@ -923,7 +923,18 @@ What each milestone added, in the order they were built. The current gaps are in
   along Z, the bearing face at z = 0 (a countersunk head: its top), the
   shank down to −Length. With a hole's rim selected (a circle with a flat
   face beside it), the screw is placed there, along the face's normal, and
-  takes the size the hole was made for.
+  takes the size the hole was made for. Several rims selected: a screw in
+  each.
+- **Screws jointed in their holes** (`Document.ScrewInHole`, `holeSeat`;
+  joint ends `JointRef.Frame` — a frame fixed in the component, the
+  screw's seat looking down its shank — and `JointRef.Out` — a round
+  edge's frame turned to look out of the part, along the flat face beside
+  it): each screw the Screw command puts in a rim gets a revolute joint
+  ("<screw> in its hole") from its seat to the hole's, so it follows the
+  hole when the part moves or the hole is edited, and the joint's Angle
+  turns it in the hole. A counterbore's top rim seats the screw on the
+  counterbore's floor (the nearest round edge of the same hole step on the
+  axis, deeper in, beside a flat face looking the same way).
 - **Holes for screws** (hole inputs Screw, Fit; `ScrewHoleSizes`): a hole
   made for a size takes its diameter from the tables — clearance close /
   normal / loose (ISO 273) or the tap drill (nominal less one pitch) — and
@@ -932,5 +943,16 @@ What each milestone added, in the order they were built. The current gaps are in
   lengths, valid and as big as their parts; a screw component named,
   moved, resized and counted in the parts list; an M5 counterbored hole
   cutting the tables' volume with an M5×16 sitting in it touching nothing,
-  a tapped and a countersunk hole's sizes). Capture: two countersunk screws
-  dropped into countersunk holes.
+  a tapped and a countersunk hole's sizes; `TestScrewInHole`: socket,
+  countersunk and button heads jointed into counterbored, countersunk and
+  plain holes, seated without touching the block, following the hole's
+  point when it moves, turned 30°, saved and reopened). Captures: two
+  countersunk screws dropped into countersunk holes; two socket head screws
+  jointed into counterbored holes in one go, following them when the block
+  and the hole's sketch are raised.
+- **A video of what's new since 0.3.0** (`captures/whats_new.json`, recorded
+  with FORMA_CAPTURE's `record`): two-distance and distance-and-angle
+  chamfers, rounds with sizes of their own, tangent chains, holes made for
+  screws and screws jointed into them, with captions. Capture targets of one
+  name drawn twice in a frame take the first (`markItem`: two joints both
+  "… in its hole"), and a joint's Play button is `btn:joint.play`.

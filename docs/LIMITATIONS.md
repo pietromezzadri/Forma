@@ -183,9 +183,10 @@ new ones as features land.
   diameter, and a tapped hole is drilled at the tap size: no thread is
   modelled or drawn yet (planned: cosmetic threads and hole callouts on
   drawings, then modelled threads).
-- **FS2 Placed, not jointed:** a screw put in a selected hole is moved and
-  turned there once; it isn't jointed, so it doesn't follow the hole if the
-  part moves or the hole is edited (planned).
+- ~~**FS2 Placed, not jointed:**~~ (M20: a screw put in a selected hole is
+  jointed there and follows it.) A screw put in a hole is seated on its
+  rim (or a counterbore's floor) at the face, never deeper; one placed with
+  nothing selected isn't jointed (join it with the Joint tool).
 - **FS3 Sizes and shapes:** ISO metric coarse M2 to M12 only (button and
   countersunk heads from M3); heads are simplified — a hex head without its
   chamfer or washer face, a button head a spherical cap, a socket's bottom

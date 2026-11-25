@@ -104,9 +104,10 @@ as PDF, SVG or DXF.</td>
   button head (ISO 7380), countersunk (ISO 10642) and hex head (ISO 4017),
   M2 to M12 at their standard lengths, built from the standards' tables;
   their size and length are changed in Properties. With a hole's rim
-  selected, a screw goes into that hole. Holes can be made for a screw:
-  clearance (close, normal or loose, ISO 273) or tapped, counterbored or
-  countersunk to take the screw's head.
+  selected, a screw goes into each, jointed there so it follows the hole
+  when the part or the hole changes, and turns in it. Holes can be made
+  for a screw: clearance (close, normal or loose, ISO 273) or tapped,
+  counterbored or countersunk to take the screw's head.
 - **Inspect.** Measuring, mass properties and section views.
 - **Stress analysis.** A part meshed with 10-node tetrahedra, faces held
   fixed or loaded by a force or a pressure, a material from a list, and
@@ -325,9 +326,9 @@ PNGs to `captures/out/`. The images above come from that script. See
 - **M20 screws and threaded holes** (in progress): ISO metric screws (socket
   head, button head, countersunk, hex) as components, M2 to M12, and holes
   made for them — clearance or tapped, counterbored or countersunk for the
-  head — with a screw placed in a selected hole (done). Left: the screw
-  jointed in its hole, threads shown on drawings with a hole callout, modelled
-  threads, washers and nuts ([H1, FS1–FS4](docs/LIMITATIONS.md)).
+  head — with a screw jointed into each selected hole (done). Left: threads
+  shown on drawings with a hole callout, modelled threads, washers and nuts
+  ([H1, FS1–FS4](docs/LIMITATIONS.md)).
 
 ## Stack
 
