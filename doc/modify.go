@@ -788,37 +788,9 @@ func (d *Document) buildHole(f *Feature) error {
 	if len(f.Points) == 0 {
 		return fmt.Errorf("no points: pick sketch points to drill at")
 	}
-	var spec ops.HoleSpec
-	var err error
-	if spec.Diameter, err = d.input(f, "Diameter"); err != nil {
+	spec, err := d.holeSpec(f)
+	if err != nil {
 		return err
-	}
-	switch f.Inputs["Type"] {
-	case "Counterbore":
-		if spec.BoreDiameter, err = d.input(f, "Bore diameter"); err != nil {
-			return err
-		}
-		if spec.BoreDepth, err = d.input(f, "Bore depth"); err != nil {
-			return err
-		}
-	case "Countersink":
-		if spec.SinkDiameter, err = d.input(f, "Sink diameter"); err != nil {
-			return err
-		}
-	}
-	// made for a screw: its diameters from the tables (the fields left be)
-	if size := f.Inputs["Screw"]; size != "" {
-		dia, bore, boreDepth, sink, err := ScrewHoleSizes(size, f.Inputs["Fit"])
-		if err != nil {
-			return err
-		}
-		spec.Diameter = dia
-		switch f.Inputs["Type"] {
-		case "Counterbore":
-			spec.BoreDiameter, spec.BoreDepth = bore, boreDepth
-		case "Countersink":
-			spec.SinkDiameter = sink
-		}
 	}
 	s := sk.Sketch
 	pl := s.Plane
@@ -850,6 +822,43 @@ func (d *Document) buildHole(f *Feature) error {
 		f.Bodies = append(f.Bodies, b)
 	}
 	return nil
+}
+
+// holeSpec is a hole step's diameters (not its depth).
+func (d *Document) holeSpec(f *Feature) (ops.HoleSpec, error) {
+	var spec ops.HoleSpec
+	var err error
+	if spec.Diameter, err = d.input(f, "Diameter"); err != nil {
+		return spec, err
+	}
+	switch f.Inputs["Type"] {
+	case "Counterbore":
+		if spec.BoreDiameter, err = d.input(f, "Bore diameter"); err != nil {
+			return spec, err
+		}
+		if spec.BoreDepth, err = d.input(f, "Bore depth"); err != nil {
+			return spec, err
+		}
+	case "Countersink":
+		if spec.SinkDiameter, err = d.input(f, "Sink diameter"); err != nil {
+			return spec, err
+		}
+	}
+	// made for a screw: its diameters from the tables (the fields left be)
+	if size := f.Inputs["Screw"]; size != "" {
+		dia, bore, boreDepth, sink, err := ScrewHoleSizes(size, f.Inputs["Fit"])
+		if err != nil {
+			return spec, err
+		}
+		spec.Diameter = dia
+		switch f.Inputs["Type"] {
+		case "Counterbore":
+			spec.BoreDiameter, spec.BoreDepth = bore, boreDepth
+		case "Countersink":
+			spec.SinkDiameter = sink
+		}
+	}
+	return spec, nil
 }
 
 // awayFrom is the direction an edge leaves its vertex v in.

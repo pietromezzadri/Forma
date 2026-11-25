@@ -47,6 +47,24 @@ type Body struct {
 	Name string
 	Body *brep.Body
 	Gen  int // changes whenever the body does (for caching)
+	// Threads are its screw threads (drawn as ISO 6410 has them)
+	Threads []Thread
+	// Callout is a hole's callout, by the name of a face of the hole (nil, or
+	// no lines: no callout). Lines may hold {depth}, {cbore} and {csink},
+	// drawn as the symbols.
+	Callout func(face string) []string
+}
+
+// Thread is a screw thread, drawn as a thin line where its roots would be
+// seen (ISO 6410): an internal thread's at its major diameter, an external
+// one's at its minor; side on as two lines along it, end on as three
+// quarters of a circle at an end.
+type Thread struct {
+	A, B     geom.Vec3 // its axis, from one end to the other (external: B the free end)
+	R        float64   // the radius of its thin line
+	External bool
+	Face     string  // an external thread's face (the cylinder it lies in, which can't hide it)
+	Limit    float64 // > 0: a wide line across at A, this far either side of the axis (where the thread stops)
 }
 
 // Arc is a circle (or a piece of one) in 2D.
@@ -65,6 +83,7 @@ type Curve struct {
 	Edge    *brep.Edge
 	Face    *brep.Face // a silhouette's face (Edge nil)
 	Arc     *Arc       // the piece lies on this circle (an edge seen end on)
+	Thread  bool       // a thread's thin line (no edge or face of the model)
 }
 
 // Region is a face cut by a section's plane, to be hatched: its loops in
@@ -86,8 +105,9 @@ type Projection struct {
 
 // Options say what a projection takes in.
 type Options struct {
-	Hidden  bool // work out hidden lines (else hidden pieces are dropped)
-	Tangent bool // keep tangent edges
+	Hidden   bool // work out hidden lines (else hidden pieces are dropped)
+	Tangent  bool // keep tangent edges
+	NoThread bool // leave the threads out
 }
 
 // Project draws bodies as seen through fr: every edge and every silhouette
@@ -105,14 +125,16 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 	mo := brep.MeshOptions{ChordTol: math.Max(diag*6e-5, 1e-4), MaxEdge: diag / 10}
 	occ := &occluder{fr: fr, eps: 6*mo.ChordTol + diag*2e-6}
 	type cand struct {
-		pts     []geom.Vec3
-		body    int
-		edge    *brep.Edge
-		face    *brep.Face
-		tangent bool
-		arc     *Arc
-		own     int32   // a silhouette's face (in the occluder's count)
-		far     float64 // how far in front its own face must be to hide it (< 0: it can't)
+		pts      []geom.Vec3
+		body     int
+		edge     *brep.Edge
+		face     *brep.Face
+		tangent  bool
+		arc      *Arc
+		own      int32   // a silhouette's face (in the occluder's count)
+		far      float64 // how far in front its own face must be to hide it (< 0: it can't)
+		thread   bool
+		external bool // a screw's thread: none of it drawn hidden
 	}
 	var cands []cand
 	nOwn := int32(0)
@@ -120,10 +142,12 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 		m := brep.Tessellate(b.Body, mo)
 		faces := map[int]*brep.Face{}
 		own := map[int]int32{}
+		ownByName := map[string]int32{}
 		for _, f := range b.Body.Faces() {
 			faces[f.ID] = f
 			nOwn++
 			own[f.ID] = nOwn
+			ownByName[f.Name] = nOwn
 		}
 		occ.add(m, own)
 		for _, e := range b.Body.Edges() {
@@ -163,6 +187,18 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 			}
 			cands = append(cands, cand{pts: s.pts, body: b.Key, face: s.face, own: own[s.face.ID], far: far})
 		}
+		if !opt.NoThread {
+			for _, t := range b.Threads {
+				for _, tc := range threadLines(t, fr, diag) {
+					c := cand{pts: tc.pts, body: b.Key, arc: tc.arc, thread: !tc.limit}
+					if t.External {
+						c.own, c.far = ownByName[t.Face], -1
+					}
+					c.external = t.External
+					cands = append(cands, c)
+				}
+			}
+		}
 	}
 	occ.index()
 
@@ -181,7 +217,10 @@ func Project(bodies []Body, fr Frame, opt Options) *Projection {
 					if run.hidden && !opt.Hidden {
 						continue
 					}
-					cv := Curve{P3: run.pts, Hidden: run.hidden, Tangent: c.tangent, Body: c.body, Edge: c.edge, Face: c.face, Arc: c.arc}
+					if run.hidden && c.external {
+						continue
+					}
+					cv := Curve{P3: run.pts, Hidden: run.hidden, Tangent: c.tangent, Body: c.body, Edge: c.edge, Face: c.face, Arc: c.arc, Thread: c.thread}
 					cv.Pts = make([]geom.Vec2, len(run.pts))
 					for k, p := range run.pts {
 						cv.Pts[k] = fr.P(p)
@@ -686,4 +725,49 @@ func distSeg(p, a, b geom.Vec2) float64 {
 		t = math.Max(0, math.Min(1, p.Sub(a).Dot(ab)/l2))
 	}
 	return p.Dist(a.Add(ab.Scale(t)))
+}
+
+type threadLine struct {
+	pts   []geom.Vec3
+	arc   *Arc
+	limit bool
+}
+
+// threadLines are a thread's lines as fr sees it: side on, its two thin
+// lines (and the wide line across where an external one stops); end on,
+// three quarters of a circle at each end (an external thread's at its
+// free end only), open at the upper right.
+func threadLines(t Thread, fr Frame, diag float64) []threadLine {
+	ax := t.B.Sub(t.A)
+	L := ax.Len()
+	if L < geom.Tol || t.R <= geom.Tol {
+		return nil
+	}
+	z := ax.Scale(1 / L)
+	var out []threadLine
+	if math.Abs(z.Dot(fr.D)) < 1-1e-6 {
+		w := fr.D.Cross(z).Norm()
+		for _, s := range []float64{-1, 1} {
+			o := w.Scale(s * t.R)
+			out = append(out, threadLine{pts: []geom.Vec3{t.A.Add(o), t.B.Add(o)}})
+		}
+		if t.Limit > 0 {
+			out = append(out, threadLine{pts: []geom.Vec3{t.A.Sub(w.Scale(t.Limit)), t.A.Add(w.Scale(t.Limit))}, limit: true})
+		}
+		return out
+	}
+	ends := []geom.Vec3{t.B}
+	if !t.External {
+		ends = append(ends, t.A)
+	}
+	n := max(12, int(math.Ceil(t.R*2*math.Pi*0.75/(diag/200))))
+	for _, c := range ends {
+		pts := make([]geom.Vec3, n+1)
+		for i := range pts {
+			a := math.Pi/2 + 1.5*math.Pi*float64(i)/float64(n)
+			pts[i] = c.Add(fr.R.Scale(t.R * math.Cos(a))).Add(fr.U.Scale(t.R * math.Sin(a)))
+		}
+		out = append(out, threadLine{pts: pts, arc: &Arc{C: fr.P(c), R: t.R}})
+	}
+	return out
 }

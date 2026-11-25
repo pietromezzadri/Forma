@@ -100,11 +100,13 @@ func (a *App) registerDrawingCommands(c *Commands) {
 		c.add(&Command{ID: "drawing.section." + side, Label: "Section " + sideLabel(side), Group: "Drawing", Enabled: viewSel,
 			Run: func(string) { a.addSideView("section", side) }})
 	}
-	for _, k := range []string{"h", "v", "a", "r", "d", "angle"} {
+	for _, k := range []string{"h", "v", "a", "r", "d", "angle", "hole"} {
 		kind := k
 		c.add(&Command{ID: "drawing.dim." + kind, Label: drawing.DimKinds[kind] + " dimension", Group: "Drawing", Enabled: inDrawing,
 			Run: func(string) { a.setDrawTool("dim:" + kind) }})
 	}
+	c.add(&Command{ID: "drawing.callouts", Label: "Hole callouts on every hole in the selected view", Group: "Drawing", Icon: icCallouts, Enabled: viewSel,
+		Run: func(string) { a.addCallouts() }})
 	c.add(&Command{ID: "drawing.note", Label: "Note", Group: "Drawing", Icon: icNote, Enabled: inDrawing,
 		Run: func(arg string) {
 			if arg == "" {
@@ -425,6 +427,8 @@ func (a *App) drawSet(arg string) {
 			vw.Tangent = v == "1"
 		case "view.centre":
 			vw.NoCentre = v == "0"
+		case "view.threads":
+			vw.NoThread = v == "0"
 		case "view.at":
 			vw.At, _ = strconv.ParseFloat(v, 64)
 		case "view.x":
@@ -715,7 +719,7 @@ func minPicks(kind string) int {
 }
 
 func maxPicks(kind string) int {
-	if kind == "r" || kind == "d" {
+	if kind == "r" || kind == "d" || kind == "hole" {
 		return 1
 	}
 	return 2
@@ -736,6 +740,8 @@ func (a *App) drawToolHint() string {
 			return "Pick another edge or point, or click where the dimension goes"
 		case kind == "r" || kind == "d":
 			return "Pick a circle seen end on"
+		case kind == "hole":
+			return "Pick a hole's rim seen end on"
 		case kind == "angle":
 			return "Pick two straight edges"
 		}
@@ -1072,9 +1078,10 @@ func (a *App) drawingRibbon(r *ribbon) {
 		icon rune
 		name string
 	}{{"h", ui.FaArrowsH, "Horizontal"}, {"v", ui.FaArrowsV, "Vertical"}, {"a", ui.FaRuler, "Aligned"},
-		{"r", ui.FaCircle, "Radius"}, {"d", ui.FaDotCircle, "Diameter"}, {"angle", icAngle, "Angle"}} {
+		{"r", ui.FaCircle, "Radius"}, {"d", ui.FaDotCircle, "Diameter"}, {"angle", icAngle, "Angle"}, {"hole", icCallout, "Hole"}} {
 		r.cmd("drawing.dim."+t.kind, t.icon, t.name, dm.tool == "dim:"+t.kind)
 	}
+	r.cmd("drawing.callouts", icCallouts, "Callouts", false)
 	r.cmd("drawing.note", icNote, "Note", dm.tool == "note")
 	r.end("Annotate")
 
@@ -1212,6 +1219,12 @@ func (a *App) drawingProperties() {
 				v.NoCentre = !cl
 				commit = true
 			}
+			th := !v.NoThread
+			if imgui.Checkbox("Threads##vth", &th) {
+				v.NoThread = !th
+				commit = true
+			}
+			imgui.SetItemTooltip("Tapped holes and screws' threads, as thin lines (ISO 6410)")
 			if v.Kind == "section" {
 				bodies := a.doc.D.DrawingBodies()
 				if fr, err := s.FrameOf(v); err == nil && len(bodies) > 0 {

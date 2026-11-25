@@ -34,7 +34,7 @@ type Dim struct {
 }
 
 // DimKinds name the kinds.
-var DimKinds = map[string]string{"h": "Horizontal", "v": "Vertical", "a": "Aligned", "r": "Radius", "d": "Diameter", "angle": "Angle"}
+var DimKinds = map[string]string{"h": "Horizontal", "v": "Vertical", "a": "Aligned", "r": "Radius", "d": "Diameter", "angle": "Angle", "hole": "Hole callout"}
 
 // AddDim puts a dimension on the sheet.
 func (s *Sheet) AddDim(d *Dim) *Dim {
@@ -217,6 +217,9 @@ func (b *Built) Pick(p geom.Vec2, tol float64) (Anchor, bool) {
 	bd := math.Inf(1)
 	for i := range b.Proj.Curves {
 		c := &b.Proj.Curves[i]
+		if c.Edge == nil && c.Face == nil {
+			continue // a thread's line
+		}
 		for k := 0; k+1 < len(c.Pts); k++ {
 			if d := distSeg(p, b.Sheet(c.Pts[k]), b.Sheet(c.Pts[k+1])); d < bd {
 				best, bi, bd = c, k, d
@@ -292,6 +295,7 @@ type measured struct {
 	r      float64
 	l1, l2 [2]geom.Vec2 // angle: the two lines
 	prefix string
+	lines  []string // a hole callout's
 }
 
 func (d *Dim) measure(b *Built) (measured, error) {
@@ -357,6 +361,16 @@ func (d *Dim) measure(b *Built) (measured, error) {
 		if d.Kind == "d" {
 			m.value *= 2
 			m.prefix = "Ø"
+		}
+	case "hole":
+		if len(gs) != 1 || gs[0].kind != gCircle {
+			return m, fmt.Errorf("pick a hole's rim seen end on")
+		}
+		m.p1, m.r = gs[0].p, gs[0].r
+		m.value = 2 * gs[0].r / b.Scale
+		m.lines = b.callout(d.Anchors[0])
+		if len(m.lines) == 0 {
+			return m, fmt.Errorf("not a hole made by a Hole step")
 		}
 	case "angle":
 		if len(gs) != 2 || gs[0].kind != gLine || gs[1].kind != gLine {
@@ -436,6 +450,12 @@ func (d *Dim) Draw(pg *Page, b *Built, places int) error {
 		round(pg, m.p1, m.r, q, d.Kind == "d", d.label(val, m.prefix))
 	case "angle":
 		return d.drawAngle(pg, m, q, places)
+	case "hole":
+		lines := m.lines
+		if d.Text != "" {
+			lines = strings.Split(strings.ReplaceAll(d.Text, "<>", strings.Join(m.lines, "\n")), "\n")
+		}
+		callout(pg, m.p1, m.r, q, lines)
 	}
 	return nil
 }

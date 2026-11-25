@@ -56,7 +56,8 @@ type View struct {
 	Hidden   bool    `json:"hidden,omitempty"`
 	Tangent  bool    `json:"tangent,omitempty"`
 	NoCentre bool    `json:"noCentre,omitempty"`
-	Bodies   []int   `json:"bodies,omitempty"` // the bodies it shows (keys); all if empty
+	NoThread bool    `json:"noThread,omitempty"` // threads left out
+	Bodies   []int   `json:"bodies,omitempty"`   // the bodies it shows (keys); all if empty
 	// a section: the cutting plane crosses the parent at At along the
 	// axis it is seen along (model mm), and Label names it (A → A-A)
 	At    float64 `json:"at,omitempty"`
@@ -564,11 +565,16 @@ func (s *Sheet) buildView(v *View, all []Body, cache *Cache, keys map[string]boo
 	// the view's centre is the bodies' middle: every view of them lines up
 	c := fr.P(box.Center())
 	b.Origin = geom.V2(v.X, v.Y).Sub(c.Scale(b.Scale))
-	opt := Options{Hidden: v.Hidden, Tangent: v.Tangent}
+	opt := Options{Hidden: v.Hidden, Tangent: v.Tangent, NoThread: v.NoThread}
 	var key strings.Builder
 	fmt.Fprintf(&key, "%v|%v|%v|%v|%s|%g", fr.R, fr.U, fr.D, opt, v.Kind, v.At)
 	for _, x := range bodies {
 		fmt.Fprintf(&key, "|%d:%d:%p", x.Key, x.Gen, x.Body)
+		if !opt.NoThread {
+			for _, t := range x.Threads {
+				fmt.Fprintf(&key, ":t%v", t)
+			}
+		}
 	}
 	keys[key.String()] = true
 	if v.Kind == "section" {
@@ -601,7 +607,7 @@ func (s *Sheet) drawView(pg *Page, b *Built) {
 		switch {
 		case c.Hidden:
 			pen = PenHidden
-		case c.Tangent:
+		case c.Tangent, c.Thread:
 			pen = PenThin
 		}
 		pts := make([]geom.Vec2, len(c.Pts))
@@ -682,7 +688,7 @@ func (s *Sheet) centreLines(pg *Page, b *Built) {
 	}
 	var circs []*circ
 	for _, c := range b.Proj.Curves {
-		if c.Arc == nil {
+		if c.Arc == nil || c.Thread {
 			continue
 		}
 		var got *circ

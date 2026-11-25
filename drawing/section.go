@@ -28,6 +28,7 @@ func Section(bodies []Body, o, n geom.Vec3, fr Frame, opt Options) *Projection {
 		case hi <= 1e-9:
 			continue // all of it cut away
 		case lo >= -1e-9:
+			b.Threads = threadsBeyond(b.Threads, o, n)
 			kept = append(kept, b)
 			continue
 		}
@@ -41,7 +42,7 @@ func Section(bodies []Body, o, n geom.Vec3, fr Frame, opt Options) *Projection {
 			warn = append(warn, fmt.Sprintf("%s: %v", b.Name, err))
 			continue
 		}
-		kept = append(kept, Body{Key: b.Key, Name: b.Name, Body: cut, Gen: b.Gen})
+		kept = append(kept, Body{Key: b.Key, Name: b.Name, Body: cut, Gen: b.Gen, Threads: threadsBeyond(b.Threads, o, n), Callout: b.Callout})
 	}
 	pr := Project(kept, fr, opt)
 	pr.Bodies = kept
@@ -175,6 +176,30 @@ func Hatch(loops [][]geom.Vec2, angle, spacing float64) [][2]geom.Vec2 {
 			base := nrm.Scale(s)
 			out = append(out, [2]geom.Vec2{base.Add(d.Scale(xs[i])), base.Add(d.Scale(xs[i+1]))})
 		}
+	}
+	return out
+}
+
+// threadsBeyond are the threads, or the parts of them, on the side of the
+// plane (o, n) a section keeps: one cut away isn't drawn.
+func threadsBeyond(ts []Thread, o, n geom.Vec3) []Thread {
+	var out []Thread
+	for _, t := range ts {
+		da, db := t.A.Sub(o).Dot(n), t.B.Sub(o).Dot(n)
+		const eps = 1e-6
+		if da < -eps && db < -eps {
+			continue
+		}
+		if da < -eps || db < -eps {
+			// crossing the plane: from where it meets it on
+			at := t.A.Lerp(t.B, da/(da-db))
+			if da < 0 {
+				t.A, t.Limit = at, 0
+			} else {
+				t.B = at
+			}
+		}
+		out = append(out, t)
 	}
 	return out
 }

@@ -41,7 +41,8 @@ func (d *Document) DrawingBodies() []drawing.Body {
 		if f := d.Feature(r.Owner); f == nil || f.Hidden {
 			continue
 		}
-		out = append(out, drawing.Body{Key: r.Key, Name: r.Name, Body: r.Body, Gen: r.Gen})
+		out = append(out, drawing.Body{Key: r.Key, Name: r.Name, Body: r.Body, Gen: r.Gen,
+			Threads: d.threadsOf(r), Callout: d.HoleCallout})
 	}
 	return out
 }
