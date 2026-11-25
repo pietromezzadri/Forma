@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"forma/brep"
 	"forma/geom"
 )
 
@@ -332,4 +333,101 @@ func SortedLengths(ls []float64) []string {
 		out = append(out, num(l))
 	}
 	return out
+}
+
+// A screw in a hole: ScrewInHole joins a screw component to the hole whose
+// rim is edge rim of body key — a revolute joint (the screw turns in its
+// hole with the joint's Angle) from the screw's seat (its frame's origin,
+// looking down the shank) to the hole's seat, so the screw follows the
+// hole when the part moves or the hole is edited. The hole's seat is the
+// rim's centre, looking out of the part; a counterbore's top rim seats it
+// on the counterbore's floor.
+func (d *Document) ScrewInHole(screw *Feature, key int, rim *brep.Edge) (*Feature, error) {
+	if _, ok := ScrewOf(screw); !ok {
+		return nil, fmt.Errorf("%s isn't a screw", screw.Name)
+	}
+	var body *brep.Body
+	for _, r := range d.Bodies {
+		if r.Key == key {
+			body = r.Body
+		}
+	}
+	if body == nil {
+		return nil, fmt.Errorf("the hole's body is gone")
+	}
+	c, ok := rim.Curve.(geom.Circle)
+	if !ok {
+		return nil, fmt.Errorf("pick a hole's round rim")
+	}
+	if _, ok := rimNormal(rim); !ok {
+		return nil, fmt.Errorf("the rim has no flat face beside it")
+	}
+	seat := d.holeSeat(body, rim)
+	if seat != rim {
+		c = seat.Curve.(geom.Circle)
+	}
+	hole, err := d.JointRefFor(key, nil, seat, nil, c.Eval(seat.T0))
+	if err != nil {
+		return nil, err
+	}
+	hole.Out = true
+	fr := square(geom.Vec3{}, geom.ZAxis.Neg(), geom.XAxis)
+	j := NewJoint(hole, JointRef{Feature: screw.ID, Key: BodyKey(screw.ID, 0), Frame: &fr}, "Revolute")
+	j.Name = screw.Name + " in its hole"
+	return j, nil
+}
+
+// HoleScrew is the screw size the hole step that made an edge's faces was
+// made for ("" if none).
+func (d *Document) HoleScrew(e *brep.Edge) string {
+	if f := d.holeStepOf(e); f != nil {
+		return f.Inputs["Screw"]
+	}
+	return ""
+}
+
+// holeStepOf is the hole step that made a face beside the edge.
+func (d *Document) holeStepOf(e *brep.Edge) *Feature {
+	for _, h := range e.HE {
+		if h == nil {
+			continue
+		}
+		if f := d.Feature(nameFeature(h.Loop.Face.Name)); f != nil && f.Kind == KHole {
+			return f
+		}
+	}
+	return nil
+}
+
+// holeSeat is where a screw put in a rim sits: below a counterbore's top
+// rim, the counterbore's floor — the nearest round edge of the same hole
+// step on the rim's axis, deeper in, beside a flat face looking the same
+// way; else the rim itself.
+func (d *Document) holeSeat(b *brep.Body, rim *brep.Edge) *brep.Edge {
+	step := d.holeStepOf(rim)
+	if step == nil {
+		return rim
+	}
+	c := rim.Curve.(geom.Circle)
+	n, _ := rimNormal(rim)
+	best, bd := rim, math.Inf(1)
+	for _, e := range b.Edges() {
+		ec, ok := e.Curve.(geom.Circle)
+		if !ok || e == rim || d.holeStepOf(e) != step {
+			continue
+		}
+		off := ec.F.O.Sub(c.F.O)
+		depth := -off.Dot(n)
+		if depth < 1e-6 || off.Add(n.Scale(depth)).Len() > 1e-6 || ec.R > c.R+1e-9 {
+			continue
+		}
+		en, ok := rimNormal(e)
+		if !ok || en.Dot(n) < 1-1e-6 {
+			continue
+		}
+		if depth < bd {
+			best, bd = e, depth
+		}
+	}
+	return best
 }

@@ -169,3 +169,98 @@ func TestScrewHoles(t *testing.T) {
 		t.Fatal("M7 should fail")
 	}
 }
+
+// A screw jointed into its hole: it sits on the counterbore's floor (picked
+// by the counterbore's top rim), flush in a countersink, on the face over a
+// plain hole — never overlapping the block — and follows the hole when the
+// hole's sketch point moves; the joint's angle turns it about the hole's
+// axis.
+func TestScrewInHole(t *testing.T) {
+	for _, tc := range []struct {
+		typ, std string
+		rimR     float64 // the rim picked (at the top face)
+		seatZ    float64 // where the screw's frame should end up
+	}{
+		{"Counterbore", "ISO 4762", 5, 20 - 5.4},
+		{"Countersink", "ISO 10642", 5.7, 20},
+		{"Simple", "ISO 7380", 2.75, 20},
+	} {
+		d := New()
+		bx := d.Insert(NewPrim(KBox))
+		bx.Inputs["Width"], bx.Inputs["Depth"], bx.Inputs["Height"] = "40", "30", "20"
+		sk := d.Insert(NewSketch(PlaneRef{Std: "xy"}))
+		sk.Inputs = map[string]string{"Offset": "20"}
+		pt := sk.Sketch.AddPoint(geom.V2(10, 10))
+		h := d.Insert(NewHole(sk.ID, []int{pt.ID}))
+		h.Inputs["Type"], h.Inputs["Extent"], h.Inputs["Screw"], h.Inputs["Fit"] = tc.typ, "Through all", "M5", "Normal"
+		d.Regenerate()
+		if h.Err != "" {
+			t.Fatalf("%s: %s", tc.typ, h.Err)
+		}
+		var rim *brep.Edge
+		for _, e := range d.Bodies[0].Body.Edges() {
+			if c, ok := e.Curve.(geom.Circle); ok && math.Abs(c.F.O.Z-20) < 1e-6 && math.Abs(c.R-tc.rimR) < 1e-6 {
+				rim = e
+			}
+		}
+		if rim == nil {
+			t.Fatalf("%s: no rim of radius %g", tc.typ, tc.rimR)
+		}
+		if got := d.HoleScrew(rim); got != "M5" {
+			t.Fatalf("%s: the hole is for %q", tc.typ, got)
+		}
+		s, err := NewScrew(ScrewSpec{tc.std, "M5", 16})
+		if err != nil {
+			t.Fatal(err)
+		}
+		d.Insert(s) // at the origin: the joint takes it to the hole
+		j, err := d.ScrewInHole(s, d.Bodies[0].Key, rim)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.typ, err)
+		}
+		d.Insert(j)
+		d.Regenerate()
+		if s.Err != "" || j.Err != "" {
+			t.Fatalf("%s: %q %q", tc.typ, s.Err, j.Err)
+		}
+		seat := func(x, y float64) {
+			t.Helper()
+			sb := d.Bodies[1].Body
+			// the screw's frame origin (0,0,0) and shank end (0,0,−16)
+			o := sb.Bounds()
+			if math.Abs(o.Min.Z-(tc.seatZ-16)) > 1e-6 {
+				t.Fatalf("%s: the shank ends at z %.4f, want %.4f", tc.typ, o.Min.Z, tc.seatZ-16)
+			}
+			if c := o.Center(); math.Hypot(c.X-x, c.Y-y) > 1e-6 {
+				t.Fatalf("%s: the screw is at (%.4f, %.4f), want (%g, %g)", tc.typ, c.X, c.Y, x, y)
+			}
+			if _, err := brep.Boolean(d.Bodies[0].Body, sb, brep.Intersect); err != brep.ErrEmpty {
+				t.Fatalf("%s: the screw and the block overlap (%v)", tc.typ, err)
+			}
+		}
+		seat(10, 10)
+		// the hole moves: the screw goes with it
+		sk.Sketch.Params[pt.Par], sk.Sketch.Params[pt.Par+1] = 25, 15
+		d.Regenerate()
+		if j.Err != "" {
+			t.Fatalf("%s after the move: %s", tc.typ, j.Err)
+		}
+		seat(25, 15)
+		// turned 30° in its hole: still in it
+		j.Inputs["Angle"] = "30"
+		d.Regenerate()
+		if j.Err != "" {
+			t.Fatal(j.Err)
+		}
+		seat(25, 15)
+		// saved and opened again: the same
+		d2, err := Unmarshal(d.Marshal())
+		if err != nil {
+			t.Fatal(err)
+		}
+		d2.Regenerate()
+		if len(d2.Bodies) != 2 || d2.Bodies[1].Body.Bounds().Min.Dist(d.Bodies[1].Body.Bounds().Min) > 1e-6 {
+			t.Fatalf("%s: reopened, the screw moved", tc.typ)
+		}
+	}
+}

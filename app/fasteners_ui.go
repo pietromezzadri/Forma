@@ -21,46 +21,75 @@ import (
 const icScrew = 0xf54a // screwdriver
 
 func (a *App) registerFastenerCommands(c *Commands) {
-	c.add(&Command{ID: "assemble.screw", Label: "Screw: an ISO screw (in the hole whose rim is selected)", Group: "Assemble", Icon: icScrew,
+	c.add(&Command{ID: "assemble.screw", Label: "Screw: an ISO screw (in each hole whose rim is selected)", Group: "Assemble", Icon: icScrew,
 		Enabled: func() bool { return a.sk == nil },
 		Run: func(arg string) {
 			// arg: "ISO 4762,M5,16" (else a socket head M5×16, or the size the
 			// selected hole was made for)
-			spec := doc.ScrewSpec{Std: "ISO 4762", Size: "M5", Length: 16}
-			place, rim := a.selectedRim()
-			if rim != nil {
-				if size := a.holeSizeAt(rim); size != "" {
-					spec.Size = size
+			var given *doc.ScrewSpec
+			if p := strings.Split(arg, ","); len(p) == 3 {
+				if l, err := strconv.ParseFloat(strings.TrimSpace(p[2]), 64); err == nil {
+					given = &doc.ScrewSpec{Std: strings.TrimSpace(p[0]), Size: strings.TrimSpace(p[1]), Length: l}
 				}
 			}
-			if arg != "" {
-				p := strings.Split(arg, ",")
-				if len(p) == 3 {
-					l, err := strconv.ParseFloat(strings.TrimSpace(p[2]), 64)
-					if err == nil {
-						spec = doc.ScrewSpec{Std: strings.TrimSpace(p[0]), Size: strings.TrimSpace(p[1]), Length: l}
+			rims := a.selectedRims()
+			if len(rims) == 0 {
+				rims = []rimSel{{}} // one at the origin
+			}
+			var screws, joints []*doc.Feature
+			for _, rim := range rims {
+				spec := doc.ScrewSpec{Std: "ISO 4762", Size: "M5", Length: 16}
+				if rim.edge != nil {
+					if size := a.doc.D.HoleScrew(rim.edge); size != "" {
+						spec.Size = size
 					}
 				}
+				if given != nil {
+					spec = *given
+				}
+				f, err := doc.NewScrew(spec)
+				if err != nil {
+					a.notify("Screw: %v", err)
+					return
+				}
+				if rim.edge != nil {
+					// head on the rim's face, shank along the hole (into the
+					// part), where it stays if the joint can't be made
+					o, n := rim.place.O, rim.place.Z
+					rx := -math.Asin(math.Max(-1, math.Min(1, n.Y)))
+					ry := math.Atan2(n.X, n.Z)
+					f.Inputs["Move X"], f.Inputs["Move Y"], f.Inputs["Move Z"] = fnum(o.X), fnum(o.Y), fnum(o.Z)
+					f.Inputs["Rotate X"], f.Inputs["Rotate Y"] = fnum(rx*180/math.Pi), fnum(ry*180/math.Pi)
+				}
+				a.doc.D.Insert(f)
+				screws = append(screws, f)
+				if rim.edge == nil {
+					continue
+				}
+				// jointed into the hole, so it follows the hole
+				j, err := a.doc.D.ScrewInHole(f, rim.key, rim.edge)
+				if err != nil {
+					a.notify("%s isn't jointed: %v", f.Name, err)
+					continue
+				}
+				a.doc.D.Insert(j)
+				joints = append(joints, j)
 			}
-			f, err := doc.NewScrew(spec)
-			if err != nil {
-				a.notify("Screw: %v", err)
-				return
-			}
-			if rim != nil {
-				// head on the rim's face, shank along the hole (into the part)
-				o, n := place.O, place.Z
-				rx := -math.Asin(math.Max(-1, math.Min(1, n.Y)))
-				ry := math.Atan2(n.X, n.Z)
-				f.Inputs["Move X"], f.Inputs["Move Y"], f.Inputs["Move Z"] = fnum(o.X), fnum(o.Y), fnum(o.Z)
-				f.Inputs["Rotate X"], f.Inputs["Rotate Y"] = fnum(rx*180/math.Pi), fnum(ry*180/math.Pi)
-			}
-			a.doc.D.Insert(f)
 			a.doc.Commit()
+			for _, j := range joints {
+				if j.Err != "" { // the screw stays where it was put
+					a.notify("%s: %s", j.Name, j.Err)
+					a.doc.Remove(j.ID)
+				}
+			}
+			last := screws[len(screws)-1]
 			a.sel = a.sel[:0]
-			a.browserSel, a.multi = bodyKey(f.ID, 0), nil
-			if f.Err != "" {
-				a.notify("%s: %s", f.Name, f.Err)
+			a.browserSel, a.multi = bodyKey(last.ID, 0), nil
+			switch {
+			case last.Err != "":
+				a.notify("%s: %s", last.Name, last.Err)
+			case len(screws) > 1:
+				a.notify("%d screws put in their holes", len(screws))
 			}
 		}})
 }
@@ -72,14 +101,23 @@ func fnum(x float64) string {
 	return strconv.FormatFloat(math.Round(x*1e4)/1e4, 'f', -1, 64)
 }
 
-// selectedRim is a selected circular edge with a flat face beside it: its
-// centre, and Z the flat face's outward normal (out of the part).
-func (a *App) selectedRim() (geom.Frame, *brep.Edge) {
+// rimSel is a selected hole rim: a circular edge with a flat face beside
+// it, on body key; place is its centre with Z the flat face's outward
+// normal (out of the part).
+type rimSel struct {
+	key   int
+	edge  *brep.Edge
+	place geom.Frame
+}
+
+// selectedRims are the selected circular edges with a flat face beside them.
+func (a *App) selectedRims() []rimSel {
+	var out []rimSel
 	for _, r := range a.sel {
 		if r.Kind != KindEdge {
 			continue
 		}
-		_, e := a.refEdge(r)
+		b, e := a.refEdge(r)
 		if e == nil {
 			continue
 		}
@@ -96,30 +134,11 @@ func (a *App) selectedRim() (geom.Frame, *brep.Edge) {
 				continue
 			}
 			u, v := f.Surf.Project(c.F.O)
-			n := f.OutwardNormal(u, v).Norm()
-			return geom.Frame{O: c.F.O, Z: n}, e
+			out = append(out, rimSel{key: b.ID, edge: e, place: geom.Frame{O: c.F.O, Z: f.OutwardNormal(u, v).Norm()}})
+			break
 		}
 	}
-	return geom.Frame{}, nil
-}
-
-// holeSizeAt is the screw size a hole step made the rim's hole for ("" if
-// none): the rim's faces' step, by their names.
-func (a *App) holeSizeAt(e *brep.Edge) string {
-	for _, h := range e.HE {
-		if h == nil {
-			continue
-		}
-		name := h.Loop.Face.Name
-		var id int
-		if _, err := fmt.Sscanf(name, "f%d/", &id); err != nil {
-			continue
-		}
-		if f := a.doc.D.Feature(id); f != nil && f.Kind == doc.KHole && f.Inputs["Screw"] != "" {
-			return f.Inputs["Screw"]
-		}
-	}
-	return ""
+	return out
 }
 
 // screwProperties draws a screw component's standard, size and length.

@@ -34,6 +34,13 @@ type JointRef struct {
 	Face    string     `json:"face,omitempty"`
 	Edge    *EdgeRef   `json:"edge,omitempty"`
 	Point   *geom.Vec3 `json:"point,omitempty"`
+	// Out turns a round edge's frame so its Z points out of the part (along
+	// the outward normal of the flat face beside it): a hole's rim, whichever
+	// way its circle runs.
+	Out bool `json:"out,omitempty"`
+	// Frame is a frame fixed in the component's own frame (a screw's seat:
+	// where its head sits, Z down the shank).
+	Frame *geom.Frame `json:"frame,omitempty"`
 }
 
 // NewComponent inserts a design (a .forma file's text) as a component.
@@ -354,6 +361,9 @@ func (d *Document) jointFrame(state []*BodyRef, j JointRef) (geom.Frame, error) 
 	place := placeOf(state, j)
 	world := func(p geom.Vec3) geom.Vec3 { return place.Pt(p) }
 	switch {
+	case j.Frame != nil:
+		fr := *j.Frame
+		return square(place.Pt(fr.O), place.Dir(fr.Z), place.Dir(fr.X)), nil
 	case j.Face != "":
 		for _, i := range idx {
 			for _, fc := range state[i].Body.Faces() {
@@ -373,6 +383,9 @@ func (d *Document) jointFrame(state []*BodyRef, j JointRef) (geom.Frame, error) 
 		_, e := d.findEdge(sub, ref)
 		if e == nil {
 			return geom.Frame{}, fmt.Errorf("edge between %s and %s is gone", shortName(ref.A), shortName(ref.B))
+		}
+		if j.Out {
+			return outwardFrame(e, EdgeFrame(e)), nil
 		}
 		return EdgeFrame(e), nil
 	case j.Point != nil:
@@ -464,6 +477,31 @@ func EdgeFrame(e *brep.Edge) geom.Frame {
 	}
 	d = d.Norm()
 	return square(mid, d, perpTo(d))
+}
+
+// outwardFrame turns an edge's frame half round its X when its Z points
+// into the part: against the outward normal of a flat face beside it.
+func outwardFrame(e *brep.Edge, fr geom.Frame) geom.Frame {
+	if n, ok := rimNormal(e); ok && n.Dot(fr.Z) < 0 {
+		fr.Y, fr.Z = fr.Y.Neg(), fr.Z.Neg()
+	}
+	return fr
+}
+
+// rimNormal is the outward normal of a flat face beside an edge.
+func rimNormal(e *brep.Edge) (geom.Vec3, bool) {
+	for _, h := range e.HE {
+		if h == nil {
+			continue
+		}
+		f := h.Loop.Face
+		if _, ok := f.Surf.(geom.Plane); !ok {
+			continue
+		}
+		p := e.Curve.Eval((e.T0 + e.T1) / 2)
+		return f.OutwardNormal(f.Surf.Project(p)).Norm(), true
+	}
+	return geom.Vec3{}, false
 }
 
 func perpTo(d geom.Vec3) geom.Vec3 {
