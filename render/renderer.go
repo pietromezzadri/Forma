@@ -27,7 +27,7 @@ type Paint struct {
 	Hover      uint32 // local ID drawn in HoverColor (0: none)
 	Width      float32
 	Dash       float32    // world units per dash period, 0 = solid
-	DepthBias  float32    // clip-space z pulled toward the camera
+	DepthBias  float32    // how far lines and points are pulled toward the camera (see depthBias)
 	IDBase     uint32     // OR'ed into IDs in the pick pass
 	OnTop      bool       // drawn over everything (no depth test)
 	NoDepth    bool       // faces: drawn without writing depth (see-through: what is behind still shows)
@@ -238,7 +238,9 @@ func (r *Renderer) lineSetup(s *Shader, v View, p Paint, pick bool) {
 	r.common(s, v, p, pick)
 	s.Vec2("uViewport", mgl32.Vec2{float32(v.W), float32(v.H)})
 	s.Float("uWidth", p.Width)
-	s.Float("uDepthBias", p.DepthBias)
+	w, near := depthBias(v.Proj, p.DepthBias)
+	s.Float("uDepthBias", w)
+	s.Float("uDepthNear", near)
 	if s == r.line || s == r.linePick {
 		s.Float("uDash", p.Dash)
 	}
