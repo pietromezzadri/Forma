@@ -165,9 +165,9 @@ new ones as features land.
 
 ## Holes, patterns, mirror, move
 
-- **H1 Holes:** threads only drawn, not modelled (FS1), the countersink is
-  always 90° and the drill point 118°; holes go square into the sketch's
-  face only.
+- **H1 Holes:** threads drawn, or modelled as facets (FS1); the
+  countersink is always 90° and the drill point 118°; holes go square into
+  the sketch's face only.
   A hole made for a screw takes its diameters from the tables (FS3).
 - **P1 Linear patterns** run along X, Y or Z only (not along an edge or a
   sketch line); no pattern along a path; no skipping instances.
@@ -180,12 +180,24 @@ new ones as features land.
 
 ## Screws (`doc/fasteners.go`, `app/fasteners_ui.go`; M20)
 
-- **FS1 Threads drawn, not modelled** (partly fixed, M20: threads on
-  drawings): a screw's shank is a plain cylinder at the nominal diameter
-  and a tapped hole is drilled at the tap size; drawings show the threads
-  as ISO 6410's thin lines (a tapped hole's at the nominal diameter, a
-  screw's at the minor, 1.22687 × pitch under it), but the solid has no
-  thread (planned: modelled threads). A tapped hole is threaded all the
+- **FS1 Threads** (M20: drawn on drawings; modelled on request). A
+  cosmetic thread (the default) is a plain shank at the nominal diameter or
+  a hole drilled at the tap size, drawn as ISO 6410's thin lines (a tapped
+  hole's at the nominal diameter, a screw's at the minor, 1.22687 × pitch
+  under it). A modelled one (Thread: Modelled on a screw, nut or tapped
+  hole) is ISO 68-1's basic profile as a solid of flat facets, 48 a turn —
+  no helical surfaces, so thousands of faces: a screw takes about a second
+  to build, a through tapped hole about as long, and booleans on them are
+  slower than on plain parts. Coarse pitch, right-handed only; no thread
+  runout, no chamfer at the start (the thread is cut off flat); a bolt's
+  crests stand a hundredth of the pitch under the nominal diameter; a
+  modelled tapped hole is drilled just under the thread's crests (not at
+  the tap drill) and threaded a pitch short of a blind hole's depth. A
+  modelled screw in a modelled nut or hole isn't screwed in: their threads
+  overlap unless it is turned to line up (the joint's Angle), so clash
+  checks find them. On drawings a modelled thread is drawn as a cosmetic
+  one with its outline (its facets' edges left out), and a side view has
+  no centre line down a modelled threaded hole. A tapped hole is threaded all the
   way down its drill (no thread depth of its own), a socket or countersunk
   head screw for 2d + 12 up from its tip (button and hex heads all the
   way); a screw's thread isn't drawn where it is hidden, and a screw in a
@@ -200,8 +212,14 @@ new ones as features land.
   flat — and lengths are the standard ones. Counterbores are DIN 974-1's
   diameter and the head's height plus 0.4 mm deep; countersinks the
   countersunk head's diameter plus 0.2 mm, 90°.
-- **FS4 Only screws:** no washers, nuts, inserts, inch sizes or other
-  standards yet.
+- **FS4 Few kinds** (partly fixed, M20: washers and nuts): ISO 7089 and
+  7093-1 washers and ISO 4032 and 4035 hex nuts, as plain shapes — a nut
+  with no chamfers or washer face, bored at the nominal diameter (so a
+  screw through it touches it, no thread), its thread not drawn. No spring
+  or lock washers, lock nuts, inserts, inch sizes or other standards. A
+  stack is built on one rim at a time (a washer and nut go on the rim the
+  screw comes out of, or on the washer there); a washer can't be slipped
+  in under a screw already in the hole.
 
 ## Measure, mass properties, section
 

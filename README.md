@@ -100,14 +100,20 @@ as PDF, SVG or DXF.</td>
 - **Assemblies.** Components from other `.forma` files; rigid, revolute,
   slider and cylindrical joints with motion and limits; grounding;
   interference checks; a bill of materials (CSV) and an exploded view.
-- **Screws.** ISO metric screws as components: socket head cap (ISO 4762),
-  button head (ISO 7380), countersunk (ISO 10642) and hex head (ISO 4017),
-  M2 to M12 at their standard lengths, built from the standards' tables;
-  their size and length are changed in Properties. With a hole's rim
-  selected, a screw goes into each, jointed there so it follows the hole
-  when the part or the hole changes, and turns in it. Holes can be made
-  for a screw: clearance (close, normal or loose, ISO 273) or tapped,
-  counterbored or countersunk to take the screw's head.
+- **Screws, washers and nuts.** ISO metric screws as components: socket
+  head cap (ISO 4762), button head (ISO 7380), countersunk (ISO 10642) and
+  hex head (ISO 4017), M2 to M12 at their standard lengths, built from the
+  standards' tables; their size and length are changed in Properties. With
+  a hole's rim selected, a screw goes into each, jointed there so it
+  follows the hole when the part or the hole changes, and turns in it.
+  Plain and large washers (ISO 7089, ISO 7093-1) and hex nuts (ISO 4032,
+  thin ISO 4035) go on a hole's rim the same way, each onto what is
+  already there: a washer under a screw's head, a washer and a nut where
+  it comes out. Holes can be made for a screw: clearance (close, normal or
+  loose, ISO 273) or tapped, counterbored or countersunk to take the
+  screw's head.
+  Threads are drawn on drawings, or modelled as a solid for 3D printing
+  (Thread: Modelled on a screw, nut or tapped hole).
 - **Inspect.** Measuring, mass properties and section views.
 - **Stress analysis.** A part meshed with 10-node tetrahedra, faces held
   fixed or loaded by a force or a pressure, a material from a list, and
@@ -326,12 +332,13 @@ PNGs to `captures/out/`. The images above come from that script. See
   corners). Left: blended corners where smaller rounds meet larger ones
   (mitred now), corners of curved faces or of more than three edges, more
   kinds of edges ([F1–F5](docs/LIMITATIONS.md)).
-- **M20 screws and threaded holes** (in progress): ISO metric screws (socket
+- **M20 screws and threaded holes** (done): ISO metric screws (socket
   head, button head, countersunk, hex) as components, M2 to M12, and holes
   made for them — clearance or tapped, counterbored or countersunk for the
   head — with a screw jointed into each selected hole (done, in 0.4.0);
-  threads on drawings and hole callouts (done). Left: modelled threads,
-  washers and nuts ([H1, FS1–FS4](docs/LIMITATIONS.md)).
+  threads on drawings and hole callouts, washers and nuts, modelled
+  threads (done). Left: finer pitches, inch sizes, lock nuts, a thread
+  runout ([H1, FS1–FS4](docs/LIMITATIONS.md)).
 
 ## Stack
 

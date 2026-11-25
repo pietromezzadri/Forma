@@ -909,7 +909,7 @@ What each milestone added, in the order they were built. The current gaps are in
   Test: `TestFilletTangentChain` (the rim with the chain, one edge without
   it or from before the option, a chamfer's chain).
 
-## M20: screws and threaded holes (in progress; screws and screw holes in 0.4.0)
+## M20: screws and threaded holes (done; screws and screw holes in 0.4.0)
 
 - **Screws** (`doc/fasteners.go`: `ScrewStds`, `ScrewSpec`, `ScrewDesign`,
   `NewScrew`; `app/fasteners_ui.go`, command `assemble.screw[:<std>,<size>,
@@ -975,6 +975,48 @@ What each milestone added, in the order they were built. The current gaps are in
   them; callouts drawn on the sheet). Capture: a block with a tapped and
   two counterbored holes, a screw in one, its standard views, Callouts on
   the top view and a section through the tapped hole.
+- **Washers and nuts** (`doc/nuts.go`: `WasherStds`, `NutStds`, `PartSpec`,
+  `FastenerDesign`, `NewFastener`; commands `assemble.washer[:<std>,<size>]`
+  and `assemble.nut[:<std>,<size>]`, the Washer and Nut buttons in
+  Assemble): ISO 7089 plain and ISO 7093-1 large washers, ISO 4032 and thin
+  ISO 4035 hex nuts, M2 to M12, components whose design comes from their
+  inputs (Washer or Nut, Size), standing on z = 0 up to their thickness.
+  Every screw, washer and nut put on a rim goes through
+  `Document.FastenerInHole`: jointed onto the top of what is already
+  stacked on that rim (`stackTop`: the joint holding something to the
+  rim's seat, then up the joints on each one's top face, `climb`) or, with
+  nothing there, onto the hole's seat; a washer's or nut's own rim picked
+  stacks on it. The joints are named "… on …". Tests: `doc/nuts_test.go`
+  (34 washers and nuts, valid and of their volume; a bolted joint through
+  a plate — washer and screw on top, washer and nut, picked by the
+  washer's rim, under it — at the right heights, clash free, following the
+  hole, two washers one row of the parts list, no washer over a screw).
+  Capture: that joint built in the app from the rims, seen in X-ray from
+  the front, with its parts list.
+- **Modelled threads** (`ops/thread.go`: `ThreadSpec`, `ThreadedRod`; the
+  primitive `thread` (Diameter, Pitch, Height, Internal), joined or cut;
+  input Thread = Modelled on a screw or nut component and on a tapped hole
+  step, `ModelledThread`; the Thread choice in their properties): ISO
+  68-1's basic profile swept along a right-hand helix, 48 flat facets a
+  turn. A threaded length is built whole as a rod (the profile's band
+  wound round the axis, clipped flat at both ends and capped by fans from
+  the axis; shifted a fraction of a step so no vertex lies on an end's
+  plane, or clipping left edges of no length) and made a solid by
+  `MeshSolid`, then joined or cut with no facet crossing a face of the
+  part but on a flat end: a screw's rod joined to the plain shank above
+  it (its crests P/100 under the nominal so it sits inside the shank's
+  rim), a nut's and a tapped hole's cut where a drill a hair under its
+  crests went (`Crest`). On drawings the thread facets' edges and
+  outlines are left out (`drawing.ThreadFacet`), a modelled thread drawn
+  as its cosmetic thin lines plus its outline (`Thread.Outline`, the
+  facets counting as one face that can't hide them), and a hole callout
+  can be put on a modelled hole's outline circle. Tests:
+  `ops/thread_test.go` (a rod joined to a shank under a head, cut from a
+  drilled block), `doc/modelled_test.go` (a modelled M5×30 screw, nut and
+  through tapped plate valid and taking the material they should; drawn
+  with no facet edges, outlines and thin lines in a top view and a
+  section; a callout on the outline). Capture: an M8 modelled screw, nut
+  and tapped plate, and their drawing.
 - **A video of what's new since 0.3.0** (`captures/whats_new.json`, recorded
   with FORMA_CAPTURE's `record`): two-distance and distance-and-angle
   chamfers, rounds with sizes of their own, tangent chains, holes made for
