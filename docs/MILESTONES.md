@@ -1093,3 +1093,11 @@ What each milestone added, in the order they were built. The current gaps are in
   Capture `captures/m21.json`: the converted arm-and-wheel circuit on the
   sheet, running, a wire drawn and the short it makes found, a Wokwi
   project opened, compiled and run.
+- After it: the Delete key on a selected wire no longer crashes the sheet
+  (the wire is taken out at the start of the next frame, `wireSheet.del`;
+  capture `captures/m21_delete.json`); adding a part with its 3D model
+  links the model to that part, not the last one added (an LED's model
+  had gone to its resistor, so it never lit; `fixModels` repairs such
+  files); a lit LED gives off its own light (`render.Paint.Glow`) on a
+  curve the eye reads (`ledLook`); closing the window or Quit with unsaved
+  changes asks to Save, Don't save or Cancel (`app/close_dialog.go`).
