@@ -44,6 +44,14 @@ interference checks.</td>
 servo and motor move the assembly's joints.</td>
 </tr>
 <tr>
+<td colspan="2"><img src="docs/images/wiring.png" alt="The wiring sheet: an Uno wired to a button, an LED through its resistor, a servo and a pot, running, with a terminal's voltage shown"></td>
+</tr>
+<tr>
+<td colspan="2"><b>Wiring.</b> Wires drawn pin to pin and part to part on a wiring sheet,
+checked as they are drawn and followed by the simulation. A Wokwi project
+opens with its wiring and sketch.</td>
+</tr>
+<tr>
 <td colspan="2"><img src="docs/images/drawing.png" alt="A drawing sheet of the part: front, top and isometric views, a section through two counterbored holes, dimensions and a title block"></td>
 </tr>
 <tr>
