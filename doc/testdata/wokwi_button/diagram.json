@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "author": "Forma",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-breadboard-half", "id": "bb1", "top": -60, "left": 100, "attrs": {} },
+    { "type": "wokwi-arduino-uno", "id": "uno", "top": 200, "left": 20, "attrs": {} },
+    { "type": "wokwi-led", "id": "led1", "top": -40, "left": 150, "attrs": { "color": "red" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": 40, "left": 140, "rotate": 90, "attrs": { "value": "1k" } },
+    { "type": "wokwi-pushbutton", "id": "btn1", "top": -20, "left": 260, "attrs": { "color": "green" } },
+    { "type": "wokwi-servo", "id": "servo1", "top": -150, "left": 400, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot1", "top": 100, "left": 420, "attrs": {} },
+    { "type": "wokwi-lcd1602", "id": "lcd1", "top": 300, "left": 400, "attrs": {} }
+  ],
+  "connections": [
+    [ "uno:13", "r1:1", "green", [ "v-20" ] ],
+    [ "r1:2", "led1:A", "green", [] ],
+    [ "led1:C", "bb1:tn.1", "black", [] ],
+    [ "uno:GND.1", "bb1:tn.5", "black", [ "v-40" ] ],
+    [ "btn1:1.l", "uno:2", "blue", [ "h0" ] ],
+    [ "btn1:2.r", "bb1:tn.9", "black", [] ],
+    [ "servo1:PWM", "uno:9", "orange", [] ],
+    [ "servo1:V+", "uno:5V", "red", [] ],
+    [ "servo1:GND", "uno:GND.2", "black", [] ],
+    [ "pot1:SIG", "uno:A0", "violet", [] ],
+    [ "pot1:VCC", "bb1:tp.2", "red", [] ],
+    [ "pot1:GND", "bb1:tn.12", "black", [] ],
+    [ "uno:5V", "bb1:tp.1", "red", [] ],
+    [ "lcd1:VSS", "uno:GND.3", "black", [] ],
+    [ "uno:RESET", "btn1:1.r", "gray", [] ]
+  ],
+  "dependencies": {}
+}

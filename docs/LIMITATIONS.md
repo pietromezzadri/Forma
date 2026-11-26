@@ -396,15 +396,26 @@ new ones as features land.
   linked through the file (a save there is read back, an edit here
   written to it), not as an extension; a board other than the Uno isn't
   compiled for.
-- **EL8 Wiring is by name** (planned: M21 and M22, see
-  [WIRING.md](WIRING.md)): pins are picked per part, not drawn; no wires,
-  no breadboard view, no reading a Wokwi `diagram.json` or a KiCad
-  netlist; one board per circuit and an Uno only. Parts connect only
-  through the Uno: a button and an LED are tied together by the sketch
-  (the Button and LED example), not by a wire between them.
+- ~~EL8 Wiring is by name~~ (M21: wires are drawn on a wiring sheet, part
+  to part as well as to the board, the simulation follows them, and a
+  Wokwi `diagram.json` is read; see EL11 for what is left).
 - **EL10 Installing arduino-cli** takes Arduino's latest release (no
   version pinned, so a future one could change its output), needs the
   internet the first time, and sets up the AVR core only.
+- **EL11 Wiring** (M21): the nets are solved as a DC circuit each step —
+  resistors, pots, LEDs (a forward voltage and 15 Ω), switches, batteries
+  and the board's pins (25 Ω, pull-ups) — with no capacitors, inductors,
+  transistors or diodes but LEDs, and a PWM LED lit by its duty; motors,
+  drivers and servos stay the lumped models of EL4, fed by their nets.
+  The sheet routes wires square in lanes of their own, but a part moved
+  far from the board can put wires across other boxes; a corner is added
+  by hand (double-click). A slide switch has one throw. From Wokwi: the
+  Uno, LEDs, resistors, push buttons, servos, pots and slide switches;
+  other parts are listed and left out, a breadboard's strips and rails
+  join wires but a part pushed into the breadboard isn't connected (it
+  joins by where it sits), and wire routes and positions aren't kept.
+  No KiCad netlist, one board per circuit, an Uno only, and the wires
+  aren't cables in the assembly yet (M22).
 
 ## Drawings (`drawing/`, `app/drawing_ui.go`; M16)
 

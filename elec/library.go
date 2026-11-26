@@ -21,7 +21,11 @@ type Model struct {
 	Drives bool     // its shaft can drive a joint
 	Analog bool     // its pin is an analogue channel (A0..A5)
 	Needs  []string // other parts it is wired to: "supply", "motor"
-	make   func(n string, pin map[string]avr.Pin, p map[string]float64) Part
+	// Terms are its terminals, the ends wires join ("SIG", "+", "A"); Role
+	// is the terminal each of its Pins roles is
+	Terms []string
+	Role  map[string]string
+	make  func(n string, pin map[string]avr.Pin, p map[string]float64) Part
 }
 
 // Param is one of a model's figures.
@@ -49,12 +53,13 @@ func Models() []string {
 	return ids
 }
 
-var kindOrder = map[string]int{"servo": 0, "motor": 1, "driver": 2, "battery": 3, "pot": 4, "button": 5, "led": 6}
+var kindOrder = map[string]int{"servo": 0, "motor": 1, "driver": 2, "battery": 3, "pot": 4, "button": 5, "switch": 6, "led": 7, "resistor": 8}
 
 func add(m *Model) { Library[m.ID] = m }
 
 func init() {
 	add(&Model{ID: "sg90", Kind: "servo", Label: "SG90 micro servo", Drives: true,
+		Terms: []string{"SIG", "V+", "GND"}, Role: map[string]string{"signal": "SIG"},
 		About:  "9 g, 180°, 0.1 s for 60° at 4.8 V; signal 544–2400 µs (the Servo library's range)",
 		Pins:   []string{"signal"},
 		Params: []Param{{"Range", "°", 180}, {"Speed", "°/s", 600}, {"Min pulse", "µs", 544}, {"Max pulse", "µs", 2400}, {"Start", "°", 90}},
@@ -65,33 +70,39 @@ func init() {
 			return s
 		}})
 	add(&Model{ID: "mg996r", Kind: "servo", Label: "MG996R servo", Drives: true,
+		Terms: []string{"SIG", "V+", "GND"}, Role: map[string]string{"signal": "SIG"},
 		About:  "55 g metal-gear servo, 180°, 0.17 s for 60° at 6 V",
 		Pins:   []string{"signal"},
 		Params: []Param{{"Range", "°", 180}, {"Speed", "°/s", 350}, {"Min pulse", "µs", 544}, {"Max pulse", "µs", 2400}, {"Start", "°", 90}},
 		make:   Library["sg90"].make})
 	add(&Model{ID: "tt-motor", Kind: "motor", Label: "TT gear motor", Drives: true,
+		Terms:  []string{"1", "2"},
 		About:  "the yellow 1:48 hobby gear motor: 200 rpm and 0.078 N·m at 6 V",
 		Params: []Param{{"Rated", "V", 6}, {"No-load speed", "rpm", 200}, {"Stall torque", "N·m", 0.078}, {"Inertia", "kg·m²", 2e-5}, {"Load", "N·m", 0}},
 		make:   motorMake})
 	add(&Model{ID: "n20-motor", Kind: "motor", Label: "N20 gear motor", Drives: true,
+		Terms:  []string{"1", "2"},
 		About:  "12 mm micro gear motor (1:100): 300 rpm and 0.04 N·m at 6 V",
 		Params: []Param{{"Rated", "V", 6}, {"No-load speed", "rpm", 300}, {"Stall torque", "N·m", 0.04}, {"Inertia", "kg·m²", 5e-6}, {"Load", "N·m", 0}},
 		make:   motorMake})
 	add(&Model{ID: "tb6612", Kind: "driver", Label: "TB6612 motor driver", Needs: []string{"supply", "motor"},
+		Terms: driverTerms, Role: driverRoles,
 		About:  "MOSFET H-bridge: 0.1 V lost; IN1 / IN2 the direction, PWM on the enable",
 		Pins:   []string{"in1", "in2", "enable"},
 		Params: []Param{{"Drop", "V", 0.1}},
 		make:   driverMake})
 	add(&Model{ID: "l298n", Kind: "driver", Label: "L298N motor driver", Needs: []string{"supply", "motor"},
+		Terms: driverTerms, Role: driverRoles,
 		About:  "bipolar H-bridge: about 1.4 V lost",
 		Pins:   []string{"in1", "in2", "enable"},
 		Params: []Param{{"Drop", "V", 1.4}},
 		make:   driverMake})
-	add(&Model{ID: "battery-4aa", Kind: "battery", Label: "4 × AA pack", About: "6 V, 0.6 Ω",
+	add(&Model{ID: "battery-4aa", Kind: "battery", Label: "4 × AA pack", About: "6 V, 0.6 Ω", Terms: []string{"+", "-"},
 		Params: []Param{{"Volts", "V", 6}, {"Resistance", "Ω", 0.6}}, make: batteryMake})
-	add(&Model{ID: "battery-2s", Kind: "battery", Label: "2S Li-ion pack", About: "7.4 V, 0.1 Ω",
+	add(&Model{ID: "battery-2s", Kind: "battery", Label: "2S Li-ion pack", About: "7.4 V, 0.1 Ω", Terms: []string{"+", "-"},
 		Params: []Param{{"Volts", "V", 7.4}, {"Resistance", "Ω", 0.1}}, make: batteryMake})
 	add(&Model{ID: "pot", Kind: "pot", Label: "Potentiometer", Analog: true,
+		Terms: []string{"1", "W", "2"}, Role: map[string]string{"wiper": "W"},
 		About:  "10 kΩ across 5 V, the wiper on an analogue input",
 		Pins:   []string{"wiper"},
 		Params: []Param{{"Value", "0..1", 0.5}},
@@ -99,16 +110,37 @@ func init() {
 			return &Pot{Name: n, Channel: int(pin["wiper"]), Value: p["Value"]}
 		}})
 	add(&Model{ID: "button", Kind: "button", Label: "Push button", About: "between the pin and ground (INPUT_PULLUP: pressed reads LOW)",
+		Terms: []string{"1", "2"}, Role: map[string]string{"pin": "1"},
 		Pins: []string{"pin"},
 		make: func(n string, pin map[string]avr.Pin, _ map[string]float64) Part {
 			return &Button{Name: n, Pin: pin["pin"]}
 		}})
-	add(&Model{ID: "led", Kind: "led", Label: "LED", About: "its brightness the pin's duty",
-		Pins: []string{"pin"},
-		make: func(n string, pin map[string]avr.Pin, _ map[string]float64) Part {
-			return &LED{Name: n, Pin: pin["pin"]}
+	add(&Model{ID: "led", Kind: "led", Label: "LED", About: "lit by the current through it: full at 20 mA",
+		Terms: []string{"A", "K"}, Role: map[string]string{"pin": "A"},
+		Params: []Param{{"Forward voltage", "V", 2}},
+		Pins:   []string{"pin"},
+		make: func(n string, pin map[string]avr.Pin, p map[string]float64) Part {
+			return &LED{Name: n, Pin: pin["pin"], Vf: p["Forward voltage"]}
 		}})
 }
+
+func init() {
+	add(&Model{ID: "resistor", Kind: "resistor", Label: "Resistor", About: "a fixed resistor (220 Ω for an LED on 5 V)",
+		Terms: []string{"1", "2"}, Params: []Param{{"Resistance", "Ω", 220}},
+		make: func(n string, _ map[string]avr.Pin, p map[string]float64) Part {
+			return &Resistor{Name: n, Ohms: p["Resistance"]}
+		}})
+	add(&Model{ID: "switch", Kind: "switch", Label: "Slide switch", About: "on or off: a power switch, a mode switch",
+		Terms: []string{"1", "2"}, Params: []Param{{"On", "0/1", 0}},
+		make: func(n string, _ map[string]avr.Pin, p map[string]float64) Part {
+			return &Switch{Name: n, On: p["On"] != 0}
+		}})
+}
+
+var (
+	driverTerms = []string{"IN1", "IN2", "EN", "VM", "GND", "OUT1", "OUT2"}
+	driverRoles = map[string]string{"in1": "IN1", "in2": "IN2", "enable": "EN"}
+)
 
 func motorMake(n string, _ map[string]avr.Pin, p map[string]float64) Part {
 	return &Motor{Name: n, Rated: p["Rated"], NoLoadRPM: p["No-load speed"], StallTorque: p["Stall torque"],

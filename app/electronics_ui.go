@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"forma/avr"
 	"forma/doc"
 	"forma/elec"
+	"forma/geom"
 	"forma/ui"
 )
 
@@ -43,6 +45,7 @@ type elecState struct {
 	compiling string // the sketch being compiled
 	addModel  string
 	noModel   bool // Add part leaves the 3D model out
+	sheet     wireSheet
 }
 
 func (a *App) registerElecCommands(c *Commands) {
@@ -70,6 +73,29 @@ func (a *App) registerElecCommands(c *Commands) {
 		}})
 	c.add(&Command{ID: "electronics.wire", Label: "Electronics: wire a part (part.role=pin)", Group: "Assemble",
 		Run: func(arg string) { a.elecCommand(arg, "wire") }})
+	c.add(&Command{ID: "electronics.sheet", Label: "Electronics: the wiring sheet", Group: "Assemble", Icon: icWiring,
+		Run: func(arg string) {
+			sh := &a.elec.sheet
+			sh.open = arg == "1" || arg == "" && !sh.open
+			sh.fit = true
+			if sh.open && a.elecCircuit() == nil {
+				a.elecAdd()
+			}
+		}})
+	c.add(&Command{ID: "electronics.wokwi", Label: "Electronics: open a Wokwi project (its diagram.json and sketch)", Group: "Assemble", Icon: icWiring,
+		Run: func(arg string) {
+			if arg != "" {
+				a.elecWokwi(arg)
+				return
+			}
+			a.pickFile(false, "Open a Wokwi project's diagram.json", "Open", startIn(a.doc.Path, ""), wokwiFilter, a.elecWokwi)
+		}})
+	c.add(&Command{ID: "electronics.connect", Label: "Electronics: wire two terminals (part.term=part.term[=colour])", Group: "Assemble",
+		Run: func(arg string) { a.elecConnect(arg, true) }})
+	c.add(&Command{ID: "electronics.disconnect", Label: "Electronics: take the wire between two terminals off (part.term=part.term)", Group: "Assemble",
+		Run: func(arg string) { a.elecConnect(arg, false) }})
+	c.add(&Command{ID: "electronics.place", Label: "Electronics: put a part on the wiring sheet (part=x,y)", Group: "Assemble",
+		Run: func(arg string) { a.elecPlace(arg) }})
 	c.add(&Command{ID: "electronics.drive", Label: "Electronics: drive a joint (part=joint[,ratio[,zero]])", Group: "Assemble",
 		Run: func(arg string) { a.elecCommand(arg, "drive") }})
 	c.add(&Command{ID: "electronics.set", Label: "Electronics: set a part's figure (part.figure=value)", Group: "Assemble",
@@ -92,8 +118,11 @@ func (a *App) registerElecCommands(c *Commands) {
 		Run: func(arg string) {
 			name, v, _ := strings.Cut(arg, "=")
 			if st := a.elec.study; st != nil {
-				if b, ok := st.Parts[name].(*elec.Button); ok {
-					b.Pressed = v != "0"
+				switch q := st.Parts[name].(type) {
+				case *elec.Button:
+					q.Pressed = v != "0"
+				case *elec.Switch:
+					q.On = v != "0"
 				}
 			}
 		}})
@@ -197,7 +226,10 @@ func trimProg(p []uint16) []uint16 {
 	return p[:n]
 }
 
-func (a *App) elecAddPart(model, name string) {
+// elecAddPart adds a part of a model and returns its name ("" if none was
+// added). Adding can bring more than the one part (an LED its resistor), so
+// the part is known by its name, not by being last.
+func (a *App) elecAddPart(model, name string) string {
 	f := a.elecCircuit()
 	if f == nil {
 		a.elecAdd()
@@ -205,14 +237,15 @@ func (a *App) elecAddPart(model, name string) {
 	}
 	if elec.Library[model] == nil {
 		a.notify("No part %q in the library", model)
-		return
+		return ""
 	}
-	if name == "" {
-		name = f.Circuit.PartName(model)
-	}
-	f.Circuit.Parts = append(f.Circuit.Parts, doc.NewCircuitPart(f.Circuit, model, name))
+	p := f.Circuit.AddPart(model, name)
 	a.elec.open = true
 	a.elecEdit()
+	if p == nil {
+		return ""
+	}
+	return p.Name
 }
 
 // elecInsertModel puts a library part's 3D model (Arduino Uno, SG90, TT
@@ -274,16 +307,22 @@ func (a *App) elecCommand(arg, what string) {
 	}
 	switch what {
 	case "wire":
-		if cp.Pins == nil {
-			cp.Pins = map[string]string{}
-		}
-		switch key {
-		case "supply":
-			cp.Supply = val
-		case "motor":
-			cp.Motor = val
+		// a role to a board pin, a driver's supply or motor, or a terminal
+		// to another (part.terminal or a board pin; empty: unwired)
+		m := elec.Library[cp.Model]
+		switch {
+		case key == "supply":
+			f.Circuit.SetSupply(cp.Name, val)
+		case key == "motor":
+			f.Circuit.SetMotor(cp.Name, val)
+		case m != nil && m.Role[key] != "":
+			f.Circuit.SetBoardPin(cp.Name, m.Role[key], strings.ToUpper(val))
+		case val == "":
+			f.Circuit.SetBoardPin(cp.Name, key, "")
+		case !strings.Contains(val, "."):
+			f.Circuit.Connect(cp.Name+"."+key, elec.Board+"."+strings.ToUpper(val))
 		default:
-			cp.Pins[key] = val
+			f.Circuit.Connect(cp.Name+"."+key, val)
 		}
 	case "drive":
 		parts := strings.Split(val, ",")
@@ -336,6 +375,11 @@ func (a *App) elecRuntime(p elec.Part, key string, v float64) bool {
 	case *elec.Button:
 		if key == "Pressed" {
 			q.Pressed = v != 0
+			return true
+		}
+	case *elec.Switch:
+		if key == "On" {
+			q.On = v != 0
 			return true
 		}
 	}
@@ -427,7 +471,7 @@ func (a *App) circuitProperties(f *doc.Feature) bool {
 	if c != nil {
 		imgui.Text("Arduino Uno · " + map[bool]string{true: c.File, false: "no firmware"}[c.File != ""])
 		for _, p := range c.Parts {
-			imgui.BulletText(a.partLine(p))
+			imgui.BulletText(a.partLine(c, p))
 		}
 	}
 	if imgui.Button(ui.Icon(icCircuit, "Open Electronics")) {
@@ -436,12 +480,12 @@ func (a *App) circuitProperties(f *doc.Feature) bool {
 	return true
 }
 
-func (a *App) partLine(p doc.CircuitPart) string {
+func (a *App) partLine(c *doc.Circuit, p doc.CircuitPart) string {
 	s := p.Name
 	var pins []string
 	if m := elec.Library[p.Model]; m != nil {
 		for _, r := range m.Pins {
-			if v := p.Pins[r]; v != "" {
+			if v := c.BoardPin(p.Name, m.Role[r]); v != "" {
 				pins = append(pins, v)
 			}
 		}
@@ -481,6 +525,11 @@ func (a *App) elecBody() {
 		if imgui.Button("Add a circuit") {
 			a.elecAdd()
 		}
+		imgui.SameLine()
+		if imgui.Button("Open a Wokwi project…") {
+			a.cmds.Run("electronics.wokwi", "")
+		}
+		imgui.SetItemTooltip("A circuit made on wokwi.com: its diagram.json, wired as it was, and its sketch")
 		return
 	}
 	c := f.Circuit
@@ -538,6 +587,20 @@ func (a *App) elecBody() {
 	a.elecStudyUI(f)
 
 	imgui.SeparatorText("Parts")
+	if imgui.Button(ui.Icon(icWiring, "Wiring sheet")) {
+		a.cmds.Run("electronics.sheet", "1")
+	}
+	a.markItem("btn:electronics.sheet")
+	imgui.SetItemTooltip("Draw the wires from pin to pin, part to part, and see the checks")
+	imgui.SameLine()
+	if imgui.Button("Wokwi…") {
+		a.cmds.Run("electronics.wokwi", "")
+	}
+	imgui.SetItemTooltip("Open a Wokwi project as a new circuit: its diagram.json, wired as it was, and its sketch")
+	if n := len(c.Issues()); n > 0 {
+		imgui.SameLine()
+		imgui.TextColored(colWarn, fmt.Sprintf("%d to look at", n))
+	}
 	if a.wiringTable(f) {
 		return
 	}
@@ -548,7 +611,7 @@ func (a *App) elecBody() {
 		changed = changed || ch
 		imgui.PopID()
 		if del {
-			c.Parts = append(c.Parts[:i], c.Parts[i+1:]...)
+			c.RemovePart(c.Parts[i].Name)
 			a.elecEdit()
 			return
 		}
@@ -574,11 +637,15 @@ func (a *App) elecBody() {
 	}
 	imgui.SameLine()
 	if imgui.Button("Add part") {
-		a.elecAddPart(a.elec.addModel, "")
-		if !a.elec.noModel && doc.PartModels[a.elec.addModel] != nil {
+		name := a.elecAddPart(a.elec.addModel, "")
+		if name != "" && !a.elec.noModel && doc.PartModels[a.elec.addModel] != nil {
 			if m := a.elecInsertModel(a.elec.addModel); m != nil {
-				if f := a.elecCircuit(); f != nil && len(f.Circuit.Parts) > 0 {
-					f.Circuit.Parts[len(f.Circuit.Parts)-1].Model3D = m.ID
+				if f := a.elecCircuit(); f != nil {
+					for i := range f.Circuit.Parts {
+						if f.Circuit.Parts[i].Name == name {
+							f.Circuit.Parts[i].Model3D = m.ID
+						}
+					}
 					a.doc.Commit()
 				}
 			}
@@ -593,9 +660,84 @@ func (a *App) elecBody() {
 
 // partEditor edits one part: wiring, what it drives, its figures. It says
 // whether to delete it and whether it changed.
+// partWires lists a part's terminals, each with the terminals it is wired
+// to (× takes a wire off) and a menu wiring it to any other terminal of the
+// circuit: another part's as well as the board's. It says whether the
+// wiring changed.
+func (a *App) partWires(c *doc.Circuit, p *doc.CircuitPart, m *elec.Model) (edited bool) {
+	n := 0
+	for _, w := range c.Wires {
+		pa, _, _ := elec.Split(w.A)
+		pb, _, _ := elec.Split(w.B)
+		if pa == p.Name || pb == p.Name {
+			n++
+		}
+	}
+	open := imgui.TreeNodeExStrV(fmt.Sprintf("Wires (%d)###wires", n), 0)
+	a.markItem("wires:" + p.Name)
+	if !open {
+		imgui.SetItemTooltip("Wire this part's terminals to other parts or to the board (or drag between terminals on the wiring sheet)")
+		return false
+	}
+	defer imgui.TreePop()
+	var all []string // every other terminal: the other parts', then the board's
+	for _, q := range c.Parts {
+		if q.Name != p.Name {
+			for _, t := range elec.Terms(q.Model) {
+				all = append(all, q.Name+"."+t)
+			}
+		}
+	}
+	for _, t := range boardOrder {
+		all = append(all, elec.Board+"."+t)
+	}
+	for _, t := range m.Terms {
+		ref := p.Name + "." + t
+		imgui.PushIDStr(t)
+		imgui.AlignTextToFramePadding()
+		imgui.Text(t)
+		wired := map[string]bool{}
+		for _, w := range c.Wires {
+			if !w.Has(ref) {
+				continue
+			}
+			o := w.Other(ref)
+			wired[o] = true
+			imgui.SameLine()
+			if imgui.SmallButton(o + " ×##" + o) {
+				c.Disconnect(ref, o)
+				edited = true
+			}
+			imgui.SetItemTooltip("Take the wire " + ref + " – " + o + " off")
+		}
+		imgui.SameLine()
+		imgui.SetNextItemWidth(130)
+		if imgui.BeginComboV("##to", "wire to…", imgui.ComboFlagsHeightLarge) {
+			for _, o := range all {
+				if wired[o] {
+					continue
+				}
+				if imgui.SelectableBool(o) {
+					c.Connect(ref, o)
+					edited = true
+				}
+				a.markItem("wireto:" + ref + ">" + o)
+			}
+			imgui.EndCombo()
+		}
+		a.markItem("wireto:" + ref)
+		imgui.PopID()
+		if edited {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *App) partEditor(f *doc.Feature, p *doc.CircuitPart) (del, changed bool) {
 	m := elec.Library[p.Model]
-	open := imgui.TreeNodeExStrV(a.partLine(*p)+"###part", 0)
+	open := imgui.TreeNodeExStrV(a.partLine(f.Circuit, *p)+"###part", 0)
+	a.markItem("part:" + p.Name)
 	if m != nil {
 		imgui.SetItemTooltip(m.Label + ": " + m.About)
 	}
@@ -625,24 +767,26 @@ func (a *App) partEditor(f *doc.Feature, p *doc.CircuitPart) (del, changed bool)
 	imgui.SetNextItemWidth(160)
 	imgui.InputTextWithHint("Name##n", "name", &name, 0, nil)
 	if name != p.Name && name != "" {
-		p.Name, changed = name, true
+		f.Circuit.RenamePart(p.Name, name)
+		changed = true
 	}
 	if imgui.IsItemDeactivatedAfterEdit() {
 		a.doc.Commit()
-	}
-	if p.Pins == nil {
-		p.Pins = map[string]string{}
 	}
 	for _, role := range m.Pins {
 		opts := unoPins
 		if m.Analog {
 			opts = []string{"", "A0", "A1", "A2", "A3", "A4", "A5"}
 		}
-		cur := p.Pins[role]
+		cur := f.Circuit.BoardPin(p.Name, m.Role[role])
 		if v, ok := a.combo(strings.ToUpper(role[:1])+role[1:]+"##pin"+role, cur, opts, nil); ok {
-			p.Pins[role] = v
+			f.Circuit.SetBoardPin(p.Name, m.Role[role], v)
 			a.elecEdit()
 		}
+	}
+	if a.partWires(f.Circuit, p, m) {
+		a.elecEdit()
+		return false, false
 	}
 	others := func(kind string) []string {
 		out := []string{""}
@@ -656,13 +800,14 @@ func (a *App) partEditor(f *doc.Feature, p *doc.CircuitPart) (del, changed bool)
 	for _, need := range m.Needs {
 		switch need {
 		case "supply":
-			if v, ok := a.combo("Supply##sup", p.Supply, others("battery"), nil); ok {
-				p.Supply = v
+			if v, ok := a.combo("Supply##sup", f.Circuit.Linked(p.Name, "VM", "battery", "+"), others("battery"), nil); ok {
+				f.Circuit.SetSupply(p.Name, v)
 				a.elecEdit()
 			}
 		case "motor":
-			if v, ok := a.combo("Motor##mot", p.Motor, others("motor"), nil); ok {
-				p.Motor = v
+			cur := f.Circuit.Linked(p.Name, "OUT1", "motor", "1") + f.Circuit.Linked(p.Name, "OUT1", "motor", "2")
+			if v, ok := a.combo("Motor##mot", cur, others("motor"), nil); ok {
+				f.Circuit.SetMotor(p.Name, v)
 				a.elecEdit()
 			}
 		}
@@ -794,8 +939,10 @@ func (a *App) elecStudyUI(f *doc.Feature) {
 				}
 			case *elec.Button:
 				imgui.Checkbox("pressed", &q.Pressed)
+			case *elec.Switch:
+				imgui.Checkbox("on", &q.On)
 			case *elec.LED:
-				b := float32(q.Brightness)
+				b := float32(ledLook(q.Brightness))
 				imgui.ColorButtonV("##led", imgui.Vec4{X: 0.25 + 0.75*b, Y: 0.12 + 0.2*b, Z: 0.1, W: 1}, imgui.ColorEditFlagsNoTooltip, imgui.Vec2{X: 14, Y: 14})
 				imgui.SameLine()
 				imgui.TextUnformatted(stateOf(p))
@@ -880,24 +1027,37 @@ func (a *App) wiringTable(f *doc.Feature) bool {
 				if m.Analog {
 					opts = []string{"", "A0", "A1", "A2", "A3", "A4", "A5"}
 				}
-				if p.Pins == nil {
-					p.Pins = map[string]string{}
-				}
 				// pins another part has taken are marked
 				taken := map[string]string{}
 				for _, q := range c.Parts {
-					if q.Name == p.Name {
+					qm := elec.Library[q.Model]
+					if q.Name == p.Name || qm == nil {
 						continue
 					}
-					for _, v := range q.Pins {
-						if v != "" {
+					for _, t := range qm.Terms {
+						if v := c.BoardPin(q.Name, t); v != "" {
 							taken[v] = "on " + q.Name
 						}
 					}
 				}
+				// a terminal wired to other parts, not to a pin (an LED's
+				// anode through its resistor), is drawn on the wiring sheet
+				ref := p.Name + "." + m.Role[role]
+				if c.BoardPin(p.Name, m.Role[role]) == "" {
+					if net := c.Net(ref); len(net) > 1 {
+						var via []string
+						for _, r := range net {
+							if q, _, _ := elec.Split(r); q != p.Name && !slices.Contains(via, q) {
+								via = append(via, q)
+							}
+						}
+						imgui.TextDisabled("through " + strings.Join(via, ", "))
+						continue
+					}
+				}
 				imgui.PushIDStr(p.Name + "." + role)
-				if v, ok := a.combo("##wire", p.Pins[role], opts, taken); ok {
-					p.Pins[role] = v
+				if v, ok := a.combo("##wire", c.BoardPin(p.Name, m.Role[role]), opts, taken); ok {
+					c.SetBoardPin(p.Name, m.Role[role], v)
 					changed = true
 				}
 				a.markItem("wire:" + p.Name + "." + role)
@@ -910,6 +1070,52 @@ func (a *App) wiringTable(f *doc.Feature) bool {
 		a.elecEdit()
 	}
 	return changed
+}
+
+// elecConnect wires two terminals ("a=b", a colour after a second "=")
+// or, with on false, takes the wire between them off.
+func (a *App) elecConnect(arg string, on bool) {
+	f := a.elecCircuit()
+	parts := strings.Split(arg, "=")
+	if f == nil || len(parts) < 2 {
+		return
+	}
+	c := f.Circuit
+	x, y := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+	if !on {
+		c.Disconnect(x, y)
+		a.elecEdit()
+		return
+	}
+	c.Connect(x, y)
+	if len(parts) > 2 {
+		for i := range c.Wires {
+			if c.Wires[i].Has(x) && c.Wires[i].Other(x) == y {
+				c.Wires[i].Colour = strings.TrimSpace(parts[2])
+			}
+		}
+	}
+	a.elecEdit()
+}
+
+// elecPlace puts a part (or the board, "uno") on the wiring sheet: "name=x,y".
+func (a *App) elecPlace(arg string) {
+	f := a.elecCircuit()
+	name, xy, _ := strings.Cut(arg, "=")
+	n := floats(xy)
+	if f == nil || len(n) != 2 {
+		return
+	}
+	p := geom.V2(n[0], n[1])
+	if name == elec.Board {
+		f.Circuit.BoardAt = &p
+	}
+	for i := range f.Circuit.Parts {
+		if f.Circuit.Parts[i].Name == name {
+			f.Circuit.Parts[i].At = &p
+		}
+	}
+	a.doc.Commit()
 }
 
 // partOfModel is the running study's part whose 3D model is step fid.
@@ -937,9 +1143,13 @@ func (a *App) pressPart() bool {
 	if b == nil {
 		return false
 	}
-	if q, ok := a.partOfModel(b.F.ID).(*elec.Button); ok {
+	switch q := a.partOfModel(b.F.ID).(type) {
+	case *elec.Button:
 		q.Pressed = true
 		a.vp.pressing = q
+		return true
+	case *elec.Switch:
+		q.On = !q.On
 		return true
 	}
 	return false
@@ -949,7 +1159,18 @@ func (a *App) pressPart() bool {
 // isn't one, or no study runs).
 func (a *App) ledGlow(fid int) float64 {
 	if q, ok := a.partOfModel(fid).(*elec.LED); ok {
-		return math.Max(0, math.Min(1, q.Brightness))
+		return ledLook(q.Brightness)
 	}
 	return 0
+}
+
+// ledLook is how lit an LED looks at a brightness (its current over the
+// 20 mA it is fully lit at): the eye takes light on a curve, so a few
+// milliamps, plainly lit on a real LED, look so here too rather than barely
+// tinted.
+func ledLook(b float64) float64 {
+	if b <= 0.002 {
+		return 0
+	}
+	return math.Pow(math.Min(1, b), 0.45)
 }

@@ -618,3 +618,10 @@ func (e *extInt) edge(p Pin, high bool) {
 		e.ch.Data[eifr] |= 1 << i
 	}
 }
+
+// Pullup reports whether an input pin has its pull-up on (PORTx set, DDRx
+// clear).
+func (ch *Chip) Pullup(p Pin) bool {
+	pt := ch.Ports[p.Port()]
+	return ch.Data[pt.ddr]&(1<<p.Bit()) == 0 && ch.Data[pt.prt]&(1<<p.Bit()) != 0
+}

@@ -8,7 +8,10 @@ because the sketch reads one pin and writes another. Two milestones take
 wires further: M21 makes the wiring itself part of the design, M22 puts
 the same wires into the 3D assembly as cables.
 
-## M21 circuit wiring
+## M21 circuit wiring (done)
+
+Built as planned; [MILESTONES.md](MILESTONES.md) has what it became and
+[LIMITATIONS.md](LIMITATIONS.md) (EL11) what is left.
 
 **What it gives.** A wiring view where wires are drawn from pin to pin,
 parts that connect to each other and not only to the board (a button

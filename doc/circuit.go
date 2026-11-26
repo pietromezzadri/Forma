@@ -8,6 +8,7 @@ import (
 
 	"forma/avr"
 	"forma/elec"
+	"forma/geom"
 )
 
 // Electronics: a circuit feature is a board (an Arduino Uno), the firmware
@@ -27,12 +28,19 @@ type Circuit struct {
 	// editor, kept with the design; its firmware is what it compiled to
 	Source string        `json:"source,omitempty"`
 	Parts  []CircuitPart `json:"parts,omitempty"`
+	// Wires join the parts' terminals and the board's (see wiring.go)
+	Wires []CircuitWire `json:"wires,omitempty"`
+	// BoardAt is where the board sits on the wiring sheet (mm)
+	BoardAt *geom.Vec2 `json:"boardAt,omitempty"`
 }
 
 // CircuitPart is a library part in the circuit.
 type CircuitPart struct {
-	Model  string             `json:"model"`
-	Name   string             `json:"name"`
+	Model string `json:"model"`
+	Name  string `json:"name"`
+	// Pins, Supply and Motor are the wiring of circuits made before wires
+	// (role → board pin, a driver's battery and motor by name): migrate
+	// turns them into wires
 	Pins   map[string]string  `json:"pins,omitempty"`   // role → board pin ("D9", "A0")
 	Params map[string]float64 `json:"params,omitempty"` // figures over the model's defaults
 	Supply string             `json:"supply,omitempty"` // a driver's battery
@@ -45,6 +53,8 @@ type CircuitPart struct {
 	// Model3D is the component its 3D model was put in as (a step's ID):
 	// clicking it presses a button, and an LED's glows as it runs
 	Model3D int `json:"model3d,omitempty"`
+	// At is where the part sits on the wiring sheet (mm; nil: laid out)
+	At *geom.Vec2 `json:"at,omitempty"`
 }
 
 // NewCircuit is an empty Uno with no firmware yet.
@@ -60,12 +70,7 @@ func NewCircuitPart(c *Circuit, model, name string) CircuitPart {
 	if m == nil {
 		return p
 	}
-	used := map[string]bool{}
-	for _, q := range c.Parts {
-		for _, v := range q.Pins {
-			used[strings.ToUpper(v)] = true
-		}
-	}
+	used := c.usedPins()
 	free := func(cands ...string) string {
 		for _, s := range cands {
 			if !used[s] {
@@ -100,6 +105,9 @@ func NewCircuitPart(c *Circuit, model, name string) CircuitPart {
 		taken := map[string]bool{}
 		for _, q := range c.Parts {
 			taken[q.Motor] = true
+			if k := elec.Library[q.Model]; k != nil && k.Kind == "motor" && c.Linked(q.Name, "1", "driver", "OUT1")+c.Linked(q.Name, "1", "driver", "OUT2") != "" {
+				taken[q.Name] = true
+			}
 		}
 		for _, q := range c.Parts {
 			k := elec.Library[q.Model]
@@ -166,88 +174,54 @@ func (d *Document) buildCircuit(f *Feature) error {
 	if b := f.Circuit.Board; b != "" && b != "uno" {
 		return fmt.Errorf("board %q: only the Arduino Uno is emulated", b)
 	}
-	if _, _, err := d.circuitParts(f); err != nil {
+	warns, err := d.circuitParts(f)
+	if err != nil {
 		return err
 	}
 	if _, err := Firmware(f); err != nil {
 		if f.Data == "" {
-			f.Warn = "no firmware: load a sketch (.hex, or .ino with arduino-cli)"
-			return nil
+			warns = append([]string{"no firmware: load a sketch (.hex, or .ino with arduino-cli)"}, warns...)
+		} else {
+			return err
 		}
-		return err
 	}
+	f.Warn = strings.Join(warns, "; ")
 	return nil
 }
 
-// circuitParts makes the circuit's parts, wired to each other, and checks
-// what they drive.
-func (d *Document) circuitParts(f *Feature) ([]elec.Part, map[string]elec.Part, error) {
+// circuitParts checks the circuit's wiring (as wires: an old one is
+// migrated) and what its parts drive; it returns the warnings.
+func (d *Document) circuitParts(f *Feature) ([]string, error) {
 	c := f.Circuit
-	byName := map[string]elec.Part{}
-	var parts []elec.Part
-	pins := map[string]string{} // board pin → the part on it
+	c.migrate()
+	var warns []string
+	for _, is := range c.Issues() {
+		if is.Err {
+			return nil, fmt.Errorf("%s", is.Text)
+		}
+		warns = append(warns, is.Text)
+	}
 	joints := map[int]string{}
 	for _, cp := range c.Parts {
-		if cp.Name == "" {
-			return nil, nil, fmt.Errorf("a %s has no name", cp.Model)
-		}
-		if byName[cp.Name] != nil {
-			return nil, nil, fmt.Errorf("two parts are called %q", cp.Name)
-		}
-		p, err := elec.Make(cp.Model, cp.Name, cp.Pins, cp.Params)
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, v := range cp.Pins {
-			if v == "" {
-				continue
-			}
-			pin, _ := avr.ParseUnoPin(v)
-			k := avr.UnoName(pin)
-			if other, ok := pins[k]; ok && other != cp.Name {
-				return nil, nil, fmt.Errorf("%s and %s are both on %s", other, cp.Name, k)
-			}
-			pins[k] = cp.Name
-		}
-		if cp.Joint != 0 {
-			if _, ok := elec.ShaftDegrees(p); !ok {
-				return nil, nil, fmt.Errorf("%s has no shaft to drive a joint", cp.Name)
-			}
-			j := d.Feature(cp.Joint)
-			if j == nil || j.Kind != KJoint {
-				return nil, nil, fmt.Errorf("%s drives a joint that is gone", cp.Name)
-			}
-			if MotionInput(j) == "" {
-				return nil, nil, fmt.Errorf("%s drives %s, a rigid joint", cp.Name, j.Name)
-			}
-			if other, ok := joints[cp.Joint]; ok {
-				return nil, nil, fmt.Errorf("%s and %s both drive %s", other, cp.Name, j.Name)
-			}
-			joints[cp.Joint] = cp.Name
-		}
-		byName[cp.Name] = p
-		parts = append(parts, p)
-	}
-	for _, cp := range c.Parts {
-		if m := elec.Library[cp.Model]; m == nil || m.Kind != "driver" {
+		if cp.Joint == 0 {
 			continue
 		}
-		var sup, mot elec.Part
-		if cp.Supply != "" {
-			if sup = byName[cp.Supply]; sup == nil {
-				return nil, nil, fmt.Errorf("%s: no part %q for its supply", cp.Name, cp.Supply)
-			}
+		if m := elec.Library[cp.Model]; m == nil || !m.Drives {
+			return nil, fmt.Errorf("%s has no shaft to drive a joint", cp.Name)
 		}
-		if cp.Motor != "" {
-			if mot = byName[cp.Motor]; mot == nil {
-				return nil, nil, fmt.Errorf("%s: no part %q for its motor", cp.Name, cp.Motor)
-			}
+		j := d.Feature(cp.Joint)
+		if j == nil || j.Kind != KJoint {
+			return nil, fmt.Errorf("%s drives a joint that is gone", cp.Name)
 		}
-		if err := elec.Connect(byName[cp.Name], sup, mot); err != nil {
-			return nil, nil, err
+		if MotionInput(j) == "" {
+			return nil, fmt.Errorf("%s drives %s, a rigid joint", cp.Name, j.Name)
 		}
+		if other, ok := joints[cp.Joint]; ok {
+			return nil, fmt.Errorf("%s and %s both drive %s", other, cp.Name, j.Name)
+		}
+		joints[cp.Joint] = cp.Name
 	}
-	return parts, byName, nil
+	return warns, nil
 }
 
 // Study is a motion study: the circuit's sketch running on the emulated
@@ -277,11 +251,15 @@ func (d *Document) NewStudy(f *Feature) (*Study, error) {
 	if err != nil {
 		return nil, err
 	}
-	parts, byName, err := d.circuitParts(f)
+	if _, err := d.circuitParts(f); err != nil {
+		return nil, err
+	}
+	specs, wires := f.Circuit.specs()
+	sim, byName, err := elec.Build(avr.NewUno(prog), specs, wires)
 	if err != nil {
 		return nil, err
 	}
-	s := &Study{F: f, Sim: elec.New(avr.NewUno(prog), parts...), Parts: byName, Was: map[int]string{}}
+	s := &Study{F: f, Sim: sim, Parts: byName, Was: map[int]string{}}
 	for _, cp := range f.Circuit.Parts {
 		if cp.Joint == 0 {
 			continue

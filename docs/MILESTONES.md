@@ -1029,3 +1029,67 @@ What each milestone added, in the order they were built. The current gaps are in
   screws and screws jointed into them, with captions. Capture targets of one
   name drawn twice in a frame take the first (`markItem`: two joints both
   "… in its hole"), and a joint's Play button is `btn:joint.play`.
+
+## M21: circuit wiring (done)
+
+- **Terminals and wires** (`elec/library.go`, `doc/wiring.go`): every
+  library part has named terminals (an LED's A and K, a servo's SIG, V+
+  and GND, a driver's IN1, IN2, EN, VM, GND, OUT1 and OUT2, a battery's +
+  and −, a pot's 1, W and 2) and the board's are its pins, 5V, 3V3, GND
+  and VIN. A circuit keeps `Wires`, each between two terminals
+  ("uno.D9", "arm.SIG") with a colour and corners; wires that touch make
+  nets. New parts: a resistor and a slide switch. A circuit made before
+  wires (pins picked per role, a driver's battery and motor by name) is
+  given the wires it meant the first time it is built (`migrate`): an LED
+  a resistor of its own between the pin and its anode and its cathode to
+  ground, a servo its supply, a pot its ends across 5 V, a button ground,
+  a driver its battery and motor; adding a part wires it the same way.
+- **The simulation follows the wires** (`elec/net.go`): `Build` makes a
+  `Network`, the simulation's first part, which solves the nets each step
+  by nodal analysis — the board's pins as 25 Ω sources (or a 35 kΩ
+  pull-up, or nothing), batteries, resistors, pots, switches, LEDs (a
+  forward voltage and 15 Ω, solved on or off until it settles) — and
+  feeds the rest: inputs read their net's level, the ADC its voltage, an
+  LED is lit by the current through it (a PWM pin's LED by mixing its
+  pin high and low by the duty, not by the average voltage, which would
+  barely clear its drop), a servo with no supply on V+ stands still, a
+  driver's inputs are its nets' levels and its supply the battery on VM.
+  `Check` finds shorts (5 V to ground, a battery's ends), an LED with no
+  resistor, a motor on a pin, a servo's supply on a pin, pins wired to
+  each other or to a rail, terminals left unwired.
+- **The wiring sheet** (`app/wiring_ui.go`; Electronics → Wiring sheet,
+  `electronics.sheet`): the Uno and each part as a box with its terminals,
+  laid out in a column ordered by the board pins they are on (half a pitch
+  off the board's, so no two terminals are level); wires routed square,
+  each net's vertical run in a lane of its own clear of the boxes and of
+  the other nets' runs (`sheetRoutes`); colours red on a supply's net,
+  black on ground's, others by net or as picked. Drag a terminal onto
+  another to wire them, a box by its title to move it; double-click a
+  wire for a corner and drag it; right-click a wire for its colour,
+  straightening or deleting it; Delete takes the selected wire off. The
+  checks list under it as it is drawn; while the study runs the LEDs
+  glow, a button's box held presses it, a switch's clicked turns it, and
+  a terminal's tooltip gives its net and voltage. The Electronics window's
+  wiring table still picks board pins (a terminal reaching the board
+  through another part says through which), and each part's Wires list
+  shows what every terminal is wired to (× takes a wire off) with a menu
+  wiring it to any other part's terminal or the board's. Commands
+  `electronics.connect` (`a=b[=colour]`), `electronics.disconnect`,
+  `electronics.place` (`part=x,y`).
+- **Wokwi** (`doc/wokwi.go`, `app/wokwi_ui.go`; `electronics.wokwi`): a
+  project's `diagram.json` and the sketch beside it come in as a new
+  circuit — the Uno as the board, LEDs, resistors (with their values),
+  push buttons, servos, pots and slide switches named by their ids, every
+  connection a wire keeping its colour, a breadboard's strips and rails
+  joining what is wired to them — and its sketch is compiled; what was
+  left out is listed on the sheet.
+- Tests: `elec/net_test.go` (a divider read by the ADC, an LED and its
+  resistor on 5 V, a battery lighting an LED through a switch, a button
+  lighting an LED through the sketch, the pot_led sketch's PWM LEDs, the
+  sweep_drive circuit wired by wires behaving as wired by name and its
+  servo unpowered, the checks), `doc/wiring_test.go` (old wiring
+  converted), `doc/wokwi_test.go` (a Wokwi project with a breadboard),
+  `app/wiring_test.go` (no wire through a box, no two nets on one lane).
+  Capture `captures/m21.json`: the converted arm-and-wheel circuit on the
+  sheet, running, a wire drawn and the short it makes found, a Wokwi
+  project opened, compiled and run.

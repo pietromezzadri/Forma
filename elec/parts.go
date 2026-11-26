@@ -45,15 +45,19 @@ type Driver struct {
 	Drop     float64 // volts lost in the bridge (L298N ~1.4, TB6612 ~0.1)
 	Motor    *Motor
 	out      float64
+	// in net mode its inputs are read through the wires (a board pin's
+	// duty, or a fixed level), and Reverse is a motor wired the other way
+	in1, in2, en func(*Sim) float64
+	Reverse      bool
 }
 
 func (d *Driver) Label() string { return d.Name }
 
 func (d *Driver) Wire(s *Sim) {
-	s.Watch(d.In1)
-	s.Watch(d.In2)
-	if d.En != NoPin {
-		s.Watch(d.En)
+	for _, p := range []avr.Pin{d.In1, d.In2, d.En} {
+		if p != NoPin {
+			s.Watch(p)
+		}
 	}
 	if d.Motor != nil && d.Supply != nil {
 		d.Supply.loads = append(d.Supply.loads, func() float64 { return math.Abs(d.Motor.Current()) })
@@ -61,15 +65,24 @@ func (d *Driver) Wire(s *Sim) {
 }
 
 func (d *Driver) Step(s *Sim, dt float64) {
-	en := 1.0
-	if d.En != NoPin {
-		en = s.Duty(d.En)
+	level := func(f func(*Sim) float64, p avr.Pin, none float64) float64 {
+		switch {
+		case f != nil:
+			return f(s)
+		case p != NoPin:
+			return s.Duty(p)
+		}
+		return none
 	}
+	en := level(d.en, d.En, 1)
 	v := 0.0
 	if d.Supply != nil {
 		v = math.Max(0, d.Supply.Out()-d.Drop)
 	}
-	d.out = (s.Duty(d.In1) - s.Duty(d.In2)) * en * v
+	d.out = (level(d.in1, d.In1, 0) - level(d.in2, d.In2, 0)) * en * v
+	if d.Reverse {
+		d.out = -d.out
+	}
 	if d.Motor != nil {
 		d.Motor.Volts = d.out
 	}
@@ -163,6 +176,7 @@ type Servo struct {
 	Angle        float64 // degrees now
 	Target       float64
 	attached     bool
+	Unpowered    bool // its supply is off (net mode): it holds still
 }
 
 // SG90 is the small blue micro servo: 180°, 0.1 s for 60° at 4.8 V.
@@ -171,9 +185,16 @@ func SG90(name string, signal avr.Pin) *Servo {
 }
 
 func (v *Servo) Label() string { return v.Name }
-func (v *Servo) Wire(s *Sim)   { s.Watch(v.Signal) }
+func (v *Servo) Wire(s *Sim) {
+	if v.Signal != NoPin {
+		s.Watch(v.Signal)
+	}
+}
 
 func (v *Servo) Step(s *Sim, dt float64) {
+	if v.Unpowered {
+		return
+	}
 	ps := s.Pulses(v.Signal)
 	for i := len(ps) - 1; i >= 0; i-- {
 		if w := ps[i]; w > 300 && w < 3000 {
@@ -193,6 +214,9 @@ func (v *Servo) Step(s *Sim, dt float64) {
 }
 
 func (v *Servo) State() string {
+	if v.Unpowered {
+		return "no power"
+	}
 	if !v.attached {
 		return "no signal"
 	}
@@ -204,12 +228,21 @@ type LED struct {
 	Name       string
 	Pin        avr.Pin
 	Brightness float64
+	Vf         float64 // forward voltage (net mode)
+	Amps       float64 // the current through it (net mode)
+	net        bool
 }
 
 func (l *LED) Label() string { return l.Name }
-func (l *LED) Wire(s *Sim)   { s.Watch(l.Pin) }
+func (l *LED) Wire(s *Sim) {
+	if !l.net {
+		s.Watch(l.Pin)
+	}
+}
 func (l *LED) Step(s *Sim, _ float64) {
-	l.Brightness = s.Duty(l.Pin)
+	if !l.net {
+		l.Brightness = s.Duty(l.Pin)
+	}
 }
 func (l *LED) State() string { return fmt.Sprintf("%.0f %%", l.Brightness*100) }
 
@@ -221,12 +254,17 @@ type Button struct {
 	Pressed bool
 	was     bool
 	wired   bool
+	net     bool
 }
 
 func (b *Button) Label() string { return b.Name }
-func (b *Button) Wire(s *Sim)   { b.set(s) }
+func (b *Button) Wire(s *Sim) {
+	if !b.net {
+		b.set(s)
+	}
+}
 func (b *Button) Step(s *Sim, _ float64) {
-	if b.Pressed != b.was || !b.wired {
+	if !b.net && (b.Pressed != b.was || !b.wired) {
 		b.set(s)
 	}
 }
@@ -245,14 +283,39 @@ type Pot struct {
 	Name    string
 	Channel int     // A0..A5
 	Value   float64 // 0..1 of its turn
+	Ohms    float64 // end to end (net mode; 0: 10 kΩ)
+	net     bool
 }
 
 func (p *Pot) Label() string      { return p.Name }
 func (p *Pot) Wire(*Sim)          {}
 func (p *Pot) Step(*Sim, float64) {}
 func (p *Pot) Volts(ch int) (float64, bool) {
-	if ch != p.Channel {
+	if p.net || ch != p.Channel {
 		return 0, false
 	}
 	return 5 * math.Max(0, math.Min(1, p.Value)), true
 }
+
+// Resistor is a fixed resistor (net mode only).
+type Resistor struct {
+	Name string
+	Ohms float64
+	Amps float64 // the current through it last step
+}
+
+func (r *Resistor) Label() string      { return r.Name }
+func (r *Resistor) Wire(*Sim)          {}
+func (r *Resistor) Step(*Sim, float64) {}
+func (r *Resistor) State() string      { return fmt.Sprintf("%.1f mA", r.Amps*1000) }
+
+// Switch is a slide switch, on or off (net mode only).
+type Switch struct {
+	Name string
+	On   bool
+}
+
+func (w *Switch) Label() string      { return w.Name }
+func (w *Switch) Wire(*Sim)          {}
+func (w *Switch) Step(*Sim, float64) {}
+func (w *Switch) State() string      { return map[bool]string{true: "on", false: "off"}[w.On] }

@@ -126,11 +126,25 @@ as PDF, SVG or DXF.</td>
   batteries, pots, buttons and LEDs from a small library are wired to its
   pins, and their shafts drive the assembly's joints in a motion study:
   run it, turn a pot, press a button (or hold the mouse on its 3D model),
-  watch the LEDs light, read the serial monitor. A wiring table lists
-  every part's pins and the Uno pin each is on. The parts
+  watch the LEDs light, read the serial monitor. The parts
   also come as 3D models (Uno, SG90, TT motor, AA holder, driver boards,
   push button, pot, LED) to design round, put in the design as each part
   is added.
+  - Wires are drawn on a wiring sheet, pin to pin and part to part (a
+    battery through a switch to an LED, an LED through its resistor): the
+    Uno and each part a box with its terminals, wires routed square and
+    coloured by what they carry (or as you pick), boxes and corners moved
+    by dragging. The simulation follows the wires, solving the circuit's
+    nets each step (LED currents through their resistors, a pot's divider
+    read by the ADC, a servo with no supply standing still), and the sheet
+    checks the wiring as it is drawn: shorts, an LED with no resistor, a
+    motor or a servo's supply on a pin, terminals left unwired. Each
+    part's Wires list in the Electronics window wires its terminals to
+    other parts or the board without the sheet.
+  - A Wokwi project (its `diagram.json` and sketch) opens as a circuit,
+    wired as it was, breadboard rails and colours included, its sketch
+    compiled; parts Forma doesn't have are listed. Circuits from before
+    the wires open with the wires they meant.
   - The sketch's code is written in Forma (an editor with C++
     highlighting, examples to start from, compile errors marked on their
     lines) or in VS Code, and compiled with arduino-cli into the firmware.
@@ -268,7 +282,7 @@ PNGs to `captures/out/`. The images above come from that script. See
 | `fea/` | static stress analysis: volume mesher, 10-node tetrahedra, solver |
 | `drawing/` | drawings: views with hidden lines, sections, sheets, dimensions, SVG / PDF / DXF |
 | `avr/` | an ATmega328P emulator (an Arduino Uno's chip): CPU, ports, timers, serial, ADC |
-| `elec/` | an Arduino sketch run against batteries, motor drivers, motors, servos, LEDs, buttons; the parts library |
+| `elec/` | an Arduino sketch run against batteries, motor drivers, motors, servos, LEDs, buttons; the wiring's nets solved as a DC circuit; the parts library |
 | `sketch/` | sketch entities, constraints, solver, region detection |
 | `expr/` | expressions with units |
 | `doc/` | the design: parameters, feature history, regeneration, references, assemblies, `.forma` files |
@@ -339,12 +353,13 @@ PNGs to `captures/out/`. The images above come from that script. See
   threads on drawings and hole callouts, washers and nuts, modelled
   threads (done). Left: finer pitches, inch sizes, lock nuts, a thread
   runout ([H1, FS1–FS4](docs/LIMITATIONS.md)).
-- **M21 circuit wiring** (planned, see [docs/WIRING.md](docs/WIRING.md)):
-  wires drawn from pin to pin in a wiring view, so parts connect to each other
-  and not only to the board (a button straight to an LED, a battery
-  through a switch), the simulation following the wires, checks for
-  floating inputs and shorts, and a Wokwi `diagram.json` read with its
-  wiring and firmware ([EL8](docs/LIMITATIONS.md)).
+- **M21 circuit wiring** (done, see [docs/WIRING.md](docs/WIRING.md)):
+  wires drawn from pin to pin on a wiring sheet, so parts connect to each
+  other and not only to the board (a button straight to an LED, a battery
+  through a switch), the simulation following the wires as a DC circuit,
+  checks for shorts and missing resistors, and a Wokwi `diagram.json`
+  read with its wiring and sketch. Left: a breadboard view, capacitors
+  and transistors, more Wokwi parts ([EL11](docs/LIMITATIONS.md)).
 - **M22 cables** (planned, see [docs/WIRING.md](docs/WIRING.md)): the
   circuit's wires as cables in the assembly, from the pins of the parts'
   3D models along a path you shape, as thick as their gauge and coloured as

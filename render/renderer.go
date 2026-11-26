@@ -34,6 +34,7 @@ type Paint struct {
 	CullBack   bool       // faces: their backs left out (a see-through body's far side isn't drawn red)
 	Behind     bool       // faces: drawn at the far plane, so only where nothing else is (a see-through body in the ID buffer)
 	Offset     mgl32.Vec3 // moves what is drawn (a component in an exploded view)
+	Glow       mgl32.Vec3 // faces: light they give off, added past the shading (a lit LED)
 }
 
 type Renderer struct {
@@ -176,6 +177,7 @@ func (r *Renderer) faceSetup(v View, p Paint, pick bool) {
 			sec = 1
 		}
 		s.Int("uSection", sec)
+		s.Vec3("uGlow", p.Glow)
 	}
 	gl.Enable(gl.POLYGON_OFFSET_FILL)
 	gl.PolygonOffset(1, 1)

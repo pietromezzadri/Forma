@@ -164,29 +164,27 @@ func TestCircuitErrors(t *testing.T) {
 		part CircuitPart
 		want string
 	}{
-		{CircuitPart{Model: "sg90", Name: "s", Pins: map[string]string{"signal": "D14"}}, "no pin"},
-		{CircuitPart{Model: "pot", Name: "p", Pins: map[string]string{"wiper": "D3"}}, "not an analogue"},
+		{CircuitPart{Model: "sg90", Name: "s", Pins: map[string]string{"signal": "D14"}}, "no terminal \"D14\""},
 		{CircuitPart{Model: "sg90", Name: "s", Pins: map[string]string{"signal": "D9"}, Joint: 999}, "gone"},
 		{CircuitPart{Model: "led", Name: "l", Pins: map[string]string{"pin": "D9"}, Joint: j.ID}, "no shaft"},
 		{CircuitPart{Model: "warp-drive", Name: "w"}, "library"},
 	} {
-		c.Circuit.Parts = []CircuitPart{tc.part}
+		c.Circuit.Parts, c.Circuit.Wires = []CircuitPart{tc.part}, nil
 		d.Regenerate()
 		if !strings.Contains(c.Err, tc.want) {
 			t.Errorf("%s: error %q, want %q", tc.part.Model, c.Err, tc.want)
 		}
 	}
-	c.Circuit.Parts = []CircuitPart{
-		{Model: "sg90", Name: "a", Pins: map[string]string{"signal": "D9"}},
-		{Model: "led", Name: "b", Pins: map[string]string{"pin": "9"}},
-	}
+	// two board pins wired together: a warning, not an error
+	c.Circuit.Parts, c.Circuit.Wires = []CircuitPart{{Model: "sg90", Name: "a", Pins: map[string]string{"signal": "D9"}}}, nil
+	c.Circuit.Wires = append(c.Circuit.Wires, CircuitWire{A: "uno.D9", B: "uno.D10"})
 	d.Regenerate()
-	if !strings.Contains(c.Err, "both on D9") {
-		t.Errorf("two parts on a pin: %q", c.Err)
+	if c.Err != "" || !strings.Contains(c.Warn, "D10, D9 are wired together") {
+		t.Errorf("two pins wired together: err %q, warn %q", c.Err, c.Warn)
 	}
 	// a rigid joint can't be driven
 	j.Inputs["Type"] = "Rigid"
-	c.Circuit.Parts = []CircuitPart{{Model: "sg90", Name: "a", Pins: map[string]string{"signal": "D9"}, Joint: j.ID}}
+	c.Circuit.Parts, c.Circuit.Wires = []CircuitPart{{Model: "sg90", Name: "a", Pins: map[string]string{"signal": "D9"}, Joint: j.ID}}, nil
 	d.Regenerate()
 	if !strings.Contains(c.Err, "rigid") {
 		t.Errorf("rigid joint: %q", c.Err)

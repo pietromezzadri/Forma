@@ -33,6 +33,7 @@ uniform uint uHover;
 uniform vec4 uHoverColor;
 uniform int uOrtho;
 uniform int uSection;
+uniform vec3 uGlow;     // light given off (a lit LED), added past the shading
 #ifdef PICK
 uniform uint uIDBase;
 out uint oID;
@@ -55,7 +56,7 @@ void main() {
 	vec3 h = normalize(normalize(uKeyDir) + v);
 	float spec = pow(max(dot(n, h), 0.0), 48.0) * 0.18;
 	float rim = pow(1.0 - head, 3.0) * 0.12;
-	vec3 c = base * (amb + 0.48 * key + 0.30 * head) + vec3(spec + rim);
+	vec3 c = base * (amb + 0.48 * key + 0.30 * head) + vec3(spec + rim) + uGlow;
 	if (!gl_FrontFacing) {
 		if (uSection == 1) {
 			// the cut, seen through the section plane: hatched

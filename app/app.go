@@ -244,6 +244,7 @@ func (a *App) buildUI() {
 	a.explodeWindow()
 	a.simWindow()
 	a.elecWindow()
+	a.wiringWindow()
 	a.codeWindow()
 	a.files.draw()
 	a.paramsWindow()

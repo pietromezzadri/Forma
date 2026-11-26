@@ -1,0 +1,24 @@
+{
+  "width": 1600, "height": 900, "out": "out/m21",
+  "shots": [
+    {"name": "a_sheet", "frames": 8, "do": [
+      "file.open:captures/data/arm_and_wheel_wired.forma", "view.iso:now", "view.fit",
+      "electronics.open", "electronics.sheet:1", "wait:10", "log"
+    ]},
+    {"name": "b_running", "frames": 8, "do": [
+      "electronics.run", "wait:40", "move:term:uno.A0", "wait:6"
+    ]},
+    {"name": "c_drawing", "frames": 8, "do": [
+      "electronics.pause", "move:term:uno.D4", "down:l", "move:term:led.K@20", "wait:2"
+    ]},
+    {"name": "d_drawn", "frames": 8, "do": [
+      "up:l", "wait:6", "log"
+    ]},
+    {"name": "e_wokwi", "frames": 8, "do": [
+      "electronics.reset", "file.new", "electronics.wokwi:doc/testdata/wokwi_button", "wait:10", "log"
+    ]},
+    {"name": "f_wokwi_running", "frames": 8, "do": [
+      "electronics.run", "wait:20", "electronics.press:btn1=1", "wait:30", "move:term:servo1.SIG", "wait:4"
+    ]}
+  ]
+}

@@ -463,12 +463,16 @@ func (a *App) renderScene() {
 		if glow := a.ledGlow(b.F.ID); glow > 0 {
 			// an LED's lens lit by the running sketch (its flange and legs
 			// keep their colour)
-			red := mgl32.Vec4{1, 0.18, 0.1, col[3]}
-			lit := col.Mul(1 - float32(glow)).Add(red.Mul(float32(glow)))
+			g32 := float32(glow)
+			k := min(1, 1.4*g32) // the lens takes the colour sooner than the light
+			red := mgl32.Vec4{0.8, 0.015, 0.01, col[3]}
+			lit := col.Mul(1 - k).Add(red.Mul(k))
+			lit[3] = col[3]
+			emit := mgl32.Vec3{0.9, 0.08, 0.03}.Mul(g32) // its own light, not shaded
 			m := doc.PartModels["led"]
 			for _, fc := range b.Body.Faces() {
 				if m.LitFace(fc.Name) {
-					r.DrawFaceRange(v, g.faces, uint32(fc.ID), render.Paint{Offset: off, Color: lit, NoDepth: xray, CullBack: xray})
+					r.DrawFaceRange(v, g.faces, uint32(fc.ID), render.Paint{Offset: off, Color: lit, Glow: emit, NoDepth: xray, CullBack: xray})
 				}
 			}
 		}

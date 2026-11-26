@@ -1,0 +1,28 @@
+{
+  "width": 1600, "height": 900, "out": "out/m21_delete",
+  "shots": [
+    {"name": "a_menu", "frames": 8, "do": [
+      "electronics.wokwi:doc/testdata/wokwi_button", "wait:10",
+      "move:wire:servo1.SIG~uno.D9", "wait:3", "click:r", "wait:4"
+    ]},
+    {"name": "b_menu_deleted", "frames": 8, "do": [
+      "move:menu:delete wire@8", "wait:2", "click", "wait:6", "log"
+    ]},
+    {"name": "c_key_deleted", "frames": 8, "do": [
+      "move:wire:servo1.V+~uno.5V", "wait:3", "click", "wait:3", "key:delete", "wait:6"
+    ]},
+    {"name": "d_backspace_deleted", "frames": 8, "do": [
+      "move:wire:pot1.W~uno.A0", "wait:3", "click", "wait:3", "key:backspace", "wait:6"
+    ]},
+    {"name": "e_wires_list", "frames": 8, "do": [
+      "move:part:servo1", "click", "wait:3", "move:wires:servo1", "click", "wait:3",
+      "move:wireto:servo1.V+", "click", "wait:4"
+    ]},
+    {"name": "f_part_to_part", "frames": 8, "do": [
+      "move:wireto:servo1.V+>pot1.2@8", "click", "wait:8"
+    ]},
+    {"name": "g_sheet_drag", "frames": 8, "do": [
+      "move:term:pot1.W", "down:l", "move:term:servo1.SIG@20", "wait:2", "up:l", "wait:8", "move:term:servo1.SIG", "wait:4"
+    ]}
+  ]
+}
