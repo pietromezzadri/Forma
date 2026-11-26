@@ -396,8 +396,9 @@ new ones as features land.
   linked through the file (a save there is read back, an edit here
   written to it), not as an extension; a board other than the Uno isn't
   compiled for.
-- **EL8 Wiring is by name:** pins are picked per part, not drawn; no
-  wires, no breadboard view, no reading a Wokwi `diagram.json` or a KiCad
+- **EL8 Wiring is by name** (planned: M21 and M22, see
+  [WIRING.md](WIRING.md)): pins are picked per part, not drawn; no wires,
+  no breadboard view, no reading a Wokwi `diagram.json` or a KiCad
   netlist; one board per circuit and an Uno only. Parts connect only
   through the Uno: a button and an LED are tied together by the sketch
   (the Button and LED example), not by a wire between them.

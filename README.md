@@ -339,6 +339,17 @@ PNGs to `captures/out/`. The images above come from that script. See
   threads on drawings and hole callouts, washers and nuts, modelled
   threads (done). Left: finer pitches, inch sizes, lock nuts, a thread
   runout ([H1, FS1–FS4](docs/LIMITATIONS.md)).
+- **M21 circuit wiring** (planned, see [docs/WIRING.md](docs/WIRING.md)):
+  wires drawn from pin to pin in a wiring view, so parts connect to each other
+  and not only to the board (a button straight to an LED, a battery
+  through a switch), the simulation following the wires, checks for
+  floating inputs and shorts, and a Wokwi `diagram.json` read with its
+  wiring and firmware ([EL8](docs/LIMITATIONS.md)).
+- **M22 cables** (planned, see [docs/WIRING.md](docs/WIRING.md)): the
+  circuit's wires as cables in the assembly, from the pins of the parts'
+  3D models along a path you shape, as thick as their gauge and coloured as
+  the wire, checked for clashes and tight bends, following the parts as
+  they move, with cut lengths in the parts list and a wire list.
 
 ## Stack
 
