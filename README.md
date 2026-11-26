@@ -330,8 +330,8 @@ PNGs to `captures/out/`. The images above come from that script. See
   models that drive the assembly's joints over time (a code-driven motion
   study), and the parts as 3D components. Left: a car that drives on the
   floor (dynamics, wheel contact), loads from the mechanism back on the
-  motors, SPI / I2C parts, reading a Wokwi diagram. Circuit-level SPICE
-  simulation is left to KiCad / LTspice.
+  motors, SPI / I2C parts (Wokwi diagrams are read since M21).
+  Circuit-level SPICE simulation is left to KiCad / LTspice.
 - **M16 drawings** (done): sheets with orthographic and isometric views,
   hidden lines, sections, centre lines, dimensions that follow the model,
   and a title block, exported as PDF, SVG or DXF. Left: detail and broken
