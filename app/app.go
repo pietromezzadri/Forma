@@ -80,6 +80,8 @@ type App struct {
 	btnRects map[string]imgui.Vec2 // centres of named widgets (for capture scripts)
 	marked   map[string]bool       // names marked this frame (the first of a name wins)
 	quit     bool
+	askClose bool // the window was closed with unsaved changes: ask first
+	leave    bool // closing was confirmed (saved, or the changes let go)
 	last     time.Time
 }
 
@@ -151,7 +153,7 @@ func Run() error {
 		cap.app = a
 		imgui.CurrentIO().AddFocusEvent(true) // ImGui takes the script's events as from a focused window
 	}
-	for !win.ShouldClose() && !a.quit {
+	for !a.mayClose() {
 		if cap == nil {
 			glfw.PollEvents()
 		} else {
@@ -245,6 +247,7 @@ func (a *App) buildUI() {
 	a.simWindow()
 	a.elecWindow()
 	a.wiringWindow()
+	a.closeDialog()
 	a.codeWindow()
 	a.files.draw()
 	a.paramsWindow()
