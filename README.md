@@ -189,7 +189,7 @@ as PDF, SVG or DXF.</td>
   - STEP output is checked against OpenCASCADE in the tests.
 - **App.** A ribbon toolbar that fits any window (names, then icons only,
   then scrolling as it narrows), a Ctrl+K command palette, native file dialogs,
-  autosave, a question before closing with unsaved changes, and exact
+  autosave, a question before closing, New or Open loses unsaved changes, and exact
   picking from an ID buffer. Any body can be shown
   in X-ray: see-through, its edges dashed on top, and picked through.
 - **Dragging.** Arrows to resize features, a Resize · Move · Turn · Scale

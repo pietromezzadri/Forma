@@ -237,7 +237,16 @@ func (c *captureRun) do(act string) {
 		}
 		return
 	}
-	if err := a.cmds.Run(id, arg); err != nil {
+	// a script's commands go through without the unsaved-changes question;
+	// asked:<command>[:<arg>] runs one as the menu does, asking
+	asked := id == "asked"
+	if asked {
+		id, arg, _ = strings.Cut(arg, ":")
+	}
+	a.scripted = !asked
+	err := a.cmds.Run(id, arg)
+	a.scripted = false
+	if err != nil {
 		log.Printf("capture: %v", err)
 	}
 }

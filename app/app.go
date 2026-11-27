@@ -80,8 +80,10 @@ type App struct {
 	btnRects map[string]imgui.Vec2 // centres of named widgets (for capture scripts)
 	marked   map[string]bool       // names marked this frame (the first of a name wins)
 	quit     bool
-	askClose bool // the window was closed with unsaved changes: ask first
-	leave    bool // closing was confirmed (saved, or the changes let go)
+	unsaved  *unsavedAsk // closing, New or Open waiting on the unsaved-changes question
+	askNow   bool        // open that question this frame
+	scripted bool        // a capture script is running a command: nothing asks
+	leave    bool        // closing was confirmed (saved, or the changes let go)
 	last     time.Time
 }
 

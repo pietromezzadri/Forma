@@ -61,19 +61,23 @@ func (a *App) registerCommands() *Commands {
 	notSketch := func() bool { return a.sk == nil }
 
 	c.add(&Command{ID: "file.new", Label: "New design", Group: "File", Icon: ui.FaFile, Shortcut: "Ctrl+N", Run: func(string) {
-		a.doc.freeAll()
-		a.doc = NewDocument()
-		a.sk, a.sel, a.hover, a.browserSel = nil, nil, Ref{}, 0
-		a.cam = NewCamera()
-		a.updateTitle()
+		a.whenSaved("starting a new design", func() {
+			a.doc.freeAll()
+			a.doc = NewDocument()
+			a.sk, a.sel, a.hover, a.browserSel = nil, nil, Ref{}, 0
+			a.cam = NewCamera()
+			a.updateTitle()
+		})
 	}})
 	c.add(&Command{ID: "file.open", Label: "Open…", Group: "File", Icon: ui.FaFolder, Shortcut: "Ctrl+O",
 		Run: func(arg string) {
-			if arg != "" {
-				a.openFile(arg)
-				return
-			}
-			a.pickFile(false, "Open design", "Open", startIn(a.doc.Path, ""), designFilter, a.openFile)
+			a.whenSaved("opening another design", func() {
+				if arg != "" {
+					a.openFile(arg)
+					return
+				}
+				a.pickFile(false, "Open design", "Open", startIn(a.doc.Path, ""), designFilter, a.openFile)
+			})
 		}})
 	c.add(&Command{ID: "file.save", Label: "Save", Group: "File", Icon: ui.FaFloppy, Shortcut: "Ctrl+S",
 		Run: func(arg string) {
@@ -88,7 +92,7 @@ func (a *App) registerCommands() *Commands {
 			a.pickFile(true, "Save design as", "Save", startIn(a.doc.Path, "design.forma"), designFilter, a.saveFile)
 		}})
 	c.add(&Command{ID: "file.recover", Label: "Recover autosave", Group: "File",
-		Enabled: func() bool { return autosaveExists() }, Run: func(string) { a.openFile(autosavePath()) }})
+		Enabled: func() bool { return autosaveExists() }, Run: func(string) { a.whenSaved("recovering the autosave", func() { a.openFile(autosavePath()) }) }})
 	c.add(&Command{ID: "file.quit", Label: "Quit", Group: "File", Run: func(string) { a.quit = true }})
 
 	c.add(&Command{ID: "edit.undo", Label: "Undo", Group: "Edit", Shortcut: "Ctrl+Z", Icon: 0xf0e2,

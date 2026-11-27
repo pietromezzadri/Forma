@@ -1100,4 +1100,6 @@ What each milestone added, in the order they were built. The current gaps are in
   had gone to its resistor, so it never lit; `fixModels` repairs such
   files); a lit LED gives off its own light (`render.Paint.Glow`) on a
   curve the eye reads (`ledLook`); closing the window or Quit with unsaved
-  changes asks to Save, Don't save or Cancel (`app/close_dialog.go`).
+  changes asks to Save, Don't save or Cancel (`app/close_dialog.go`), and
+  so do New design, Open and Recover autosave (`whenSaved`; a capture
+  script's commands go straight through, `asked:<command>` asks).
